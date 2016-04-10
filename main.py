@@ -4,6 +4,7 @@ from typing import Mapping, List
 from flask import Flask, request, make_response
 from flask_restful import Resource, Api
 
+import datastore
 from datastore import ActivityDatastore
 
 
@@ -11,7 +12,7 @@ app = Flask("actwa-server")
 api = Api(app)
 
 
-activitydb = ActivityDatastore("mongodb")
+activitydb = ActivityDatastore(datastore.MONGODB)
 
 class ActivityResource(Resource):
     def get(self, activity_type):

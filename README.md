@@ -3,8 +3,19 @@ actwa-server
 
 Server for storage of all your QS data.
 
+
 ## Examples
 
 Some simple examples, they assume you have the server running on the default port on localhost.
 
-    curl http://localhost:5000/api/0/activity/test -d 'data={"label": ["test-activity"], note: "Just a test"}' -X PUT -v
+
+Get all data for a given activity type:
+
+    curl http://localhost:5000/api/0/activity/test -X GET -v
+
+
+Store an event: 
+
+    curl http://localhost:5000/api/0/activity/test -d '{"label": ["test-activity"], note: "Just a test"}' -H "Content-Type: application/json" -X POST -v
+
+

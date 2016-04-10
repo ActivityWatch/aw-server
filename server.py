@@ -10,9 +10,15 @@ import datastore
 from datastore import ActivityDatastore
 
 
-app = Flask("actwa-server")
+app = Flask("actwa-server", static_folder='site')
 api = Api(app)
 logger = logging.getLogger("actwa-server")
+
+
+@app.route("/")
+def index():
+    return app.send_static_file('index.html')
+
 
 
 activitydb = ActivityDatastore(datastore.MONGODB)

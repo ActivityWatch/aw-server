@@ -3,6 +3,16 @@ actwa-server
 
 Server for storage of all your QS data.
 
+## Install
+
+Install dependencies:
+
+    sudo pip3 install -r requirements.txt
+
+Run module:
+
+    python3 .
+
 
 ## Examples
 

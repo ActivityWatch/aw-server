@@ -1,3 +1,3 @@
-import server
+import actwa.server
 
-server.main()
+actwa.server.main()

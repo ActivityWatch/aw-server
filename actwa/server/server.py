@@ -6,8 +6,8 @@ from datetime import datetime
 from flask import Flask, request, make_response
 from flask_restful import Resource, Api
 
-import datastore
-from datastore import ActivityDatastore
+from . import datastore
+from .datastore import ActivityDatastore
 
 
 app = Flask("actwa-server", static_folder='site')

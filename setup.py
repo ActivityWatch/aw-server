@@ -10,5 +10,8 @@ setup(name='actwa-server',
       url='https://github.com/ActivityWatch/actwa-server',
       namespace_packages=['actwa'],
       packages=['actwa.server'],
-      install_requires=['actwa-client']
+      install_requires=['actwa-client'],
+      entry_points={
+            'console_scripts': ['actwa-server = actwa.server:main']
+        }
      )

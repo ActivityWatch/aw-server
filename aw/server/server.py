@@ -15,6 +15,14 @@ api = Api(app)
 logger = logging.getLogger("actwa-server")
 
 
+
+"""
+Enables event-watching, for desktop notifications.
+Events should later be dispatchable/subscribable with websockets.
+"""
+
+
+
 @app.route("/")
 def index():
     return app.send_static_file('index.html')

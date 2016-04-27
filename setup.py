@@ -2,16 +2,16 @@
 
 from setuptools import setup, find_packages
 
-setup(name='actwa-server',
+setup(name='aw-server',
       version='0.1',
       description='ActivityWatch server',
       author='Erik Bjäreholt',
       author_email='erik@bjareho.lt',
-      url='https://github.com/ActivityWatch/actwa-server',
-      namespace_packages=['actwa'],
-      packages=['actwa.server'],
-      install_requires=['actwa-client'],
+      url='https://github.com/ActivityWatch/aw-server',
+      namespace_packages=['aw'],
+      packages=['aw.server'],
+      install_requires=['aw-client'],
       entry_points={
-            'console_scripts': ['actwa-server = actwa.server:main']
+            'console_scripts': ['aw-server = aw.server:main']
         }
      )

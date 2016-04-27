@@ -5,31 +5,49 @@ from datetime import datetime
 
 from flask import Flask, request, make_response
 from flask_restful import Resource, Api
+from flask.ext.cors import CORS
 
 from . import datastore
 from .datastore import ActivityDatastore
 
 
-app = Flask("actwa-server", static_folder='site')
+app = Flask("aw-server")
+CORS(app) # See: https://flask-cors.readthedocs.org/en/latest/
 api = Api(app)
-logger = logging.getLogger("actwa-server")
+logger = logging.getLogger("aw-server")
 
 
 
-"""
-Enables event-watching, for desktop notifications.
-Events should later be dispatchable/subscribable with websockets.
-"""
+class ClientManager:
+    def __init__(self):
+        self._clients = {}
 
+    def add_client(self, client_name, hostname=None, key=None):
+        self._clients[client_name] = {
+            "hostname": hostname,
+            "key": key
+        }
 
+    def get_client(self, client_name):
+        return self._clients[client_name]
 
-@app.route("/")
-def index():
-    return app.send_static_file('index.html')
-
-
+    @property
+    def clients(self):
+        return self._clients
+client_manager = ClientManager()
 
 activitydb = ActivityDatastore(datastore.MONGODB)
+
+
+class ClientsResource(Resource):
+    def get(self):
+        return client_manager.clients
+
+    def post(self):
+        print(request.get_json())
+        pass
+
+
 
 # TODO: Might be renamed to EventResource
 class ActivityResource(Resource):
@@ -77,10 +95,20 @@ class HeartbeatResource(Resource):
         return "success", 200
 
 
+api.add_resource(ClientsResource, "/api/0/clients")
 api.add_resource(ActivityResource, "/api/0/activity/<string:activity_type>")
 api.add_resource(HeartbeatResource, "/api/0/heartbeat/<string:client_name>")
 
 def main():
     """Called from __main__.py"""
-    app.run(debug=True)
+    import sys
+
+    if "--test" in sys.argv:
+        debug = True
+        port = 5666
+    else:
+        debug = False
+        port = 5600
+
+    app.run(debug=debug, port=port)
 

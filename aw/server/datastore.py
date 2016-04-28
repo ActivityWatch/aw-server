@@ -1,11 +1,14 @@
 import json
 from datetime import datetime
 from typing import Mapping, List, Union
+import logging
+
+logger = logging.getLogger("aw.server.datastore")
 
 try:
     import pymongo
 except ImportError:
-    print("Could not import pymongo, not available as a datastore backend")
+    logger.warning("Could not import pymongo, not available as a datastore backend")
 
 
 class Activity(dict):
@@ -19,7 +22,7 @@ MONGODB = "mongodb"
 _activitydb = {}  # type: Mapping[str, List[Activity]]
 
 class ActivityDatastore:
-    def __init__(self, storage_method=MEMORY):
+    def __init__(self, storage_method=MEMORY, testing=False):
         if storage_method in [MEMORY, MONGODB]:
             pass
         else:
@@ -29,7 +32,7 @@ class ActivityDatastore:
 
         if self.storage_method == MONGODB:
             self.client = pymongo.MongoClient()
-            self.db = self.client["actwa_server"]
+            self.db = self.client["activitywatch" if not testing else "activitywatch_testing"]
             self.activities = self.db.activities
 
     def insert(self, activity_type: str, one_or_more_activities: Union[list, dict]):

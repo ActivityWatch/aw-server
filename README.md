@@ -1,17 +1,18 @@
-actwa-server
+aw-server
 ============
 
-Server for storage of all your QS data.
+ActivityWatch Server, for secure storage and retrieval of all your QS data. (security is in progress)
+
 
 ## Install
 
 Install dependencies:
 
-    sudo pip3 install -r requirements.txt
+    sudo python3 setup.py install 
 
-Run module:
+Run aw-server:
 
-    python3 .
+    aw-server
 
 
 ## Examples

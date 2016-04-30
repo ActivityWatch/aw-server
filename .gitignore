@@ -2,3 +2,5 @@
 __pycache__
 *.swp
 *.egg-info
+build
+dist

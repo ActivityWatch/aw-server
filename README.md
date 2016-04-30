@@ -30,3 +30,13 @@ Store an event:
     curl http://localhost:5000/api/0/activity/test -d '{"label": ["test-activity"], note: "Just a test"}' -H "Content-Type: application/json" -X POST -v
 
 
+## Event-hierarchy
+
+ - **Event**
+   Has at least a start-time
+    - **Activity**
+      Has both a start-time and end-time
+        - Input (ex: afk or not, keypresses, mouse-move deltas)
+        - Window (top-level tabs)
+        - Tabs
+    - More to come

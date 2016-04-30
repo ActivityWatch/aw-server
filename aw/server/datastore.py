@@ -1,7 +1,8 @@
-import json
-from datetime import datetime
-from typing import Mapping, List, Union
 import logging
+from datetime import datetime
+from typing import Mapping, List, Union, Sequence
+
+from aw.core.models import Event
 
 logger = logging.getLogger("aw.server.datastore")
 
@@ -19,46 +20,45 @@ MEMORY = "memory"
 MONGODB = "mongodb"
 
 # For storage of data in-memory, useful in testing
-_activitydb = {}  # type: Mapping[str, List[Activity]]
+_memorydb = {}  # type: Mapping[str, Mapping[str, List[Event]]]
 
-class ActivityDatastore:
+
+class Datastore:
     def __init__(self, storage_method=MEMORY, testing=False):
-        if storage_method in [MEMORY, MONGODB]:
-            pass
-        else:
+        if storage_method not in [MEMORY, MONGODB]:
             raise Exception("Invalid storage method")
 
         self.storage_method = storage_method
 
         if self.storage_method == MONGODB:
-            self.client = pymongo.MongoClient()
-            self.db = self.client["activitywatch" if not testing else "activitywatch_testing"]
-            self.activities = self.db.activities
+            client = pymongo.MongoClient()
+            db = client["activitywatch" if not testing else "activitywatch_testing"]
+            self.activities = db.activities
 
-    def insert(self, activity_type: str, one_or_more_activities: Union[list, dict]):
-        if isinstance(one_or_more_activities, list):
-            self._insert_many(activity_type, one_or_more_activities)
-        elif isinstance(one_or_more_activities, dict):
-            self._insert_one(activity_type, one_or_more_activities)
+    def insert(self, event_type: str, events: Union[Event, Sequence[Event]]):
+        if isinstance(events, Event):
+            self._insert_one(event_type, events)
+        elif isinstance(events, Sequence):
+            self._insert_many(event_type, events)
 
-    def _insert_one(self, activity_type: str, activity: dict):
-        activity["type"] = activity_type
-        activity["stored_at"] = datetime.now().isoformat()
+    def _insert_one(self, event_type: str, event: Event):
+        event["type"] = event_type
+        event["stored_at"] = datetime.now().isoformat()
         if self.storage_method == MEMORY:
-            if activity_type not in _activitydb:
-                _activitydb[activity_type] = []
-            _activitydb[activity_type].append(activity)
+            if event_type not in _memorydb:
+                _memorydb[event_type] = []
+            _memorydb[event_type].append(event)
         elif self.storage_method == MONGODB:
-            self.activities.insert_one(activity)
+            self.activities.insert_one(event)
 
-    def _insert_many(self, activity_type: str, activities: dict):
-        for activity in activities:
-            self._insert_one(activity_type, activity)
+    def _insert_many(self, event_type: str, events: Sequence[Event]):
+        for activity in events:
+            self._insert_one(event_type, activity)
 
-    def get(self, activity_type: str):
+    def get(self, event_type: str):
         if self.storage_method == MEMORY:
-            return _activitydb[activity_type] if activity_type in _activitydb else []
+            return _memorydb[event_type] if event_type in _memorydb else []
         elif self.storage_method == MONGODB:
-            return list(self.activities.find({"type": activity_type}, {"_id": 0}))
+            return list(self.activities.find({"type": event_type}, {"_id": 0}))
 
 

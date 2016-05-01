@@ -1,7 +1,7 @@
 aw-server
 ============
 
-ActivityWatch server, for secure storage and retrieval of all your QS data.
+ActivityWatch server, for secure storage and retrieval of all your Quantified Self data and more.
 
 **NOTE:** Work in progress, contributions and feedback warmly welcome!
 

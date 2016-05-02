@@ -5,6 +5,7 @@ ActivityWatch server, for secure storage and retrieval of all your Quantified Se
 
 **NOTE:** Work in progress, contributions and feedback warmly welcome!
 
+
 ## About
 
 ActivityWatch is a set of applications that act as a system. This application, the ActivityWatch server, could be considered the primary piece of software with which all others interact.
@@ -12,8 +13,17 @@ ActivityWatch is a set of applications that act as a system. This application, t
 What the system does is handle collection and retreival of all kinds of logging data (relating to your life, your computer or any type of record). aw-server is the safe repository where you store your data, it is not a place for modification (providing data integrity), once a record is created, it is intended to be immutable.
 
 
-### Security
+### Reason for existence
 
+There are plenty of companies offering services which do collection of Quantified Self data with goals ranging from increasing personal producivity to understanding the people that managers manage (organizational productivity). However, all known services suffer from a significant disadvantage, the users data is in the hands of the service providers hands which leads to the problem of trust. Every customer of these companies have their data in untrusted hands. This is a significant problem, but the true reason that we decided to do something about it was that existing solutions were inadequate. They focused on short-term insight, a goal worthy in itself, but we also want long-term understanding. Making the software completely free and open source so anyone can {use, audit, improve, extend} it seemed like the only reasonable alternative.
+
+
+### Data philosophy
+
+Raw data is the best data when it comes to Quantified Self, you want to be able to access all the data in it's entirety, and then do your assumptions based on said raw data (using a single datasource such as keyboard and mouse input is only a heuristic for if the user is AFK or not). This is not what is done today by existing services, they store summarized data, simplifications of the data gathered since the raw data isn't needed for what they are trying to do right now. But we can't predict what we would like to know in the future, and it is therefore of importance that we get the raw data now, before it disappears into the aether.
+
+
+### Security
 
 One of the reasons this project was started was due to the fact that I was missing security in how my Quantified Self data was stored. Data needs to be collected on many devices, and be stored at a central and secure location. Since we want to be able to provide a safe storage service for initial users who do not have the time to run a server of their own, we will provide a feature such that we will only have the users encrypted data, without information of the contents (with exception for some relatively unimportant metadata such as allocated storage space, sessions, clients, and number of entries).
 

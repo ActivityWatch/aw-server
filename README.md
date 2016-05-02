@@ -8,7 +8,7 @@ ActivityWatch server, for secure storage and retrieval of all your Quantified Se
 
 ## About
 
-ActivityWatch is a set of applications that act as a system. This application, the ActivityWatch server, could be considered the primary piece of software with which all others interact.
+[ActivityWatch](https://github.com/ActivityWatch/) is a set of applications that act as a system. This application, the ActivityWatch server (aw-server for short), could be considered the primary piece of software with which all others interact.
 
 What the system does is handle collection and retreival of all kinds of logging data (relating to your life, your computer or any type of record). aw-server is the safe repository where you store your data, it is not a place for modification (providing data integrity), once a record is created, it is intended to be immutable.
 
@@ -64,10 +64,8 @@ curl http://localhost:5600/api/0/activity/test -d '{"label": ["test-activity"], 
 
 ## Event-hierarchy
 
- - **Event**
-   Has at least a start-time
-    - **Activity**
-      Has both a start-time and end-time
+ - **Event**, has at least one timestamp (usually time of event, but could also be a series timestamps where the event was otherwise identical)
+    - **Activity**, has exactly two timestamps (start time, end time) which imply a duration/timeinterval
         - Input (ex: afk or not, keypresses, mouse-move deltas)
         - Window (top-level tabs)
         - Tabs

@@ -38,10 +38,25 @@ Install program and dependencies:
 sudo python3 setup.py install 
 ```
 
+The `aw-server` binary should now be available to you in your PATH (if it is set correctly).
+
+
+## Usage
+
 Run aw-server:
 
 ```bash
 aw-server
+```
+
+## Development
+
+If you want to run aw-server in development, you probably want to run a 
+development instance beside your personal (stable) instance. You can do 
+this by giving aw-server the `--testing` flag.
+
+```bash
+aw-server --testing
 ```
 
 

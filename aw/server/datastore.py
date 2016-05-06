@@ -17,6 +17,7 @@ class Activity(dict):
 
 
 MEMORY = "memory"
+FILES = "files"
 MONGODB = "mongodb"
 
 # For storage of data in-memory, useful in testing
@@ -26,7 +27,7 @@ _memorydb = {}  # type: Mapping[str, Mapping[str, List[Event]]]
 class Datastore:
     def __init__(self, storage_method=MEMORY, testing=False):
         if storage_method not in [MEMORY, MONGODB]:
-            raise Exception("Invalid storage method")
+            raise Exception("Unsupported storage medium: {}".format(storage_method))
 
         self.storage_method = storage_method
 

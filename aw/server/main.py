@@ -12,10 +12,9 @@ def main():
     parser.add_argument('--testing', dest='testing', action='store_const',
                         const=True, default=False,
                         help='Run aw-server in testing mode using different ports and database')
-    # TODO: Fix this argument to be more broadly generalized to any supported storage medium
-    #       instead of a binary option, but should not be highly prioritized
-    parser.add_argument('--store-in-files', dest='storage_method', action='store_const',
-                        const=datastore.FILES, default=datastore.MONGODB,
+    parser.add_argument('--storage', dest='storage',
+                        choices=[datastore.MONGODB, datastore.MEMORY, datastore.FILES],
+                        default=datastore.MONGODB,
                         help='Uses files as storage method (not supported yet)')
 
     args = parser.parse_args()
@@ -34,5 +33,5 @@ def main():
         port = 5600
 
     logger.info("Staring up...")
-    _start(port=port, testing=testing, storage_method=args.storage_method)
+    _start(port=port, testing=testing, storage_method=args.storage)
 

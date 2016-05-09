@@ -31,12 +31,19 @@ class Datastore:
         self.storage_method = storage_method
 
         if self.storage_method == MONGODB:
-            client = pymongo.MongoClient()
+            if 'pymongo' not in vars() and 'pymongo' not in globals():
+                logger.error("Cannot use the mongodb backend without pymongo installed")
+                exit(1)
+            try:
+                client = pymongo.MongoClient(serverSelectionTimeoutMS=5000)
+                self.client.server_info() # Try to connect to the server to make sure that it's available
+            except pymongo.errors.ServerSelectionTimeoutError:
+            	logger.error("Couldn't connect to mongodb")
+            	exit(1)
             db = client["activitywatch" if not testing else "activitywatch_testing"]
             self.activities = db.activities
         elif self.storage_method == MEMORY:
             self.logger.warning("Using in-memory storage, any events stored will not be persistent and will be lost when server is shut down. Use the --storage parameter to set a different storage method.")
-
 
     def insert(self, event_type: str, events: Union[Event, Sequence[Event]]):
         if isinstance(events, Event):
@@ -46,7 +53,7 @@ class Datastore:
 
     def _insert_one(self, event_type: str, event: Event):
         event["type"] = event_type
-        event["stored_at"] = datetime.now().isoformat()
+        event["stored_at"] = datetime.now()
         if self.storage_method == MEMORY:
             if event_type not in _memorydb:
                 _memorydb[event_type] = []

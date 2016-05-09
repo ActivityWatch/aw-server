@@ -31,7 +31,15 @@ class ActivityDatastore:
         self.storage_method = storage_method
 
         if self.storage_method == MONGODB:
-            self.client = pymongo.MongoClient()
+            if 'pymongo' not in vars() and 'pymongo' not in globals():
+                logger.error("Cannot use the mongodb backend without pymongo installed")
+                exit(1)
+            try:
+                self.client = pymongo.MongoClient(serverSelectionTimeoutMS=5000)
+                self.client.server_info() # Try to connect to the server to make sure that it's available
+            except pymongo.errors.ServerSelectionTimeoutError:
+            	logger.error("Couldn't connect to mongodb")
+            	exit(1)
             self.db = self.client["activitywatch" if not testing else "activitywatch_testing"]
             self.activities = self.db.activities
 

@@ -10,7 +10,7 @@ setup(name='aw-server',
       url='https://github.com/ActivityWatch/aw-server',
       namespace_packages=['aw'],
       packages=['aw.server'],
-      install_requires=['aw-core', 'flask', 'flask_restful', 'flask-cors'],
+      install_requires=['aw-core', 'Flask', 'Flask-RESTful', 'Flask-Cors', 'pymongo'],
       entry_points={
             'console_scripts': ['aw-server = aw.server:main']
         }

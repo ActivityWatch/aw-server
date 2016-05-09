@@ -12,9 +12,6 @@ except ImportError:
     logger.warning("Could not import pymongo, not available as a datastore backend")
 
 
-class Activity(dict):
-    pass
-
 
 MEMORY = "memory"
 FILES = "files"
@@ -26,6 +23,8 @@ _memorydb = {}  # type: Mapping[str, Mapping[str, List[Event]]]
 
 class Datastore:
     def __init__(self, storage_method=MEMORY, testing=False):
+        self.logger = logging.getLogger("datastore")
+
         if storage_method not in [MEMORY, MONGODB]:
             raise Exception("Unsupported storage medium: {}".format(storage_method))
 
@@ -35,6 +34,9 @@ class Datastore:
             client = pymongo.MongoClient()
             db = client["activitywatch" if not testing else "activitywatch_testing"]
             self.activities = db.activities
+        elif self.storage_method == MEMORY:
+            self.logger.warning("Using in-memory storage, any events stored will not be persistent and will be lost when server is shut down. Use the --storage parameter to set a different storage method.")
+
 
     def insert(self, event_type: str, events: Union[Event, Sequence[Event]]):
         if isinstance(events, Event):

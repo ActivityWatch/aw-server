@@ -9,8 +9,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Starts an ActivityWatch server')
-    parser.add_argument('--testing', dest='testing', action='store_const',
-                        const=True, default=False,
+    parser.add_argument('--testing', action='store_true',
                         help='Run aw-server in testing mode using different ports and database')
     # TODO: Implement datastore.FILES storage method and use it so that there is a storage method
     #       with persistence that does not have any dependencies on external software (such as MongoDB)

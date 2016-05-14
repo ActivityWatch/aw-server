@@ -1,12 +1,12 @@
 [Unit]
 Description=ActivityWatch
 Documentation=
+After=mongodb.service
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/aw-server
 Restart=always
-After=mongodb.service
 
 [Install]
 WantedBy=default.target

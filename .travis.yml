@@ -7,8 +7,9 @@ python:
  - "nightly" # currently points to 3.6-dev
 
 install:
- - "pip install git+https://github.com/ActivityWatch/aw-core.git"
- - "python3 setup.py install"
+# The `-e` and `develop` hack is due to weirdness in namespace packages
+ - "pip install -e git+https://github.com/ActivityWatch/aw-core.git#egg=aw-core"
+ - "python3 setup.py develop"
 
 script:
  - "python3 -c 'import aw.core'"

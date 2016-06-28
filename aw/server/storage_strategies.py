@@ -3,6 +3,8 @@ import os
 import logging
 from typing import Mapping, List, Union, Sequence
 
+import appdirs
+
 from aw.core.models import Event
 
 try:
@@ -99,7 +101,10 @@ class FileStorageStrategy(StorageStrategy):
         self.logger = logging.getLogger("datastore-files")
 
     def get_filename(self, bucket: str):
-        return "data/{bucket}.json".format(bucket=bucket)
+        directory = appdirs.user_data_dir("aw-server", "activitywatch")
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        return "{directory}/{bucket}.json".format(directory=directory, bucket=bucket)
 
     def get(self, bucket: str):
         filename = self.get_filename(bucket)

@@ -86,13 +86,13 @@ class ActivityResource(Resource):
 
     def get(self, session_id):
         logger.debug("Received get request for activity type {}".format(session_id))
-        return app.db.get(session_id)
+        return app.db[session_id].get()
 
     def post(self, session_id):
         logger.debug("Received post request for activity type and data: {}, {}".format(session_id, request.get_json()))
         activity = request.get_json()
-        app.db.insert(session_id, activity)
-        return app.db.get(session_id), 200
+        app.db[session_id].insert(activity)
+        return app.db[session_id].get(), 200
 
 
 heartbeats = {}   # type: Dict[str, datetime]

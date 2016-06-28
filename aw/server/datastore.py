@@ -1,74 +1,44 @@
 import logging
 from datetime import datetime
 from typing import Mapping, List, Union, Sequence
+import json
 
 from aw.core.models import Event
 
+from .storage_strategies import *
+
 logger = logging.getLogger("aw.server.datastore")
 
-try:
-    import pymongo
-except ImportError:
-    logger.warning("Could not import pymongo, not available as a datastore backend")
 
-
-
-MEMORY = "memory"
-FILES = "files"
-MONGODB = "mongodb"
-
-# For storage of data in-memory, useful in testing
-_memorydb = {}  # type: Mapping[str, Mapping[str, List[Event]]]
-
+MEMORY = MemoryStorageStrategy
+FILES = FileStorageStrategy
+MONGODB = MongoDBStorageStrategy
 
 class Datastore:
-    def __init__(self, storage_method=MEMORY, testing=False):
+    def __init__(self, storage_strategy: StorageStrategy = MEMORY, testing=False):
         self.logger = logging.getLogger("datastore")
 
-        if storage_method not in [MEMORY, MONGODB]:
+        if storage_strategy not in [MEMORY, MONGODB, FILES]:
             raise Exception("Unsupported storage medium: {}".format(storage_method))
 
-        self.storage_method = storage_method
+        self.storage_strategy = storage_strategy()
 
-        if self.storage_method == MONGODB:
-            if 'pymongo' not in vars() and 'pymongo' not in globals():
-                logger.error("Cannot use the mongodb backend without pymongo installed")
-                exit(1)
-            try:
-                client = pymongo.MongoClient(serverSelectionTimeoutMS=5000)
-                self.client.server_info() # Try to connect to the server to make sure that it's available
-            except pymongo.errors.ServerSelectionTimeoutError:
-            	logger.error("Couldn't connect to mongodb")
-            	exit(1)
-            db = client["activitywatch" if not testing else "activitywatch_testing"]
-            self.activities = db.activities
-        elif self.storage_method == MEMORY:
-            self.logger.warning("Using in-memory storage, any events stored will not be persistent and will be lost when server is shut down. Use the --storage parameter to set a different storage method.")
+    def __getitem__(self, bucket_id: str):
+        return Bucket(self, bucket_id)
 
-    def insert(self, event_type: str, events: Union[Event, Sequence[Event]]):
-        if isinstance(events, Event):
-            self._insert_one(event_type, events)
-        elif isinstance(events, Sequence):
-            self._insert_many(event_type, events)
+class Bucket:
+    def __init__(self, datastore: Datastore, bucket_id: str):
+        self.ds = datastore
+        self.bucket_id = bucket_id
 
-    def _insert_one(self, event_type: str, event: Event):
-        event["type"] = event_type
-        event["stored_at"] = datetime.now()
-        if self.storage_method == MEMORY:
-            if event_type not in _memorydb:
-                _memorydb[event_type] = []
-            _memorydb[event_type].append(event)
-        elif self.storage_method == MONGODB:
-            self.activities.insert_one(event)
+    def get(self):
+        return self.ds.storage_strategy.get(self.bucket_id)
 
-    def _insert_many(self, event_type: str, events: Sequence[Event]):
-        for activity in events:
-            self._insert_one(event_type, activity)
+    def insert(self, events: Union[Event, Sequence[Event]]):
+        return self.ds.storage_strategy.insert(self.bucket_id, events)
 
-    def get(self, event_type: str):
-        if self.storage_method == MEMORY:
-            return _memorydb[event_type] if event_type in _memorydb else []
-        elif self.storage_method == MONGODB:
-            return list(self.activities.find({"type": event_type}, {"_id": 0}))
+    def insert_one(self, event: Event):
+        return self.ds.storage_strategy.insert_one(self.bucket_id, event)
 
-
+    def insert_many(self, events: Sequence[Event]):
+        return self.ds.storage_strategy.insert_many(self.bucket_id, events)

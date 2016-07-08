@@ -1,3 +1,3 @@
-import aw.server
+import aw_server
 
-aw.server.main()
+aw_server.main()

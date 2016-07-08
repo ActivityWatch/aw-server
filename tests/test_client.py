@@ -2,11 +2,11 @@ import logging
 import unittest
 from datetime import datetime
 
-from aw.client import ActivityWatchClient
-from aw.core.models import Event
+from aw_client import ActivityWatchClient
+from aw_core.models import Event
 
-from aw.server import datastore
-from aw.server.datastore import Datastore
+from aw_server import datastore
+from aw_server.datastore import Datastore
 
 logging.basicConfig(level=logging.DEBUG)
 

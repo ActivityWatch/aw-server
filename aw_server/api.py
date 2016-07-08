@@ -10,7 +10,7 @@ from . import app, logger
 
 
 # SECURITY
-# As we work our way through features, disable (while this is False, only accept connections from localhost)
+# As we work our way through features, disable (while this is False, we should only accept connections from localhost)
 SECURITY_ENABLED = False
 
 # For the planned zeroknowledge storage feature
@@ -19,7 +19,7 @@ ZEROKNOWLEDGE_ENABLED = False
 
 api = Api(app)
 
-
+# FIXME: This should probably be scrapped, just something I threw together trying to reason about stuff
 class SessionManager:
     # TODO: Don't rely on in-memory session storage
     def __init__(self):
@@ -58,7 +58,7 @@ session_manager = SessionManager()
 # Use the following for authentication using user roles:
 #   http://flask.pocoo.org/snippets/98/
 
-@api.resource("/api/0/session/start/<string:session_id>")
+@api.resource("/api/0/session/<string:session_id>/start")
 class StartSessionResource(Resource):
     def post(self, session_id):
         data = request.get_json()
@@ -66,23 +66,56 @@ class StartSessionResource(Resource):
         return {"session_key": session_key}
 
 
-@api.resource("/api/0/session/stop/<string:session_id>")
+@api.resource("/api/0/session/<string:session_id>/stop")
 class StopSessionResource(Resource):
     def post(self, session_id):
         data = request.get_json()
         pass
 
 
-# TODO: Might be renamed to EventResource
+@api.resource("/api/0/buckets/<string:bucket_id>")
+class BucketResource(Resource):
+    """
+    Used to get metadata about buckets and create them.
+    """
+
+    # FIXME: Currently just gets events and not bucket data
+
+    def get(self, bucket_id):
+        logger.debug("Received get request for bucket '{}'".format(bucket_id))
+        return app.db[bucket_id].get()
+
+    def post(self, bucket_id):
+        logger.debug("Received post request for bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+        activity = request.get_json()
+        app.db[bucket_id].insert(activity)
+        return app.db[bucket_id].get(), 200
+
+
+@api.resource("/api/0/buckets/<string:bucket_id>/events")
+class EventResource(Resource):
+    """
+    Used to get and create events in a particular bucket.
+    """
+
+    def get(self, bucket_id):
+        logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
+        return app.db[bucket_id].get()
+
+    def post(self, bucket_id):
+        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+        activity = request.get_json()
+        app.db[bucket_id].insert(activity)
+        return app.db[bucket_id].get(), 200
+
+
+# DEPRECATED
+# Will be replaced with BucketResource and EventResource
 @api.resource("/api/0/activity/<string:session_id>")
 class ActivityResource(Resource):
     """
     Can be used to store and access activity/event objects with a given type.
     """
-
-    # TODO: Set up so that access is done for a given client, not a given activity_type.
-    #       By doing this we can also enforce authentication on a client-basis such that a
-    #       malicious client cannot access any data other than what it has the rights to.
 
     def get(self, session_id):
         logger.debug("Received get request for activity type {}".format(session_id))
@@ -98,13 +131,13 @@ class ActivityResource(Resource):
 heartbeats = {}   # type: Dict[str, datetime]
 
 
-# TODO: Might be renamed to WatchdogResource
 @api.resource("/api/0/heartbeat/<string:session_id>")
 class HeartbeatResource(Resource):
     """
     WIP!
 
-    Used to give clients the ability to signal that they are alive.
+    Used to give clients the ability to signal on regular intervals something particular which can then be post-processed into events.
+    The endpoint could compress a list of events which only differ by their timestamps into a event with a list of the timestamps.
 
     Should store the last time time the client checked in.
     """

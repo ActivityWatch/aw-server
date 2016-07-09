@@ -104,9 +104,16 @@ class EventResource(Resource):
 
     def post(self, bucket_id):
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
-        activity = request.get_json()
-        app.db[bucket_id].insert(activity)
-        return app.db[bucket_id].get(), 200
+        data = request.get_json()
+        if isinstance(data, dict):
+            app.db[bucket_id].insert(data)
+        elif isinstance(data, list):
+            for event in data:
+                app.db[bucket_id].insert(event)
+        else:
+            logger.error("Invalid JSON object")
+            return {}, 500
+        return {}, 200
 
 
 heartbeats = {}   # type: Dict[str, datetime]

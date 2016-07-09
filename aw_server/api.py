@@ -109,25 +109,6 @@ class EventResource(Resource):
         return app.db[bucket_id].get(), 200
 
 
-# DEPRECATED
-# Will be replaced with BucketResource and EventResource
-@api.resource("/api/0/activity/<string:session_id>")
-class ActivityResource(Resource):
-    """
-    Can be used to store and access activity/event objects with a given type.
-    """
-
-    def get(self, session_id):
-        logger.debug("Received get request for activity type {}".format(session_id))
-        return app.db[session_id].get()
-
-    def post(self, session_id):
-        logger.debug("Received post request for activity type and data: {}, {}".format(session_id, request.get_json()))
-        activity = request.get_json()
-        app.db[session_id].insert(activity)
-        return app.db[session_id].get(), 200
-
-
 heartbeats = {}   # type: Dict[str, datetime]
 
 

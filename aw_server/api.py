@@ -79,17 +79,13 @@ class BucketResource(Resource):
     Used to get metadata about buckets and create them.
     """
 
-    # FIXME: Currently just gets events and not bucket data
-
     def get(self, bucket_id):
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
-        return app.db[bucket_id].get()
+        return app.db[bucket_id].metadata()
 
     def post(self, bucket_id):
-        logger.debug("Received post request for bucket '{}' and data: {}".format(bucket_id, request.get_json()))
-        activity = request.get_json()
-        app.db[bucket_id].insert(activity)
-        return app.db[bucket_id].get(), 200
+        # TODO: Implement bucket creation
+        raise NotImplementedError
 
 
 @api.resource("/api/0/buckets/<string:bucket_id>/events")

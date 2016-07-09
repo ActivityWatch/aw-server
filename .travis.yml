@@ -8,9 +8,8 @@ python:
 
 install:
 # The `-e` and `develop` hack is due to weirdness in namespace packages
- - "pip install -e git+https://github.com/ActivityWatch/aw-core.git#egg=aw-core"
- - "python3 setup.py develop"
+ - "pip install git+https://github.com/ActivityWatch/aw-core.git#egg=aw-core"
+ - "python3 setup.py install"
 
 script:
- - "python3 -c 'import aw.core'"
- - "python3 -c 'import aw.server'"
+ - "python3 -c 'import aw_server'"

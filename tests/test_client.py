@@ -17,7 +17,7 @@ class ClientTest(unittest.TestCase):
         self.client.send_event(Event(timestamp=datetime.now(), label="test"))
 
     def test_send_events(self):
-        self.client.send_event([
+        self.client.send_events([
             Event(timestamp=datetime.now(), label="test"),
             Event(timestamp=datetime.now(), label="test2"),
         ])

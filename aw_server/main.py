@@ -1,32 +1,21 @@
 import logging
 
+from pythonjsonlogger import jsonlogger
+
 from .server import _start
 from aw_datastore import Datastore, get_storage_methods, get_storage_method_names
 
 
+
 def main():
     """Called from the executable and __main__.py"""
-    import argparse
 
-    storage_methods = get_storage_methods()
-    storage_method_names = get_storage_method_names()
+    args, storage_method = parse_args()
 
-    parser = argparse.ArgumentParser(description='Starts an ActivityWatch server')
-    parser.add_argument('--testing', action='store_true',
-                        help='Run aw-server in testing mode using different ports and database')
-    # TODO: Implement datastore.FILES storage method and use it so that there is a storage method
-    #       with persistence that does not have any dependencies on external software (such as MongoDB)
-    parser.add_argument('--storage', dest='storage',
-                        choices=storage_method_names,
-                        default=storage_method_names[0],
-                        help='The method to use for storing data. Some methods (such as MongoDB) require specific Python packages to be available (in the MongoDB case: pymongo)')
-    args = parser.parse_args()
+    setup_logging(args)
 
     logger = logging.getLogger("main")
-    logging.basicConfig(level=logging.DEBUG if args.testing else logging.INFO)
-
-    logging.info("Using storage method: {}".format(args.storage))
-    storage_method = storage_methods[storage_method_names.index(args.storage)]
+    logger.info("Using storage method: {}".format(args.storage))
 
     if args.testing:
         # TODO: Set logging level for root logger properly
@@ -38,5 +27,66 @@ def main():
         testing = False
         port = 5600
 
-    logger.info("Staring up...")
+    logger.info("Starting up...")
     _start(port=port, testing=testing, storage_method=storage_method)
+
+
+def setup_logging(args):
+    logger = logging.getLogger()
+
+    if args.log_json:
+        supported_keys = [
+            'asctime',
+            #'created',
+            'filename',
+            'funcName',
+            'levelname',
+            #'levelno',
+            'lineno',
+            'module',
+            #'msecs',
+            'message',
+            'name',
+            'pathname',
+            #'process',
+            #'processName',
+            #'relativeCreated',
+            #'thread',
+            #'threadName'
+        ]
+
+        log_format = lambda x: ['%({0:s})'.format(i) for i in x]
+        custom_format = ' '.join(log_format(supported_keys))
+
+        logHandler = logging.StreamHandler()
+        formatter = jsonlogger.JsonFormatter(custom_format)
+        logHandler.setFormatter(formatter)
+        logger.addHandler(logHandler)
+    else:
+        logging.basicConfig()
+
+    logger.setLevel(logging.DEBUG if args.testing else logging.INFO)
+
+
+def parse_args():
+    import argparse
+
+    storage_methods = get_storage_methods()
+    storage_method_names = get_storage_method_names()
+
+    parser = argparse.ArgumentParser(description='Starts an ActivityWatch server')
+    parser.add_argument('--testing', action='store_true',
+                        help='Run aw-server in testing mode using different ports and database')
+    parser.add_argument('--log-json', action='store_true',
+                        help='Output the logs in JSON format')
+    # TODO: Implement datastore.FILES storage method and use it so that there is a storage method
+    #       with persistence that does not have any dependencies on external software (such as MongoDB)
+    parser.add_argument('--storage', dest='storage',
+                        choices=storage_method_names,
+                        default=storage_method_names[0],
+                        help='The method to use for storing data. Some methods (such as MongoDB) require specific Python packages to be available (in the MongoDB case: pymongo)')
+
+
+    args = parser.parse_args()
+    storage_method = storage_methods[storage_method_names.index(args.storage)]
+    return args, storage_method

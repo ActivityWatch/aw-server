@@ -4,7 +4,7 @@ import binascii
 import os
 
 from flask import request
-from flask_restful import Resource, Api
+from flask_restplus import Api, Resource, fields
 
 from . import app, logger
 
@@ -19,61 +19,17 @@ ZEROKNOWLEDGE_ENABLED = False
 
 api = Api(app)
 
-# FIXME: This should probably be scrapped, just something I threw together trying to reason about stuff
-class SessionManager:
-    # TODO: Don't rely on in-memory session storage
-    def __init__(self):
-        self._sessions = {}
+@api.route("/api/0/buckets")
+class BucketsResource(Resource):
+    """
+    Used to list buckets.
+    """
 
-    # SECURITY
-    def start_session(self, session_id: str) -> str:
-        # Returns a session key to be used in all following requests in session
-        session_key = binascii.hexlify(os.urandom(24)).decode("utf8")
-        self._sessions[session_id] = {
-            "session_key": session_key
-        }
-        return session_key
+    def get(self, bucket_id):
+        logger.debug("Received get request for bucket '{}'".format(bucket_id))
+        return app.db[bucket_id].metadata()
 
-    # SECURITY
-    # TODO: Implement session closing
-    def stop_session(self):
-        pass
-
-    # SECURITY
-    def verify_session(self, session_id, session_key):
-        # session_id is public, session_key is secret
-        if SECURITY_ENABLED:
-            if session_id not in self._sessions:
-                return False
-
-            session = self._sessions[session_id]
-            return session["session_key"] == session_key
-        else:
-            return True
-
-
-session_manager = SessionManager()
-
-
-# Use the following for authentication using user roles:
-#   http://flask.pocoo.org/snippets/98/
-
-@api.resource("/api/0/session/<string:session_id>/start")
-class StartSessionResource(Resource):
-    def post(self, session_id):
-        data = request.get_json()
-        session_key = session_manager.start_session(session_id)
-        return {"session_key": session_key}
-
-
-@api.resource("/api/0/session/<string:session_id>/stop")
-class StopSessionResource(Resource):
-    def post(self, session_id):
-        data = request.get_json()
-        pass
-
-
-@api.resource("/api/0/buckets/<string:bucket_id>")
+@api.route("/api/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):
     """
     Used to get metadata about buckets and create them.
@@ -88,7 +44,7 @@ class BucketResource(Resource):
         raise NotImplementedError
 
 
-@api.resource("/api/0/buckets/<string:bucket_id>/events")
+@api.route("/api/0/buckets/<string:bucket_id>/events")
 class EventResource(Resource):
     """
     Used to get and create events in a particular bucket.
@@ -115,7 +71,7 @@ class EventResource(Resource):
 heartbeats = {}   # type: Dict[str, datetime]
 
 
-@api.resource("/api/0/heartbeat/<string:session_id>")
+@api.route("/api/0/heartbeat/<string:session_id>")
 class HeartbeatResource(Resource):
     """
     WIP!

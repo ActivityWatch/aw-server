@@ -25,9 +25,9 @@ class BucketsResource(Resource):
     Used to list buckets.
     """
 
-    def get(self, bucket_id):
-        logger.debug("Received get request for bucket '{}'".format(bucket_id))
-        return app.db[bucket_id].metadata()
+    def get(self):
+        logger.debug("Received get request for buckets")
+        return app.db.buckets()
 
 @api.route("/api/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):

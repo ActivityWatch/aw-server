@@ -16,8 +16,22 @@ SECURITY_ENABLED = False
 # For the planned zeroknowledge storage feature
 ZEROKNOWLEDGE_ENABLED = False
 
-
 api = Api(app)
+
+
+# TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
+event = api.model('Event', {
+    'timestamp': fields.List(fields.DateTime(required=True)),
+    'label': fields.List(fields.String(description='Labels on event'))
+})
+
+bucket = api.model('Bucket', {
+    'id': fields.String(required=True, description='The buckets unique identifier'),
+    'created': fields.DateTime(required=True),
+    'client': fields.String(description='The client in charge of sending data to the bucket'),
+    'hostname': fields.String(description='The hostname that the client is running on')
+})
+
 
 @api.route("/api/0/buckets")
 class BucketsResource(Resource):
@@ -25,6 +39,7 @@ class BucketsResource(Resource):
     Used to list buckets.
     """
 
+    @api.marshal_list_with(bucket)
     def get(self):
         logger.debug("Received get request for buckets")
         return app.db.buckets()
@@ -35,10 +50,12 @@ class BucketResource(Resource):
     Used to get metadata about buckets and create them.
     """
 
+    @api.marshal_with(bucket)
     def get(self, bucket_id):
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
         return app.db[bucket_id].metadata()
 
+    @api.expect(bucket)
     def post(self, bucket_id):
         # TODO: Implement bucket creation
         raise NotImplementedError
@@ -50,10 +67,12 @@ class EventResource(Resource):
     Used to get and create events in a particular bucket.
     """
 
+    @api.marshal_list_with(event)
     def get(self, bucket_id):
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
         return app.db[bucket_id].get()
 
+    @api.expect(event)
     def post(self, bucket_id):
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
         data = request.get_json()

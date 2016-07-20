@@ -6,6 +6,7 @@ import os
 from flask import request
 from flask_restplus import Api, Resource, fields
 
+from aw_core.models import Event
 from . import app, logger
 
 
@@ -77,10 +78,10 @@ class EventResource(Resource):
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
         data = request.get_json()
         if isinstance(data, dict):
-            app.db[bucket_id].insert(data)
+            app.db[bucket_id].insert(Event(**data))
         elif isinstance(data, list):
             for event in data:
-                app.db[bucket_id].insert(event)
+                app.db[bucket_id].insert(Event(**event))
         else:
             logger.error("Invalid JSON object")
             return {}, 500

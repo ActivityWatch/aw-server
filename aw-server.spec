@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['__main__.py'],
-             pathex=['/home/erb/Programming/activitywatch/aw-server'],
+             pathex=[],
              binaries=None,
              datas=None,
              hiddenimports=[],

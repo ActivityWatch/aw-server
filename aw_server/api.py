@@ -69,9 +69,13 @@ class EventResource(Resource):
     """
 
     @api.marshal_list_with(event)
+    @api.param("limit", "the maximum number of requests to get")
     def get(self, bucket_id):
+        args = request.args
+        limit = int(args["limit"]) if "limit" in args else 100
+
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
-        return app.db[bucket_id].get()
+        return app.db[bucket_id].get(limit)
 
     @api.expect(event)
     def post(self, bucket_id):

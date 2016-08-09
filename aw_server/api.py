@@ -42,6 +42,9 @@ class BucketsResource(Resource):
 
     @api.marshal_list_with(bucket)
     def get(self):
+        """
+        Get list of all buckets
+        """
         logger.debug("Received get request for buckets")
         return app.db.buckets()
 
@@ -53,11 +56,17 @@ class BucketResource(Resource):
 
     @api.marshal_with(bucket)
     def get(self, bucket_id):
+        """
+        Get metadata about bucket
+        """
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
         return app.db[bucket_id].metadata()
 
     @api.expect(bucket)
     def post(self, bucket_id):
+        """
+        Create bucktet
+        """
         # TODO: Implement bucket creation
         raise NotImplementedError
 
@@ -71,6 +80,9 @@ class EventResource(Resource):
     @api.marshal_list_with(event)
     @api.param("limit", "the maximum number of requests to get")
     def get(self, bucket_id):
+        """
+        Get events from a bucket
+        """
         args = request.args
         limit = int(args["limit"]) if "limit" in args else 100
 
@@ -79,6 +91,9 @@ class EventResource(Resource):
 
     @api.expect(event)
     def post(self, bucket_id):
+        """
+        Create events for a bucket
+        """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
         data = request.get_json()
         if isinstance(data, dict):

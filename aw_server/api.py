@@ -20,9 +20,15 @@ ZEROKNOWLEDGE_ENABLED = False
 api = Api(app)
 
 
+fDuration = api.model('Duration', {
+    'value': fields.Float,
+    'unit': fields.String,
+})
+
 # TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
 event = api.model('Event', {
     'timestamp': fields.List(fields.DateTime(required=True)),
+    'duration': fields.List(fields.Nested(fDuration)),
     'label': fields.List(fields.String(description='Labels on event'))
 })
 

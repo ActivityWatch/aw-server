@@ -1,8 +1,7 @@
 import logging
 
-from pythonjsonlogger import jsonlogger
-
 from .server import _start
+from .log import setup_logging
 from aw_datastore import Datastore, get_storage_methods, get_storage_method_names
 
 
@@ -29,43 +28,6 @@ def main():
 
     logger.info("Starting up...")
     _start(port=port, testing=testing, storage_method=storage_method)
-
-
-def setup_logging(args):
-    logger = logging.getLogger()
-
-    if args.log_json:
-        supported_keys = [
-            'asctime',
-            #'created',
-            'filename',
-            'funcName',
-            'levelname',
-            #'levelno',
-            'lineno',
-            'module',
-            #'msecs',
-            'message',
-            'name',
-            'pathname',
-            #'process',
-            #'processName',
-            #'relativeCreated',
-            #'thread',
-            #'threadName'
-        ]
-
-        log_format = lambda x: ['%({0:s})'.format(i) for i in x]
-        custom_format = ' '.join(log_format(supported_keys))
-
-        logHandler = logging.StreamHandler()
-        formatter = jsonlogger.JsonFormatter(custom_format)
-        logHandler.setFormatter(formatter)
-        logger.addHandler(logHandler)
-    else:
-        logging.basicConfig()
-
-    logger.setLevel(logging.DEBUG if args.testing else logging.INFO)
 
 
 def parse_args():

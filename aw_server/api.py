@@ -8,6 +8,7 @@ from flask_restplus import Api, Resource, fields
 
 from aw_core.models import Event
 from . import app, logger
+from .log import get_log_file_path
 
 
 # SECURITY
@@ -132,3 +133,15 @@ class HeartbeatResource(Resource):
         logger.debug("Received heartbeat for client '{}'".format(client_name))
         heartbeats[client_name] = datetime.now()
         return "success", 200
+
+
+@api.route("/api/0/log")
+class LogResource(Resource):
+    """
+    """
+
+    def get(self):
+        payload = ""
+        with open(get_log_file_path(), 'r') as log_file:
+            payload = log_file.read()
+        return payload, 200

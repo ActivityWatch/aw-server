@@ -2,6 +2,7 @@ from typing import List, Dict
 from datetime import datetime
 import binascii
 import os
+import json
 
 from flask import request
 from flask_restplus import Api, Resource, fields
@@ -151,7 +152,8 @@ class LogResource(Resource):
         """
         Get the server log in json format
         """
-        payload = ""
+        payload = []
         with open(get_log_file_path(), 'r') as log_file:
-            payload = log_file.read()
+            for line in log_file.readlines()[::-1]:
+                payload.append(json.loads(line))
         return payload, 200

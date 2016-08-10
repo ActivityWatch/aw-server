@@ -144,9 +144,13 @@ class HeartbeatResource(Resource):
 @api.route("/api/0/log")
 class LogResource(Resource):
     """
+    Server log of the current instance in json format
     """
 
     def get(self):
+        """
+        Get the server log in json format
+        """
         payload = ""
         with open(get_log_file_path(), 'r') as log_file:
             payload = log_file.read()

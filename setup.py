@@ -10,7 +10,7 @@ setup(name='aw-server',
       url='https://github.com/ActivityWatch/aw-server',
       packages=['aw_server'],
       install_requires=[
-          'aw-core',
+          'aw-core>=0.1',
           'flask>=0.10',
           'flask-restplus>=0.9.2',
           'flask-cors>=2.1',
@@ -19,7 +19,7 @@ setup(name='aw-server',
           'python-json-logger>=0.1.5'
       ],
       dependency_links=[
-          'https://github.com/ActivityWatch/aw-core/tarball/master#egg=aw-core'
+          'https://github.com/ActivityWatch/aw-core/tarball/master#egg=aw-core-0.1.0'
       ],
       entry_points={
           'console_scripts': ['aw-server = aw_server:main']

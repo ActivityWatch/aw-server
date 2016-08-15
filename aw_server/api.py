@@ -1,8 +1,9 @@
 from typing import List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 import binascii
 import os
 import json
+import iso8601
 
 from flask import request
 from flask_restplus import Api, Resource, fields
@@ -113,6 +114,50 @@ class EventResource(Resource):
             logger.error("Invalid JSON object")
             return {}, 500
         return {}, 200
+
+
+@api.route("/api/0/buckets/<string:bucket_id>/events/chunk")
+class EventChunkResource(Resource):
+    """
+    Used to get chunked events
+    """
+
+    @api.param("start", "Start date of chunk")
+    @api.param("end", "End date of chunk")
+    def get(self, bucket_id):
+        """
+        Get events from a bucket
+        """
+        args = request.args
+        if not args["start"]:
+            return "Start parameter not specified, cannot chunk", 400
+        start = args["start"] if "start" in args else str(datetime.now())
+        start = iso8601.parse_date(start)
+        end = args["end"] if "end" in args else str(datetime.now() - timedelta(days=1))
+        end = iso8601.parse_date(end)
+
+        events = app.db[bucket_id].get()
+
+        eventcount = 0
+        chunk = {"label": []}
+        for event in events:
+            eventdate = iso8601.parse_date(event["timestamp"][0])
+            if eventdate >= start and eventdate <= end:
+                if "duration" in event:
+                    if chunk["duration"]:
+                        chunk["duration"] = str(iso8601.parse_date(chunk["duration"]) + iso8601.parse_date(event["duration"]))
+                    else:
+                        chunk["duration"] = event["duration"]
+                if "label" in event:
+                    chunk["label"].append(event["label"])
+                eventcount += 1
+
+        logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
+        payload = {
+            "eventcount": eventcount,
+            "chunks": chunk,
+        }
+        return payload
 
 
 heartbeats = {}   # type: Dict[str, datetime]

@@ -31,6 +31,7 @@ fDuration = api.model('Duration', {
 event = api.model('Event', {
     'timestamp': fields.List(fields.DateTime(required=True)),
     'duration': fields.List(fields.Nested(fDuration)),
+    'count': fields.List(fields.Integer()),
     'label': fields.List(fields.String(description='Labels on event'))
 })
 

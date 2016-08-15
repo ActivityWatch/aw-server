@@ -143,13 +143,17 @@ class EventChunkResource(Resource):
         for event in events:
             eventdate = iso8601.parse_date(event["timestamp"][0])
             if eventdate >= start and eventdate <= end:
-                if "duration" in event:
-                    if chunk["duration"]:
-                        chunk["duration"] = str(iso8601.parse_date(chunk["duration"]) + iso8601.parse_date(event["duration"]))
-                    else:
-                        chunk["duration"] = event["duration"]
-                if "label" in event:
-                    chunk["label"].append(event["label"])
+                if "label" not in event:
+                    print("Shit")
+                for label in event["label"]:
+                    if label not in chunk:
+                        chunk[label] = {}
+                    if "duration" in event:
+                        if "duration" not in chunk[label]:
+                            chunk[label]["duration"] = event["duration"][0]
+                        else:
+                            chunk[label]["duration"]["value"] += event["duration"][0]["value"]
+
                 eventcount += 1
 
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))

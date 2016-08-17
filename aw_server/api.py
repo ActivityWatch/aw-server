@@ -35,11 +35,13 @@ event = api.model('Event', {
     'label': fields.List(fields.String(description='Labels on event'))
 })
 
-bucket = api.model('Bucket', {
-    'id': fields.String(required=True, description='The buckets unique identifier'),
-    'created': fields.DateTime(required=True),
-    'client': fields.String(description='The client in charge of sending data to the bucket'),
-    'hostname': fields.String(description='The hostname that the client is running on')
+bucket = api.model('Bucket',{
+    'id': fields.String(required=True, description='The buckets unique id'),
+    'name': fields.String(required=False, description='The buckets readable and renameable name'),
+    'type': fields.String(required=True, description='The buckets event type'),
+    'client': fields.String(required=True, description='The name of the watcher client'),
+    'hostname': fields.String(required=True, description='The hostname of the client that the bucket belongs to'),
+    'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
 })
 
 
@@ -49,7 +51,6 @@ class BucketsResource(Resource):
     Used to list buckets.
     """
 
-    @api.marshal_list_with(bucket)
     def get(self):
         """
         Get list of all buckets
@@ -76,8 +77,14 @@ class BucketResource(Resource):
         """
         Create bucktet
         """
-        # TODO: Implement bucket creation
-        raise NotImplementedError
+        data = request.get_json()
+        app.db.create_bucket(
+            bucket_id,
+            type=data["type"],
+            client=data["client"],
+            hostname=data["hostname"],
+            created=data["created"]
+        )
 
 
 @api.route("/api/0/buckets/<string:bucket_id>/events")

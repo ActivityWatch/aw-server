@@ -96,7 +96,7 @@ class BucketResource(Resource):
             type=data["type"],
             client=data["client"],
             hostname=data["hostname"],
-            created=str(datetime.now().isoformat())
+            created=datetime.now()
         )
         return {}, 200
 

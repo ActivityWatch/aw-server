@@ -53,7 +53,7 @@ create_bucket = api.model('CreateBucket',{
 
 class BadRequest(werkzeug.exceptions.BadRequest):
     def __init__(self, type, message):
-        super(message)
+        super().__init__(message)
         self.type = type
 
 
@@ -90,7 +90,7 @@ class BucketResource(Resource):
         """
         data = request.get_json()
         if bucket_id in app.db.buckets():
-            return BadRequest("BucketAlreadyExists","A bucket with this name already exists, cannot create it")
+            raise BadRequest("BucketAlreadyExists","A bucket with this name already exists, cannot create it")
         app.db.create_bucket(
             bucket_id,
             type=data["type"],

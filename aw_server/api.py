@@ -89,6 +89,8 @@ class BucketResource(Resource):
         Create bucktet
         """
         data = request.get_json()
+        if bucket_id in app.db:
+            return BadRequest("BucketAlreadyExists","A bucket with this name already exists, cannot create it")
         app.db.create_bucket(
             bucket_id,
             type=data["type"],

@@ -3,6 +3,7 @@ from datetime import datetime
 import binascii
 import os
 import json
+import werkzeug.exceptions
 
 from flask import request
 from flask_restplus import Api, Resource, fields
@@ -44,6 +45,17 @@ bucket = api.model('Bucket',{
     'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
 })
 
+create_bucket = api.model('CreateBucket',{
+    'client': fields.String(required=True),
+    'type': fields.String(required=True),
+    'hostname': fields.String(required=True),
+})
+
+class BadRequest(werkzeug.exceptions.BadRequest):
+    def __init__(self, type, message):
+        super(message)
+        self.type = type
+
 
 @api.route("/api/0/buckets")
 class BucketsResource(Resource):
@@ -63,7 +75,6 @@ class BucketResource(Resource):
     """
     Used to get metadata about buckets and create them.
     """
-
     @api.marshal_with(bucket)
     def get(self, bucket_id):
         """
@@ -72,7 +83,7 @@ class BucketResource(Resource):
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
         return app.db[bucket_id].metadata()
 
-    @api.expect(bucket)
+    @api.expect(create_bucket)
     def post(self, bucket_id):
         """
         Create bucktet
@@ -83,8 +94,9 @@ class BucketResource(Resource):
             type=data["type"],
             client=data["client"],
             hostname=data["hostname"],
-            created=data["created"]
+            created=str(datetime.now().isoformat())
         )
+        return {}, 200
 
 
 @api.route("/api/0/buckets/<string:bucket_id>/events")
@@ -119,7 +131,7 @@ class EventResource(Resource):
                 app.db[bucket_id].insert(Event(**event))
         else:
             logger.error("Invalid JSON object")
-            return {}, 500
+            raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
 

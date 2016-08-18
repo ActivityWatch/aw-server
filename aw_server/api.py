@@ -3,6 +3,7 @@ from datetime import datetime
 import binascii
 import os
 import json
+import werkzeug.exceptions
 
 from flask import request
 from flask_restplus import Api, Resource, fields
@@ -35,12 +36,25 @@ event = api.model('Event', {
     'label': fields.List(fields.String(description='Labels on event'))
 })
 
-bucket = api.model('Bucket', {
-    'id': fields.String(required=True, description='The buckets unique identifier'),
-    'created': fields.DateTime(required=True),
-    'client': fields.String(description='The client in charge of sending data to the bucket'),
-    'hostname': fields.String(description='The hostname that the client is running on')
+bucket = api.model('Bucket',{
+    'id': fields.String(required=True, description='The buckets unique id'),
+    'name': fields.String(required=False, description='The buckets readable and renameable name'),
+    'type': fields.String(required=True, description='The buckets event type'),
+    'client': fields.String(required=True, description='The name of the watcher client'),
+    'hostname': fields.String(required=True, description='The hostname of the client that the bucket belongs to'),
+    'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
 })
+
+create_bucket = api.model('CreateBucket',{
+    'client': fields.String(required=True),
+    'type': fields.String(required=True),
+    'hostname': fields.String(required=True),
+})
+
+class BadRequest(werkzeug.exceptions.BadRequest):
+    def __init__(self, type, message):
+        super().__init__(message)
+        self.type = type
 
 
 @api.route("/api/0/buckets")
@@ -49,7 +63,6 @@ class BucketsResource(Resource):
     Used to list buckets.
     """
 
-    @api.marshal_list_with(bucket)
     def get(self):
         """
         Get list of all buckets
@@ -62,7 +75,6 @@ class BucketResource(Resource):
     """
     Used to get metadata about buckets and create them.
     """
-
     @api.marshal_with(bucket)
     def get(self, bucket_id):
         """
@@ -71,13 +83,22 @@ class BucketResource(Resource):
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
         return app.db[bucket_id].metadata()
 
-    @api.expect(bucket)
+    @api.expect(create_bucket)
     def post(self, bucket_id):
         """
         Create bucktet
         """
-        # TODO: Implement bucket creation
-        raise NotImplementedError
+        data = request.get_json()
+        if bucket_id in app.db.buckets():
+            raise BadRequest("BucketAlreadyExists","A bucket with this name already exists, cannot create it")
+        app.db.create_bucket(
+            bucket_id,
+            type=data["type"],
+            client=data["client"],
+            hostname=data["hostname"],
+            created=datetime.now()
+        )
+        return {}, 200
 
 
 @api.route("/api/0/buckets/<string:bucket_id>/events")
@@ -112,7 +133,7 @@ class EventResource(Resource):
                 app.db[bucket_id].insert(Event(**event))
         else:
             logger.error("Invalid JSON object")
-            return {}, 500
+            raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
 

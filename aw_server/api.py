@@ -129,6 +129,7 @@ class EventResource(Resource):
         if isinstance(data, dict):
             app.db[bucket_id].insert(Event(**data))
         elif isinstance(data, list):
+            # TODO: LOL, what? there is a db.insert_many
             for event in data:
                 app.db[bucket_id].insert(Event(**event))
         else:
@@ -136,6 +137,23 @@ class EventResource(Resource):
             raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
+@api.route("/api/0/buckets/<string:bucket_id>/events/replace_last")
+class ReplaceLastEventResource(Resource):
+    """
+    """
+
+    @api.expect(event)
+    def post(self, bucket_id):
+        """
+        """
+        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+        data = request.get_json()
+        if isinstance(data, dict):
+            app.db[bucket_id].replace_last(Event(**data))
+        else:
+            logger.error("Invalid JSON object")
+            raise BadRequest("InvalidJSON", "Invalid JSON object")
+        return {}, 200
 
 heartbeats = {}   # type: Dict[str, datetime]
 

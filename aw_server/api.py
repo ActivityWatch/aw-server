@@ -155,33 +155,6 @@ class ReplaceLastEventResource(Resource):
             raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
-heartbeats = {}   # type: Dict[str, datetime]
-
-
-@api.route("/api/0/heartbeat/<string:session_id>")
-class HeartbeatResource(Resource):
-    """
-    WIP!
-
-    Used to give clients the ability to signal on regular intervals something particular which can then be post-processed into events.
-    The endpoint could compress a list of events which only differ by their timestamps into a event with a list of the timestamps.
-
-    Should store the last time time the client checked in.
-    """
-
-    def get(self, client_name):
-        logger.debug("Received heartbeat status request for client '{}'".format(client_name))
-        if client_name in heartbeats:
-            return heartbeats[client_name].isoformat()
-        else:
-            return "No heartbeat has been received for this client"
-
-    def post(self, client_name):
-        logger.debug("Received heartbeat for client '{}'".format(client_name))
-        heartbeats[client_name] = datetime.now()
-        return "success", 200
-
-
 @api.route("/api/0/log")
 class LogResource(Resource):
     """

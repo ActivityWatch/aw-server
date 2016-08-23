@@ -140,11 +140,13 @@ class EventResource(Resource):
 @api.route("/api/0/buckets/<string:bucket_id>/events/replace_last")
 class ReplaceLastEventResource(Resource):
     """
+    Replaces last event inserted into bucket
     """
 
     @api.expect(event)
     def post(self, bucket_id):
         """
+        Replace last event inserted into the bucket
         """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
         data = request.get_json()

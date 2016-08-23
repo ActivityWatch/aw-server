@@ -1,11 +1,13 @@
 import os
 import sys
 import logging
-from .server import app
 from datetime import datetime
 
 import appdirs
 from pythonjsonlogger import jsonlogger
+
+from werkzeug import serving
+from werkzeug._internal import _log
 
 
 log_file_path = None
@@ -92,3 +94,15 @@ def create_json_formatter():
     custom_format = ' '.join(log_format(supported_keys))
 
     return jsonlogger.JsonFormatter(custom_format)
+
+class FlaskLogHandler(serving.WSGIRequestHandler):
+    def __init__(self, *args):
+        self.logger = logging.getLogger("flask")
+        super().__init__(*args)
+
+    def log(self, type, message, *args):
+        msg = args[0]
+        code = args[1]
+        if code == 200:
+            type = "debug"
+        _log(type, '{} - {} - {}\n'.format(code, self.address_string(), msg))

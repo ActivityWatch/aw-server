@@ -14,6 +14,5 @@ app.db = None  # type: Datastore
 
 # Only to be called from aw_server.main function!
 def _start(storage_method, port=5600, testing=False):
-    # TODO: Restructure so it's called in a more sane way
     app.db = Datastore(storage_method, testing=testing)
     app.run(debug=testing, port=port)

@@ -5,7 +5,7 @@ import os
 import json
 import werkzeug.exceptions
 
-from flask import request
+from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
 
 from aw_core.models import Event
@@ -20,8 +20,10 @@ SECURITY_ENABLED = False
 # For the planned zeroknowledge storage feature
 ZEROKNOWLEDGE_ENABLED = False
 
-api = Api(app)
+blueprint = Blueprint('api', __name__, url_prefix='/api')
+api = Api(blueprint, doc='/')
 
+app.register_blueprint(blueprint)
 
 fDuration = api.model('Duration', {
     'value': fields.Float,
@@ -57,7 +59,7 @@ class BadRequest(werkzeug.exceptions.BadRequest):
         self.type = type
 
 
-@api.route("/api/0/buckets")
+@api.route("/0/buckets")
 class BucketsResource(Resource):
     """
     Used to list buckets.
@@ -70,7 +72,7 @@ class BucketsResource(Resource):
         logger.debug("Received get request for buckets")
         return app.db.buckets()
 
-@api.route("/api/0/buckets/<string:bucket_id>")
+@api.route("/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):
     """
     Used to get metadata about buckets and create them.
@@ -101,7 +103,7 @@ class BucketResource(Resource):
         return {}, 200
 
 
-@api.route("/api/0/buckets/<string:bucket_id>/events")
+@api.route("/0/buckets/<string:bucket_id>/events")
 class EventResource(Resource):
     """
     Used to get and create events in a particular bucket.
@@ -137,7 +139,7 @@ class EventResource(Resource):
             raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
-@api.route("/api/0/buckets/<string:bucket_id>/events/replace_last")
+@api.route("/0/buckets/<string:bucket_id>/events/replace_last")
 class ReplaceLastEventResource(Resource):
     """
     Replaces last event inserted into bucket
@@ -157,7 +159,7 @@ class ReplaceLastEventResource(Resource):
             raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
-@api.route("/api/0/log")
+@api.route("/0/log")
 class LogResource(Resource):
     """
     Server log of the current instance in json format

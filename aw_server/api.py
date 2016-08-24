@@ -172,7 +172,10 @@ class EventChunkResource(Resource):
                     print("Shit")
                 for label in event["label"]:
                     if label not in chunk:
-                        chunk[label] = {}
+                        chunk[label] = {"other_labels":[]}
+                    for co_label in event["label"]:
+                        if co_label != label and co_label not in chunk[label]["other_labels"]:
+                            chunk[label]["other_labels"].append(co_label)
                     if "duration" in event:
                         if "duration" not in chunk[label]:
                             chunk[label]["duration"] = event["duration"][0]

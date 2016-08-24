@@ -4,8 +4,9 @@ import binascii
 import os
 import json
 import iso8601
+import werkzeug.exceptions
 
-from flask import request
+from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
 
 from aw_core.models import Event
@@ -20,8 +21,10 @@ SECURITY_ENABLED = False
 # For the planned zeroknowledge storage feature
 ZEROKNOWLEDGE_ENABLED = False
 
-api = Api(app)
+blueprint = Blueprint('api', __name__, url_prefix='/api')
+api = Api(blueprint, doc='/')
 
+app.register_blueprint(blueprint)
 
 fDuration = api.model('Duration', {
     'value': fields.Float,
@@ -32,24 +35,37 @@ fDuration = api.model('Duration', {
 event = api.model('Event', {
     'timestamp': fields.List(fields.DateTime(required=True)),
     'duration': fields.List(fields.Nested(fDuration)),
+    'count': fields.List(fields.Integer()),
     'label': fields.List(fields.String(description='Labels on event'))
 })
 
-bucket = api.model('Bucket', {
-    'id': fields.String(required=True, description='The buckets unique identifier'),
-    'created': fields.DateTime(required=True),
-    'client': fields.String(description='The client in charge of sending data to the bucket'),
-    'hostname': fields.String(description='The hostname that the client is running on')
+bucket = api.model('Bucket',{
+    'id': fields.String(required=True, description='The buckets unique id'),
+    'name': fields.String(required=False, description='The buckets readable and renameable name'),
+    'type': fields.String(required=True, description='The buckets event type'),
+    'client': fields.String(required=True, description='The name of the watcher client'),
+    'hostname': fields.String(required=True, description='The hostname of the client that the bucket belongs to'),
+    'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
 })
 
+create_bucket = api.model('CreateBucket',{
+    'client': fields.String(required=True),
+    'type': fields.String(required=True),
+    'hostname': fields.String(required=True),
+})
 
-@api.route("/api/0/buckets")
+class BadRequest(werkzeug.exceptions.BadRequest):
+    def __init__(self, type, message):
+        super().__init__(message)
+        self.type = type
+
+
+@api.route("/0/buckets")
 class BucketsResource(Resource):
     """
     Used to list buckets.
     """
 
-    @api.marshal_list_with(bucket)
     def get(self):
         """
         Get list of all buckets
@@ -57,12 +73,11 @@ class BucketsResource(Resource):
         logger.debug("Received get request for buckets")
         return app.db.buckets()
 
-@api.route("/api/0/buckets/<string:bucket_id>")
+@api.route("/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):
     """
     Used to get metadata about buckets and create them.
     """
-
     @api.marshal_with(bucket)
     def get(self, bucket_id):
         """
@@ -71,16 +86,25 @@ class BucketResource(Resource):
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
         return app.db[bucket_id].metadata()
 
-    @api.expect(bucket)
+    @api.expect(create_bucket)
     def post(self, bucket_id):
         """
         Create bucktet
         """
-        # TODO: Implement bucket creation
-        raise NotImplementedError
+        data = request.get_json()
+        if bucket_id in app.db.buckets():
+            raise BadRequest("BucketAlreadyExists","A bucket with this name already exists, cannot create it")
+        app.db.create_bucket(
+            bucket_id,
+            type=data["type"],
+            client=data["client"],
+            hostname=data["hostname"],
+            created=datetime.now()
+        )
+        return {}, 200
 
 
-@api.route("/api/0/buckets/<string:bucket_id>/events")
+@api.route("/0/buckets/<string:bucket_id>/events")
 class EventResource(Resource):
     """
     Used to get and create events in a particular bucket.
@@ -108,11 +132,12 @@ class EventResource(Resource):
         if isinstance(data, dict):
             app.db[bucket_id].insert(Event(**data))
         elif isinstance(data, list):
+            # TODO: LOL, what? there is a db.insert_many
             for event in data:
                 app.db[bucket_id].insert(Event(**event))
         else:
             logger.error("Invalid JSON object")
-            return {}, 500
+            raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
 
@@ -164,34 +189,27 @@ class EventChunkResource(Resource):
         return payload
 
 
-heartbeats = {}   # type: Dict[str, datetime]
-
-
-@api.route("/api/0/heartbeat/<string:session_id>")
-class HeartbeatResource(Resource):
+@api.route("/0/buckets/<string:bucket_id>/events/replace_last")
+class ReplaceLastEventResource(Resource):
     """
-    WIP!
-
-    Used to give clients the ability to signal on regular intervals something particular which can then be post-processed into events.
-    The endpoint could compress a list of events which only differ by their timestamps into a event with a list of the timestamps.
-
-    Should store the last time time the client checked in.
+    Replaces last event inserted into bucket
     """
 
-    def get(self, client_name):
-        logger.debug("Received heartbeat status request for client '{}'".format(client_name))
-        if client_name in heartbeats:
-            return heartbeats[client_name].isoformat()
+    @api.expect(event)
+    def post(self, bucket_id):
+        """
+        Replace last event inserted into the bucket
+        """
+        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+        data = request.get_json()
+        if isinstance(data, dict):
+            app.db[bucket_id].replace_last(Event(**data))
         else:
-            return "No heartbeat has been received for this client"
+            logger.error("Invalid JSON object")
+            raise BadRequest("InvalidJSON", "Invalid JSON object")
+        return {}, 200
 
-    def post(self, client_name):
-        logger.debug("Received heartbeat for client '{}'".format(client_name))
-        heartbeats[client_name] = datetime.now()
-        return "success", 200
-
-
-@api.route("/api/0/log")
+@api.route("/0/log")
 class LogResource(Resource):
     """
     Server log of the current instance in json format

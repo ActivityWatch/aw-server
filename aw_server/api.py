@@ -141,7 +141,7 @@ class EventResource(Resource):
         return {}, 200
 
 
-@api.route("/api/0/buckets/<string:bucket_id>/events/chunk")
+@api.route("/0/buckets/<string:bucket_id>/events/chunk")
 class EventChunkResource(Resource):
     """
     Used to get chunked events

@@ -8,7 +8,11 @@ setup(name='aw-server',
       author='Erik Bjäreholt',
       author_email='erik@bjareho.lt',
       url='https://github.com/ActivityWatch/aw-server',
+
       packages=['aw_server'],
+
+      include_package_data=True,
+
       install_requires=[
           'aw-core>=0.1',
           'flask>=0.10',
@@ -21,6 +25,7 @@ setup(name='aw-server',
       dependency_links=[
           'https://github.com/ActivityWatch/aw-core/tarball/master#egg=aw-core-0.1.0'
       ],
+
       entry_points={
           'console_scripts': ['aw-server = aw_server:main']
       })

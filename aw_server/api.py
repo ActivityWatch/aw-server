@@ -154,35 +154,29 @@ class EventChunkResource(Resource):
         Get events from a bucket
         """
         args = request.args
-        if not args["start"]:
-            return "Start parameter not specified, cannot chunk", 400
-        start = args["start"] if "start" in args else str(datetime.now())
-        start = iso8601.parse_date(start)
-        end = args["end"] if "end" in args else str(datetime.now() - timedelta(days=1))
-        end = iso8601.parse_date(end)
+        start = iso8601.parse_date(args["start"]) if "start" in args else None
+        end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        events = app.db[bucket_id].get()
+        events = app.db[bucket_id].get(starttime=start, endtime=end)
 
         eventcount = 0
         chunk = {"label": []}
         for event in events:
-            eventdate = iso8601.parse_date(event["timestamp"][0])
-            if eventdate >= start and eventdate <= end:
-                if "label" not in event:
-                    print("Shit")
-                for label in event["label"]:
-                    if label not in chunk:
-                        chunk[label] = {"other_labels":[]}
-                    for co_label in event["label"]:
-                        if co_label != label and co_label not in chunk[label]["other_labels"]:
-                            chunk[label]["other_labels"].append(co_label)
-                    if "duration" in event:
-                        if "duration" not in chunk[label]:
-                            chunk[label]["duration"] = event["duration"][0]
-                        else:
-                            chunk[label]["duration"]["value"] += event["duration"][0]["value"]
+            if "label" not in event:
+                print("Shit")
+            for label in event["label"]:
+                if label not in chunk:
+                    chunk[label] = {"other_labels":[]}
+                for co_label in event["label"]:
+                    if co_label != label and co_label not in chunk[label]["other_labels"]:
+                        chunk[label]["other_labels"].append(co_label)
+                if "duration" in event:
+                    if "duration" not in chunk[label]:
+                        chunk[label]["duration"] = event["duration"][0]
+                    else:
+                        chunk[label]["duration"]["value"] += event["duration"][0]["value"]
 
-                eventcount += 1
+            eventcount += 1
 
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
         payload = {

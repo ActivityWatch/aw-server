@@ -122,6 +122,11 @@ class EventResource(Resource):
         limit = int(args["limit"]) if "limit" in args else 100
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
+        
+        if bucket_id not in app.db.buckets():
+            msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
+            logger.error(msg)
+            raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
         return app.db[bucket_id].get(limit, start, end)
@@ -161,8 +166,13 @@ class EventChunkResource(Resource):
         args = request.args
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
+        
+        if bucket_id not in app.db.buckets():
+            msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
+            logger.error(msg)
+            raise BadRequest("NoSuchBucket", msg)
+        
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
-
         return app.db[bucket_id].chunk(start, end)
 
 

@@ -103,6 +103,6 @@ class FlaskLogHandler(serving.WSGIRequestHandler):
     def log(self, type, message, *args):
         msg = args[0]
         code = args[1]
-        if code == 200:
+        if code in [200, 304]:
             type = "debug"
         _log(type, '{} - {} - {}\n'.format(code, self.address_string(), msg))

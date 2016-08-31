@@ -1,8 +1,9 @@
 from typing import List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 import binascii
 import os
 import json
+import iso8601
 import werkzeug.exceptions
 
 from flask import request, Blueprint
@@ -111,15 +112,24 @@ class EventResource(Resource):
 
     @api.marshal_list_with(event)
     @api.param("limit", "the maximum number of requests to get")
+    @api.param("start", "Start date of events")
+    @api.param("end", "End date of events")
     def get(self, bucket_id):
         """
         Get events from a bucket
         """
         args = request.args
         limit = int(args["limit"]) if "limit" in args else 100
+        start = iso8601.parse_date(args["start"]) if "start" in args else None
+        end = iso8601.parse_date(args["end"]) if "end" in args else None
+        
+        if bucket_id not in app.db.buckets():
+            msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
+            logger.error(msg)
+            raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
-        return app.db[bucket_id].get(limit)
+        return app.db[bucket_id].get(limit, start, end)
 
     @api.expect(event)
     def post(self, bucket_id):
@@ -128,16 +138,43 @@ class EventResource(Resource):
         """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
         data = request.get_json()
+        events = []
         if isinstance(data, dict):
-            app.db[bucket_id].insert(Event(**data))
+            events = [Event(**data)]
         elif isinstance(data, list):
-            # TODO: LOL, what? there is a db.insert_many
-            for event in data:
-                app.db[bucket_id].insert(Event(**event))
+            for e in data:
+                events.append(Event(**e))
         else:
             logger.error("Invalid JSON object")
             raise BadRequest("InvalidJSON", "Invalid JSON object")
+        app.db[bucket_id].insert(events)
         return {}, 200
+
+
+@api.route("/0/buckets/<string:bucket_id>/events/chunk")
+class EventChunkResource(Resource):
+    """
+    Used to get chunked events
+    """
+
+    @api.param("start", "Start date of chunk")
+    @api.param("end", "End date of chunk")
+    def get(self, bucket_id):
+        """
+        Get chunked events from a bucket
+        """
+        args = request.args
+        start = iso8601.parse_date(args["start"]) if "start" in args else None
+        end = iso8601.parse_date(args["end"]) if "end" in args else None
+        
+        if bucket_id not in app.db.buckets():
+            msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
+            logger.error(msg)
+            raise BadRequest("NoSuchBucket", msg)
+        
+        logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
+        return app.db[bucket_id].chunk(start, end)
+
 
 @api.route("/0/buckets/<string:bucket_id>/events/replace_last")
 class ReplaceLastEventResource(Resource):

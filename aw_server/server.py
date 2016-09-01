@@ -10,7 +10,6 @@ from .log import FlaskLogHandler
 
 app_folder = os.path.dirname(os.path.abspath(__file__))
 static_folder = os.path.join(app_folder, 'static')
-print(static_folder)
 
 app = Flask("aw-server",
             static_folder=static_folder, static_url_path='')

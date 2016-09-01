@@ -10,6 +10,7 @@ from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
 
 from aw_core.models import Event
+from aw_core import transforms
 from . import app, logger
 from .log import get_log_file_path
 
@@ -39,7 +40,7 @@ event = api.model('Event', {
     'label': fields.List(fields.String(description='Labels on event'))
 })
 
-bucket = api.model('Bucket',{
+bucket = api.model('Bucket', {
     'id': fields.String(required=True, description='The buckets unique id'),
     'name': fields.String(required=False, description='The buckets readable and renameable name'),
     'type': fields.String(required=True, description='The buckets event type'),
@@ -48,11 +49,12 @@ bucket = api.model('Bucket',{
     'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
 })
 
-create_bucket = api.model('CreateBucket',{
+create_bucket = api.model('CreateBucket', {
     'client': fields.String(required=True),
     'type': fields.String(required=True),
     'hostname': fields.String(required=True),
 })
+
 
 class BadRequest(werkzeug.exceptions.BadRequest):
     def __init__(self, type, message):
@@ -72,6 +74,7 @@ class BucketsResource(Resource):
         """
         logger.debug("Received get request for buckets")
         return app.db.buckets()
+
 
 @api.route("/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):
@@ -93,7 +96,7 @@ class BucketResource(Resource):
         """
         data = request.get_json()
         if bucket_id in app.db.buckets():
-            raise BadRequest("BucketAlreadyExists","A bucket with this name already exists, cannot create it")
+            raise BadRequest("BucketAlreadyExists", "A bucket with this name already exists, cannot create it")
         app.db.create_bucket(
             bucket_id,
             type=data["type"],
@@ -122,7 +125,7 @@ class EventResource(Resource):
         limit = int(args["limit"]) if "limit" in args else 100
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
-        
+
         if bucket_id not in app.db.buckets():
             msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
             logger.error(msg)
@@ -166,14 +169,15 @@ class EventChunkResource(Resource):
         args = request.args
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
-        
+
         if bucket_id not in app.db.buckets():
             msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
             logger.error(msg)
             raise BadRequest("NoSuchBucket", msg)
-        
+
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
-        return app.db[bucket_id].chunk(start, end)
+        events = app.db[bucket_id].get(start, end)
+        return transforms.chunk(events)
 
 
 @api.route("/0/buckets/<string:bucket_id>/events/replace_last")
@@ -195,6 +199,7 @@ class ReplaceLastEventResource(Resource):
             logger.error("Invalid JSON object")
             raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
+
 
 @api.route("/0/log")
 class LogResource(Resource):

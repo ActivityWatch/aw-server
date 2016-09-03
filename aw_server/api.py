@@ -1,5 +1,5 @@
 from typing import List, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import binascii
 import os
 import json
@@ -286,7 +286,7 @@ class CreateViewResource(Resource):
         view["name"] = viewname
         if "created" not in view:
             view["created"] = datetime.now(timezone.utc).isoformat()
-        views.views[viewname] = view
+        views.create_view(view)
         return {}, 200
 
 

@@ -10,7 +10,7 @@ from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
 
 from aw_core.models import Event
-from aw_core import transforms
+from aw_core import transforms, views
 from . import app, logger
 from .log import get_log_file_path
 
@@ -27,15 +27,21 @@ api = Api(blueprint, doc='/')
 
 app.register_blueprint(blueprint)
 
-fDuration = api.model('Duration', {
-    'value': fields.Float,
-    'unit': fields.String,
-})
+class AnyJson(fields.Raw):
+    def format(self, value):
+        return json.loads(value)
 
 # TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
+
+fDuration = api.model('Duration', {
+    'unit': fields.String,
+    'value': fields.Float,
+})
+
 event = api.model('Event', {
     'timestamp': fields.List(fields.DateTime(required=True)),
-    'duration': fields.List(fields.Nested(fDuration)),
+    # Duration validation is broken
+    #'duration': fields.List(fields.Nested(fDuration)),
     'count': fields.List(fields.Integer()),
     'label': fields.List(fields.String(description='Labels on event'))
 })
@@ -55,11 +61,23 @@ create_bucket = api.model('CreateBucket', {
     'hostname': fields.String(required=True),
 })
 
+view = api.model('View',{
+    'name': fields.String,
+    'created': fields.DateTime,
+    'query': AnyJson,  # Can be any dict
+})
 
 class BadRequest(werkzeug.exceptions.BadRequest):
     def __init__(self, type, message):
         super().__init__(message)
         self.type = type
+
+
+"""
+
+    BUCKETS
+
+"""
 
 
 @api.route("/0/buckets")
@@ -107,13 +125,20 @@ class BucketResource(Resource):
         return {}, 200
 
 
+"""
+
+    EVENTS
+
+"""
+
+
 @api.route("/0/buckets/<string:bucket_id>/events")
 class EventResource(Resource):
     """
     Used to get and create events in a particular bucket.
     """
 
-    @api.marshal_list_with(event)
+    #@api.marshal_list_with(event)
     @api.param("limit", "the maximum number of requests to get")
     @api.param("start", "Start date of events")
     @api.param("end", "End date of events")
@@ -201,12 +226,74 @@ class ReplaceLastEventResource(Resource):
         return {}, 200
 
 
+"""
+
+    VIEWS
+
+"""
+
+
+@api.route("/0/views")
+class ViewListResource(Resource):
+    """
+    """
+
+    def get(self):
+        """
+        """
+        return views.get_views(), 200
+
+
+@api.route("/0/views/<string:viewname>")
+class GetViewResource(Resource):
+    """
+    """
+
+    def get(self, viewname):
+        if viewname not in views.views:
+            return {}, 404
+        result = views.query_view(viewname, app.db)
+        return result, 200
+
+
+@api.route("/0/views/<string:viewname>/info")
+class InfoViewResource(Resource):
+    """
+    """
+
+    def get(self, viewname):
+        return views.get_view(viewname), 200
+
+
+@api.route("/0/views/<string:viewname>/create")
+class CreateViewResource(Resource):
+    """
+    """
+
+    @api.expect(view)
+    def post(self, viewname):
+        view = request.get_json()
+        view["name"] = viewname
+        if "created" not in view:
+            view["created"] = datetime.now(timezone.utc).isoformat()
+        views.views[viewname] = view
+        return {}, 200
+
+
+"""
+
+    LOGGING
+
+"""
+
+
 @api.route("/0/log")
 class LogResource(Resource):
     """
     Server log of the current instance in json format
     """
 
+    @api.expect()
     def get(self):
         """
         Get the server log in json format

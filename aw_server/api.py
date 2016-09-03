@@ -245,14 +245,24 @@ class ViewListResource(Resource):
 
 
 @api.route("/0/views/<string:viewname>")
-class GetViewResource(Resource):
+class QueryViewResource(Resource):
     """
     """
 
+    @api.param("limit", "the maximum number of requests to get")
+    @api.param("start", "Start date of events")
+    @api.param("end", "End date of events")
     def get(self, viewname):
+        """
+        """
         if viewname not in views.views:
             return {}, 404
-        result = views.query_view(viewname, app.db)
+        args = request.args
+        limit = int(args["limit"]) if "limit" in args else -1
+        start = iso8601.parse_date(args["start"]) if "start" in args else None
+        end = iso8601.parse_date(args["end"]) if "end" in args else None
+        
+        result = views.query_view(viewname, app.db, limit, start, end)
         return result, 200
 
 

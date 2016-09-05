@@ -28,8 +28,8 @@ api = Api(blueprint, doc='/')
 app.register_blueprint(blueprint)
 
 fDuration = api.model('Duration', {
-    'value': fields.Float,
-    'unit': fields.String,
+    'value': fields.Float(),
+    'unit': fields.String(),
 })
 
 # TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
@@ -132,7 +132,8 @@ class EventResource(Resource):
             raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
-        return app.db[bucket_id].get(limit, start, end)
+        events = [event.to_json_dict() for event in app.db[bucket_id].get(limit, start, end)]
+        return events
 
     @api.expect(event)
     def post(self, bucket_id):

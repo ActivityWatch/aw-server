@@ -13,7 +13,8 @@ static_folder = os.path.join(app_folder, 'static')
 
 app = Flask("aw-server",
             static_folder=static_folder, static_url_path='')
-CORS(app)   # See: https://flask-cors.readthedocs.org/en/latest/
+# CORS won't be supported until we fix our authentication
+# CORS(app)   # See: https://flask-cors.readthedocs.org/en/latest/
 
 # The following will be set when started
 app.db = None  # type: Datastore

@@ -2,8 +2,7 @@ import logging
 
 from .server import _start
 from .log import setup_logging
-from aw_datastore import Datastore, get_storage_methods, get_storage_method_names
-
+from aw_datastore import get_storage_methods, get_storage_method_names
 
 
 def main():

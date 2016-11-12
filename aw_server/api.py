@@ -34,8 +34,8 @@ class AnyJson(fields.Raw):
 # TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
 
 fDuration = api.model('Duration', {
-    'unit': fields.String,
-    'value': fields.Float,
+    'value': fields.Float(),
+    'unit': fields.String(),
 })
 
 event = api.model('Event', {
@@ -80,7 +80,7 @@ class BadRequest(werkzeug.exceptions.BadRequest):
 """
 
 
-@api.route("/0/buckets")
+@api.route("/0/buckets/")
 class BucketsResource(Resource):
     """
     Used to list buckets.
@@ -157,7 +157,8 @@ class EventResource(Resource):
             raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
-        return app.db[bucket_id].get(limit, start, end)
+        events = [event.to_json_dict() for event in app.db[bucket_id].get(limit, start, end)]
+        return events
 
     @api.expect(event)
     def post(self, bucket_id):
@@ -201,7 +202,7 @@ class EventChunkResource(Resource):
             raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
-        events = app.db[bucket_id].get(start, end)
+        events = app.db[bucket_id].get(-1, start, end)
         return transforms.chunk(events)
 
 

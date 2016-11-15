@@ -13,6 +13,7 @@ from aw_core.models import Event
 from aw_core import transforms, views
 from . import app, logger
 from .log import get_log_file_path
+from aw_core.query import QueryException
 
 
 # SECURITY
@@ -138,7 +139,7 @@ class EventResource(Resource):
     Used to get and create events in a particular bucket.
     """
 
-    #@api.marshal_list_with(event)
+    @api.marshal_list_with(event)
     @api.param("limit", "the maximum number of requests to get")
     @api.param("start", "Start date of events")
     @api.param("end", "End date of events")
@@ -234,53 +235,55 @@ class ReplaceLastEventResource(Resource):
 """
 
 
-@api.route("/0/views")
+@api.route("/0/views/")
 class ViewListResource(Resource):
-    """
-    """
-
     def get(self):
         """
+            Retuns names of all views
         """
         return views.get_views(), 200
 
 
 @api.route("/0/views/<string:viewname>")
 class QueryViewResource(Resource):
-    """
-    """
-
     @api.param("limit", "the maximum number of requests to get")
     @api.param("start", "Start date of events")
     @api.param("end", "End date of events")
     def get(self, viewname):
         """
+            Executes a view query and returns the result
         """
         if viewname not in views.views:
-            return {}, 404
+            return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
         args = request.args
         limit = int(args["limit"]) if "limit" in args else -1
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
-        
-        result = views.query_view(viewname, app.db, limit, start, end)
+
+        try:
+            result = views.query_view(viewname, app.db, limit, start, end)
+        except QueryException as qe:
+            return {"msg": str(qe)}, 500
         return result, 200
 
 
 @api.route("/0/views/<string:viewname>/info")
 class InfoViewResource(Resource):
     """
+        Sends information about the specified view
     """
 
     def get(self, viewname):
+        if viewname not in views.views:
+            return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
         return views.get_view(viewname), 200
 
 
 @api.route("/0/views/<string:viewname>/create")
 class CreateViewResource(Resource):
     """
+        Creates a view
     """
-
     @api.expect(view)
     def post(self, viewname):
         view = request.get_json()

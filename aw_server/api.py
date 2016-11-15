@@ -1,5 +1,5 @@
 from typing import List, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import binascii
 import os
 import json
@@ -10,9 +10,10 @@ from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
 
 from aw_core.models import Event
-from aw_core import transforms
+from aw_core import transforms, views
 from . import app, logger
 from .log import get_log_file_path
+from aw_core.query import QueryException
 
 
 # SECURITY
@@ -27,15 +28,21 @@ api = Api(blueprint, doc='/')
 
 app.register_blueprint(blueprint)
 
+class AnyJson(fields.Raw):
+    def format(self, value):
+        return json.loads(value)
+
+# TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
+
 fDuration = api.model('Duration', {
     'value': fields.Float(),
     'unit': fields.String(),
 })
 
-# TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
 event = api.model('Event', {
     'timestamp': fields.List(fields.DateTime(required=True)),
-    'duration': fields.List(fields.Nested(fDuration)),
+    # Duration validation is broken
+    #'duration': fields.List(fields.Nested(fDuration)),
     'count': fields.List(fields.Integer()),
     'label': fields.List(fields.String(description='Labels on event'))
 })
@@ -55,6 +62,11 @@ create_bucket = api.model('CreateBucket', {
     'hostname': fields.String(required=True),
 })
 
+view = api.model('View',{
+    'name': fields.String,
+    'created': fields.DateTime,
+    'query': AnyJson,  # Can be any dict
+})
 
 class BadRequest(werkzeug.exceptions.BadRequest):
     def __init__(self, type, message):
@@ -62,7 +74,14 @@ class BadRequest(werkzeug.exceptions.BadRequest):
         self.type = type
 
 
-@api.route("/0/buckets")
+"""
+
+    BUCKETS
+
+"""
+
+
+@api.route("/0/buckets/")
 class BucketsResource(Resource):
     """
     Used to list buckets.
@@ -105,6 +124,13 @@ class BucketResource(Resource):
             created=datetime.now()
         )
         return {}, 200
+
+
+"""
+
+    EVENTS
+
+"""
 
 
 @api.route("/0/buckets/<string:bucket_id>/events")
@@ -177,7 +203,7 @@ class EventChunkResource(Resource):
             raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
-        events = app.db[bucket_id].get(start, end)
+        events = app.db[bucket_id].get(-1, start, end)
         return transforms.chunk(events)
 
 
@@ -202,12 +228,86 @@ class ReplaceLastEventResource(Resource):
         return {}, 200
 
 
+"""
+
+    VIEWS
+
+"""
+
+
+@api.route("/0/views/")
+class ViewListResource(Resource):
+    def get(self):
+        """
+            Retuns names of all views
+        """
+        return views.get_views(), 200
+
+
+@api.route("/0/views/<string:viewname>")
+class QueryViewResource(Resource):
+    @api.param("limit", "the maximum number of requests to get")
+    @api.param("start", "Start date of events")
+    @api.param("end", "End date of events")
+    def get(self, viewname):
+        """
+            Executes a view query and returns the result
+        """
+        if viewname not in views.views:
+            return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
+        args = request.args
+        limit = int(args["limit"]) if "limit" in args else -1
+        start = iso8601.parse_date(args["start"]) if "start" in args else None
+        end = iso8601.parse_date(args["end"]) if "end" in args else None
+
+        try:
+            result = views.query_view(viewname, app.db, limit, start, end)
+        except QueryException as qe:
+            return {"msg": str(qe)}, 500
+        return result, 200
+
+
+@api.route("/0/views/<string:viewname>/info")
+class InfoViewResource(Resource):
+    """
+        Sends information about the specified view
+    """
+
+    def get(self, viewname):
+        if viewname not in views.views:
+            return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
+        return views.get_view(viewname), 200
+
+
+@api.route("/0/views/<string:viewname>/create")
+class CreateViewResource(Resource):
+    """
+        Creates a view
+    """
+    @api.expect(view)
+    def post(self, viewname):
+        view = request.get_json()
+        view["name"] = viewname
+        if "created" not in view:
+            view["created"] = datetime.now(timezone.utc).isoformat()
+        views.create_view(view)
+        return {}, 200
+
+
+"""
+
+    LOGGING
+
+"""
+
+
 @api.route("/0/log")
 class LogResource(Resource):
     """
     Server log of the current instance in json format
     """
 
+    @api.expect()
     def get(self):
         """
         Get the server log in json format

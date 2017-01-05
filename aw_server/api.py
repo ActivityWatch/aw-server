@@ -1,7 +1,5 @@
-from typing import List, Dict
-from datetime import datetime, timedelta, timezone
-import binascii
-import os
+from typing import Dict
+from datetime import datetime, timezone
 import json
 import iso8601
 import werkzeug.exceptions
@@ -12,7 +10,7 @@ from flask_restplus import Api, Resource, fields
 from aw_core.models import Event
 from aw_core import transforms, views
 from . import app, logger
-from .log import get_log_file_path
+from aw_core.log import get_log_file_path
 from aw_core.query import QueryException
 
 
@@ -27,6 +25,7 @@ blueprint = Blueprint('api', __name__, url_prefix='/api')
 api = Api(blueprint, doc='/')
 
 app.register_blueprint(blueprint)
+
 
 class AnyJson(fields.Raw):
     def format(self, value):
@@ -61,16 +60,29 @@ create_bucket = api.model('CreateBucket', {
     'hostname': fields.String(required=True),
 })
 
-view = api.model('View',{
+view = api.model('View', {
     'name': fields.String,
     'created': fields.DateTime,
     'query': AnyJson,  # Can be any dict
 })
 
+
 class BadRequest(werkzeug.exceptions.BadRequest):
     def __init__(self, type, message):
         super().__init__(message)
         self.type = type
+
+
+def checkBucketExists(bucket_id):
+    if bucket_id not in app.db.buckets():
+        # FIXME: Really ugly, but should get rid of a lot of errors. We need a better solution for
+        # when a client tries to add queued events to a removed bucket. Such as always ensuring the
+        # bucket exists at initialization (which ensures the client will work properly again after a restart).
+        app.db.create_bucket(bucket_id, type="unknown", client="unknown", hostname="unknown")
+        # msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
+        # logger.error(msg)
+        # raise BadRequest("NoSuchBucket", msg)
+        # bucketNotFound = "bucket not found", 404
 
 
 """
@@ -86,9 +98,9 @@ class BucketsResource(Resource):
     Used to list buckets.
     """
 
-    def get(self):
+    def get(self) -> Dict[str, Dict]:
         """
-        Get list of all buckets
+        Get dict {bucket_name: Bucket} of all buckets
         """
         logger.debug("Received get request for buckets")
         return app.db.buckets()
@@ -99,13 +111,19 @@ class BucketResource(Resource):
     """
     Used to get metadata about buckets and create them.
     """
+
     @api.marshal_with(bucket)
     def get(self, bucket_id):
         """
         Get metadata about bucket
         """
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
-        return app.db[bucket_id].metadata()
+
+        try:
+            bucket = app.db[bucket_id]
+            return bucket.metadata()
+        except KeyError:
+            return "bucket with id not found", 404
 
     @api.expect(create_bucket)
     def post(self, bucket_id):
@@ -151,10 +169,7 @@ class EventResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        if bucket_id not in app.db.buckets():
-            msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
-            logger.error(msg)
-            raise BadRequest("NoSuchBucket", msg)
+        checkBucketExists(bucket_id)
 
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
         events = [event.to_json_dict() for event in app.db[bucket_id].get(limit, start, end)]
@@ -166,6 +181,9 @@ class EventResource(Resource):
         Create events for a bucket
         """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+
+        checkBucketExists(bucket_id)
+
         data = request.get_json()
         events = []
         if isinstance(data, dict):
@@ -196,10 +214,7 @@ class EventChunkResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        if bucket_id not in app.db.buckets():
-            msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
-            logger.error(msg)
-            raise BadRequest("NoSuchBucket", msg)
+        checkBucketExists(bucket_id)
 
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
         events = app.db[bucket_id].get(-1, start, end)
@@ -219,6 +234,9 @@ class ReplaceLastEventResource(Resource):
         """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
         data = request.get_json()
+
+        checkBucketExists(bucket_id)
+
         if isinstance(data, dict):
             app.db[bucket_id].replace_last(Event(**data))
         else:

@@ -1,8 +1,10 @@
 import logging
 
-from .server import _start
-from .log import setup_logging
 from aw_datastore import get_storage_methods, get_storage_method_names
+from aw_core.log import setup_logging
+
+from .server import _start
+from .log import config_flask_logging
 
 
 def main():
@@ -10,14 +12,20 @@ def main():
 
     args, storage_method = parse_args()
 
-    setup_logging(args)
+    # FIXME: The LogResource API endpoint relies on the log being in JSON format
+    # at the path specified by aw_core.log.get_log_file_path(). We probably want
+    # to write the LogResource API so that it does not depend on any physical file
+    # but instead add a logging handler that it can use privately.
+    # That is why log_file_json=True currently.
+    setup_logging("aw-server", testing=args.testing, verbose=False,
+                  log_stderr=True, log_file=True, log_file_json=True)
+    config_flask_logging()
 
     logger = logging.getLogger("main")
     logger.info("Using storage method: {}".format(args.storage))
 
     if args.testing:
         logger.info("Will run in testing mode")
-        logger.debug("Using args: {}".format(args))
 
     logger.info("Starting up...")
     _start(port=args.port, testing=args.testing, storage_method=storage_method)

@@ -45,6 +45,12 @@ event = api.model('Event', {
     'label': fields.List(fields.String(description='Labels on event'))
 })
 
+heartbeat = api.model('Event', {
+    'timestamp': fields.List(fields.DateTime(required=True)),
+    'count': fields.List(fields.Integer()),
+    'label': fields.List(fields.String(description='Labels on event'))
+})
+
 bucket = api.model('Bucket', {
     'id': fields.String(required=True, description='The buckets unique id'),
     'name': fields.String(required=False, description='The buckets readable and renameable name'),
@@ -185,15 +191,7 @@ class EventResource(Resource):
         checkBucketExists(bucket_id)
 
         data = request.get_json()
-        events = []
-        if isinstance(data, dict):
-            events = [Event(**data)]
-        elif isinstance(data, list):
-            for e in data:
-                events.append(Event(**e))
-        else:
-            logger.error("Invalid JSON object")
-            raise BadRequest("InvalidJSON", "Invalid JSON object")
+        events = Event.from_json_obj(data)
         app.db[bucket_id].insert(events)
         return {}, 200
 
@@ -244,6 +242,43 @@ class ReplaceLastEventResource(Resource):
             raise BadRequest("InvalidJSON", "Invalid JSON object")
         return {}, 200
 
+
+@api.route("/0/buckets/<string:bucket_id>/heartbeat")
+class HeartbeatResource(Resource):
+    """
+    Heartbeats are useful when implementing watchers that simply keep
+    track of a state, when it's a certain value and when it changes.
+
+    Heartbeats are essentially events without durations.
+
+    If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
+    If the heartbeat differed, then a new event is created.
+
+    Such as:
+     - Active application and window title (aw-watcher-window)
+     - Active browser tab (aw-watcher-web)
+     - Currently open document (wakatime)
+
+    Might be badly suited for:
+     - Has activity occurred? (aw-watcher-afk)
+
+    Inspired by: https://wakatime.com/developers#heartbeats
+    """
+
+    @api.expect(heartbeat)
+    def post(self, bucket_id):
+        """
+        Where heartbeats are sent.
+        """
+        logger.debug("Received post request for heartbeat in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+
+        checkBucketExists(bucket_id)
+
+        data = request.get_json()
+
+        # TODO: Do the thing here
+
+        return "not implemented", 500
 
 """
 

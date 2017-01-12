@@ -47,7 +47,6 @@ event = api.model('Event', {
 
 heartbeat = api.model('Event', {
     'timestamp': fields.List(fields.DateTime(required=True)),
-    'count': fields.List(fields.Integer()),
     'label': fields.List(fields.String(description='Labels on event'))
 })
 

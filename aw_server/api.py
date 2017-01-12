@@ -231,15 +231,15 @@ class ReplaceLastEventResource(Resource):
         Replace last event inserted into the bucket
         """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
-        data = request.get_json()
 
         checkBucketExists(bucket_id)
+        data = request.get_json()
 
-        if isinstance(data, dict):
-            app.db[bucket_id].replace_last(Event(**data))
-        else:
+        if not isinstance(data, dict):
             logger.error("Invalid JSON object")
             raise BadRequest("InvalidJSON", "Invalid JSON object")
+
+        app.db[bucket_id].replace_last(Event(**data))
         return {}, 200
 
 
@@ -266,6 +266,7 @@ class HeartbeatResource(Resource):
     """
 
     @api.expect(heartbeat)
+    @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
     def post(self, bucket_id):
         """
         Where heartbeats are sent.
@@ -273,12 +274,37 @@ class HeartbeatResource(Resource):
         logger.debug("Received post request for heartbeat in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
 
         checkBucketExists(bucket_id)
+        if "pulsetime" not in request.args:
+            raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
 
         data = request.get_json()
+        pulsetime = float(request.args["pulsetime"])
 
-        # TODO: Do the thing here
+        if not isinstance(data, dict):
+            logger.error("Invalid JSON object")
+            raise BadRequest("InvalidJSON", "Invalid JSON object")
 
-        return "not implemented", 500
+        heartbeat = Event(**data)
+        events = app.db[bucket_id].get(limit=1)
+
+        if len(events) == 1:
+            print("found a last event")
+            last_event = events[0]
+
+            # Diff between timestamps in seconds, takes into account the duration of the last event
+            ts_diff_seconds = (heartbeat.timestamp - last_event.timestamp).total_seconds()
+            last_duration_seconds = last_event.duration.total_seconds() if last_event.duration else 0
+
+            if last_event.labels == heartbeat.labels and ts_diff_seconds < pulsetime + last_duration_seconds:
+                last_event.duration = {"value": ts_diff_seconds, "unit": "s"}
+
+                app.db[bucket_id].replace_last(last_event)
+                return last_event.to_json_dict(), 200
+
+        print("last event either didn't exist, didn't have identical labels or was too old. heartbeat will be stored as new event")
+        app.db[bucket_id].insert(heartbeat)
+        return heartbeat.to_json_dict(), 200
+
 
 """
 

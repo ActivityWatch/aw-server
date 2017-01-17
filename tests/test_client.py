@@ -11,7 +11,8 @@ logging.basicConfig(level=logging.WARN)
 class ClientTest(unittest.TestCase):
     def setUp(self):
         self.client = ActivityWatchClient("unittest", testing=True)
-        self.client.create_bucket("test", "testevents")
+        self.client.setup_bucket("test", "testevents")
+        self.client.connect()
 
     def test_send_event(self):
         self.client.send_event("test", Event(timestamp=datetime.now(), label="test"))

@@ -133,7 +133,7 @@ class BucketResource(Resource):
     @api.expect(create_bucket)
     def post(self, bucket_id):
         """
-        Create bucktet
+        Create bucket
         """
         data = request.get_json()
         if bucket_id in app.db.buckets():

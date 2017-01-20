@@ -263,6 +263,7 @@ class HeartbeatResource(Resource):
 
     @api.expect(heartbeat)
     @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
+    @api.param("create_bucket", "Will automatically create a bucket if set")
     def post(self, bucket_id):
         """
         Where heartbeats are sent.
@@ -270,8 +271,18 @@ class HeartbeatResource(Resource):
         logger.debug("Received post request for heartbeat in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
 
         if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
+            if "create_bucket" in request.args:
+                # TODO: How should we pass type, client and hostname? As args? Arg for createbucket could be a JSON object (it would be short).
+                app.db.create_bucket(
+                    bucket_id,
+                    type='unspecified',  # data["type"],
+                    client='unknown',  # data["client"],
+                    hostname='unknown',  # data["hostname"],
+                    created=datetime.now()
+                )
+            else:
+                msg = "There's no bucket named {}".format(bucket_id)
+                raise BadRequest("NoSuchBucket", msg)
 
         if "pulsetime" not in request.args:
             raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
@@ -284,23 +295,44 @@ class HeartbeatResource(Resource):
             raise BadRequest("InvalidJSON", "Invalid JSON object")
 
         heartbeat = Event(**data)
-        events = app.db[bucket_id].get(limit=1)
+        events = app.db[bucket_id].get(limit=3)
 
-        if len(events) == 1:
-            print("found a last event")
+        # FIXME: The below is needed due to the weird fact that for some reason
+        # events[0] turns out to be the *oldest* event,
+        # events[1] turns out to be the latest,
+        # events[2] the second latest, etc.
+        events = sorted(events, key=lambda e: e.timestamp, reverse=True)
+
+        # Uncomment this to verify my above claim:
+        #  for e in events:
+        #      print(e.timestamp)
+        #      print(e.labels)
+
+        if len(events) >= 1:
             last_event = events[0]
+            # print("found a last event")
+            # print(last_event)
 
-            # Diff between timestamps in seconds, takes into account the duration of the last event
-            ts_diff_seconds = (heartbeat.timestamp - last_event.timestamp).total_seconds()
-            last_duration_seconds = last_event.duration.total_seconds() if last_event.duration else 0
+            if json.dumps(last_event.labels) == json.dumps(heartbeat.labels):
+                # print("Passed labels check")
 
-            if last_event.labels == heartbeat.labels and ts_diff_seconds < pulsetime + last_duration_seconds:
-                last_event.duration = {"value": ts_diff_seconds, "unit": "s"}
+                # Diff between timestamps in seconds, takes into account the duration of the last event
+                ts_diff_seconds = (heartbeat.timestamp - last_event.timestamp).total_seconds()
+                last_duration_seconds = last_event.duration.total_seconds() if last_event.duration else 0
 
-                app.db[bucket_id].replace_last(last_event)
-                return last_event.to_json_dict(), 200
+                if ts_diff_seconds < pulsetime + last_duration_seconds:
+                    print("Passed ts_diff check")
+                    last_event.duration = {"value": ts_diff_seconds, "unit": "s"}
 
-        print("last event either didn't exist, didn't have identical labels or was too old. heartbeat will be stored as new event")
+                    app.db[bucket_id].replace_last(last_event)
+                    return last_event.to_json_dict(), 200
+            else:
+                pass
+                # print("Did not pass labels check")
+                # print(json.dumps(last_event.labels))
+                # print(json.dumps(heartbeat.labels))
+
+        logger.debug("last event either didn't exist, didn't have identical labels or was too old. heartbeat will be stored as new event")
         app.db[bucket_id].insert(heartbeat)
         return heartbeat.to_json_dict(), 200
 

@@ -321,7 +321,7 @@ class HeartbeatResource(Resource):
                 last_duration_seconds = last_event.duration.total_seconds() if last_event.duration else 0
 
                 if ts_diff_seconds < pulsetime + last_duration_seconds:
-                    print("Passed ts_diff check")
+                    # print("Passed ts_diff check")
                     last_event.duration = {"value": ts_diff_seconds, "unit": "s"}
 
                     app.db[bucket_id].replace_last(last_event)

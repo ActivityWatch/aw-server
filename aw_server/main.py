@@ -17,7 +17,7 @@ def main():
     # to write the LogResource API so that it does not depend on any physical file
     # but instead add a logging handler that it can use privately.
     # That is why log_file_json=True currently.
-    setup_logging("aw-server", testing=args.testing, verbose=False,
+    setup_logging("aw-server", testing=args.testing, verbose=args.verbose,
                   log_stderr=True, log_file=True, log_file_json=True)
     config_flask_logging()
 
@@ -41,6 +41,9 @@ def parse_args():
     parser.add_argument('--testing',
                         action='store_true',
                         help='Run aw-server in testing mode using different ports and database')
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        help='Be chatty.')
     parser.add_argument('--log-json',
                         action='store_true',
                         help='Output the logs in JSON format')

@@ -96,7 +96,14 @@ class BucketsResource(Resource):
         Get dict {bucket_name: Bucket} of all buckets
         """
         logger.debug("Received get request for buckets")
-        return app.db.buckets()
+        buckets = app.db.buckets()
+        for b in buckets:
+            last_events = app.db[b].get(limit=1)
+            if len(last_events) > 0:
+                last_event = last_events[0]
+                last_updated = last_event.timestamp + last_event.duration
+                buckets[b]["last_updated"] = last_updated.isoformat()
+        return buckets
 
 
 @api.route("/0/buckets/<string:bucket_id>")

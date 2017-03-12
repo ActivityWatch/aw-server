@@ -1,5 +1,6 @@
 from typing import Dict
 from datetime import datetime, timezone
+from socket import gethostname
 import json
 import iso8601
 import werkzeug.exceptions
@@ -32,6 +33,11 @@ class AnyJson(fields.Raw):
         return json.loads(value)
 
 # TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
+
+info = api.model('Info', {
+    'hostname': fields.String(),
+    'testing': fields.Boolean(),
+})
 
 fDuration = api.model('Duration', {
     'value': fields.Float(),
@@ -77,6 +83,20 @@ class BadRequest(werkzeug.exceptions.BadRequest):
         super().__init__(message)
         self.type = type
 
+
+@api.route("/0/info/")
+class InfoResource(Resource):
+    """
+    Lists info about the aw-server.
+    """
+
+    @api.marshal_with(info)
+    def get(self) -> Dict[str, Dict]:
+        payload = {
+            'hostname': gethostname(),
+            'testing': app.config['DEBUG'] # Checks if flask is run in debug mode, which it will depending on if it is in testing mode or not
+        }
+        return payload
 
 """
 

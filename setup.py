@@ -19,7 +19,7 @@ setup(name='aw-server',
           'flask-restplus>=0.9.2',
           'flask-cors>=2.1',
           'pymongo>=3.2',
-          'appdirs==1.4.0',
+          'appdirs>=1.4.0',
           'python-json-logger>=0.1.5'
       ],
       dependency_links=[

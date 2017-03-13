@@ -1,5 +1,6 @@
 from typing import Dict
 from datetime import datetime, timezone
+from socket import gethostname
 import json
 import iso8601
 import werkzeug.exceptions
@@ -33,6 +34,11 @@ class AnyJson(fields.Raw):
 
 # TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
 
+info = api.model('Info', {
+    'hostname': fields.String(),
+    'testing': fields.Boolean(),
+})
+
 fDuration = api.model('Duration', {
     'value': fields.Float(),
     'unit': fields.String(),
@@ -42,6 +48,11 @@ event = api.model('Event', {
     'timestamp': fields.List(fields.DateTime(required=True)),
     'duration': fields.List(fields.Nested(fDuration)),
     'count': fields.List(fields.Integer()),
+    'label': fields.List(fields.String(description='Labels on event'))
+})
+
+heartbeat = api.model('Event', {
+    'timestamp': fields.List(fields.DateTime(required=True)),
     'label': fields.List(fields.String(description='Labels on event'))
 })
 
@@ -73,17 +84,19 @@ class BadRequest(werkzeug.exceptions.BadRequest):
         self.type = type
 
 
-def checkBucketExists(bucket_id):
-    if bucket_id not in app.db.buckets():
-        # FIXME: Really ugly, but should get rid of a lot of errors. We need a better solution for
-        # when a client tries to add queued events to a removed bucket. Such as always ensuring the
-        # bucket exists at initialization (which ensures the client will work properly again after a restart).
-        app.db.create_bucket(bucket_id, type="unknown", client="unknown", hostname="unknown")
-        # msg = "Unable to fetch data from bucket {}, because it doesn't exist".format(bucket_id)
-        # logger.error(msg)
-        # raise BadRequest("NoSuchBucket", msg)
-        # bucketNotFound = "bucket not found", 404
+@api.route("/0/info/")
+class InfoResource(Resource):
+    """
+    Lists info about the aw-server.
+    """
 
+    @api.marshal_with(info)
+    def get(self) -> Dict[str, Dict]:
+        payload = {
+            'hostname': gethostname(),
+            'testing': app.config['DEBUG'] # Checks if flask is run in debug mode, which it will depending on if it is in testing mode or not
+        }
+        return payload
 
 """
 
@@ -103,7 +116,14 @@ class BucketsResource(Resource):
         Get dict {bucket_name: Bucket} of all buckets
         """
         logger.debug("Received get request for buckets")
-        return app.db.buckets()
+        buckets = app.db.buckets()
+        for b in buckets:
+            last_events = app.db[b].get(limit=1)
+            if len(last_events) > 0:
+                last_event = last_events[0]
+                last_updated = last_event.timestamp + last_event.duration
+                buckets[b]["last_updated"] = last_updated.isoformat()
+        return buckets
 
 
 @api.route("/0/buckets/<string:bucket_id>")
@@ -119,20 +139,21 @@ class BucketResource(Resource):
         """
         logger.debug("Received get request for bucket '{}'".format(bucket_id))
 
-        try:
-            bucket = app.db[bucket_id]
-            return bucket.metadata()
-        except KeyError:
-            return "bucket with id not found", 404
+        if bucket_id not in app.db.buckets():
+            msg = "There's no bucket named {}".format(bucket_id)
+            raise BadRequest("NoSuchBucket", msg)
+
+        bucket = app.db[bucket_id]
+        return bucket.metadata()
 
     @api.expect(create_bucket)
     def post(self, bucket_id):
         """
-        Create bucktet
+        Create bucket
         """
         data = request.get_json()
         if bucket_id in app.db.buckets():
-            raise BadRequest("BucketAlreadyExists", "A bucket with this name already exists, cannot create it")
+            raise BadRequest("BucketExists", "A bucket with this name already exists, cannot create it")
         app.db.create_bucket(
             bucket_id,
             type=data["type"],
@@ -169,7 +190,9 @@ class EventResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        checkBucketExists(bucket_id)
+        if bucket_id not in app.db.buckets():
+            msg = "There's no bucket named {}".format(bucket_id)
+            raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
         events = [event.to_json_dict() for event in app.db[bucket_id].get(limit, start, end)]
@@ -182,18 +205,12 @@ class EventResource(Resource):
         """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
 
-        checkBucketExists(bucket_id)
+        if bucket_id not in app.db.buckets():
+            msg = "There's no bucket named {}".format(bucket_id)
+            raise BadRequest("NoSuchBucket", msg)
 
         data = request.get_json()
-        events = []
-        if isinstance(data, dict):
-            events = [Event(**data)]
-        elif isinstance(data, list):
-            for e in data:
-                events.append(Event(**e))
-        else:
-            logger.error("Invalid JSON object")
-            raise BadRequest("InvalidJSON", "Invalid JSON object")
+        events = Event.from_json_obj(data)
         app.db[bucket_id].insert(events)
         return {}, 200
 
@@ -214,7 +231,9 @@ class EventChunkResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        checkBucketExists(bucket_id)
+        if bucket_id not in app.db.buckets():
+            msg = "There's no bucket named {}".format(bucket_id)
+            raise BadRequest("NoSuchBucket", msg)
 
         logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
         events = app.db[bucket_id].get(-1, start, end)
@@ -233,16 +252,102 @@ class ReplaceLastEventResource(Resource):
         Replace last event inserted into the bucket
         """
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+
+        if bucket_id not in app.db.buckets():
+            msg = "There's no bucket named {}".format(bucket_id)
+            raise BadRequest("NoSuchBucket", msg)
         data = request.get_json()
 
-        checkBucketExists(bucket_id)
-
-        if isinstance(data, dict):
-            app.db[bucket_id].replace_last(Event(**data))
-        else:
+        if not isinstance(data, dict):
             logger.error("Invalid JSON object")
             raise BadRequest("InvalidJSON", "Invalid JSON object")
+
+        app.db[bucket_id].replace_last(Event(**data))
         return {}, 200
+
+
+@api.route("/0/buckets/<string:bucket_id>/heartbeat")
+class HeartbeatResource(Resource):
+    """
+    Heartbeats are useful when implementing watchers that simply keep
+    track of a state, when it's a certain value and when it changes.
+
+    Heartbeats are essentially events without durations.
+
+    If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
+    If the heartbeat differed, then a new event is created.
+
+    Such as:
+     - Active application and window title (aw-watcher-window)
+     - Active browser tab (aw-watcher-web)
+     - Currently open document (wakatime)
+
+    Might be badly suited for:
+     - Has activity occurred? (aw-watcher-afk)
+
+    Inspired by: https://wakatime.com/developers#heartbeats
+    """
+
+    @api.expect(heartbeat)
+    @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
+    @api.param("create_bucket", "Will automatically create a bucket if set")
+    def post(self, bucket_id):
+        """
+        Where heartbeats are sent.
+        """
+        logger.debug("Received post request for heartbeat in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+
+        if bucket_id not in app.db.buckets():
+            # NOTE: This "create_bucket" arg is deprecated
+            if "create_bucket" in request.args:
+                # TODO: How should we pass type, client and hostname? As args? Arg for createbucket could be a JSON object (it would be short).
+                app.db.create_bucket(
+                    bucket_id,
+                    type='unspecified',  # data["type"],
+                    client='unknown',  # data["client"],
+                    hostname='unknown',  # data["hostname"],
+                    created=datetime.now()
+                )
+            else:
+                msg = "There's no bucket named {}".format(bucket_id)
+                raise BadRequest("NoSuchBucket", msg)
+
+        if "pulsetime" not in request.args:
+            raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
+
+        data = request.get_json()
+        pulsetime = float(request.args["pulsetime"])
+
+        if not isinstance(data, dict):
+            logger.error("Invalid JSON object")
+            raise BadRequest("InvalidJSON", "Invalid JSON object")
+
+        heartbeat = Event(**data)
+        events = app.db[bucket_id].get(limit=3)
+
+        # FIXME: The below is needed due to the weird fact that for some reason
+        # events[0] turns out to be the *oldest* event,
+        # events[1] turns out to be the latest,
+        # events[2] the second latest, etc.
+        events = sorted(events, key=lambda e: e.timestamp, reverse=True)
+
+        # Uncomment this to verify my above claim:
+        #  for e in events:
+        #      print(e.timestamp)
+        #      print(e.labels)
+
+        if len(events) >= 1:
+            last_event = events[0]
+            merged = transforms.heartbeat_merge(last_event, heartbeat, pulsetime)
+            if merged is not None:
+                # Heartbeat was merged into last_event
+                app.db[bucket_id].replace_last(merged)
+                return merged.to_json_dict(), 200
+
+        # Heartbeat should be stored as new event
+        logger.debug("last event either didn't have identical labels, was too old or didn't exist. heartbeat will be stored as new event")
+        app.db[bucket_id].insert(heartbeat)
+        return heartbeat.to_json_dict(), 200
 
 
 """

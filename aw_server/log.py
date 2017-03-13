@@ -20,7 +20,7 @@ class FlaskLogHandler(serving.WSGIRequestHandler):
         msg = args[0]
         code = args[1]
 
-        if code in [200, 304]:
+        if code in [200, 301, 304, 404]:
             levelname = "debug"
             # type = "debug"
 

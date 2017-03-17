@@ -38,11 +38,11 @@ def static_js(path):
 
 
 # Only to be called from aw_server.main function!
-def _start(storage_method, port=5600, testing=False):
+def _start(storage_method, host, port, testing=False):
     if testing:
         # CORS won't be supported in non-testing mode until we fix our authentication
         CORS(app)   # See: https://flask-cors.readthedocs.org/en/latest/
         logger.warning("CORS is enabled when ran in testing mode")
 
     app.db = Datastore(storage_method, testing=testing)
-    app.run(debug=testing, port=port, request_handler=FlaskLogHandler)
+    app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler)

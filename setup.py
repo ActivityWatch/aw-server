@@ -21,6 +21,10 @@ setup(name='aw-server',
           'pymongo>=3.2',
           'appdirs>=1.4.0',
           'python-json-logger>=0.1.5'
+          # There is an issue in PyInstaller which doesn't like
+          # some async stuff that was introduced in Jinja 2.9.
+          # This is a workaround.
+          'jinja2==2.8.5',
       ],
       dependency_links=[
           'https://github.com/ActivityWatch/aw-core/tarball/master#egg=aw-core-0.1.0'

@@ -14,13 +14,18 @@ setup(name='aw-server',
       include_package_data=True,
 
       install_requires=[
+          # There is an issue in PyInstaller which doesn't like
+          # some async stuff that was introduced in Jinja 2.9.
+          # This is a workaround.
+          'jinja2==2.8.1',
+
           'aw-core>=0.1',
           'flask>=0.10',
           'flask-restplus>=0.9.2',
           'flask-cors>=2.1',
           'pymongo>=3.2',
           'appdirs>=1.4.0',
-          'python-json-logger>=0.1.5'
+          'python-json-logger>=0.1.5',
       ],
       dependency_links=[
           'https://github.com/ActivityWatch/aw-core/tarball/master#egg=aw-core-0.1.0'

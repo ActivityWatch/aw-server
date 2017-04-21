@@ -215,31 +215,6 @@ class EventResource(Resource):
         return {}, 200
 
 
-@api.route("/0/buckets/<string:bucket_id>/events/chunk")
-class EventChunkResource(Resource):
-    """
-    Used to get chunked events
-    """
-
-    @api.param("start", "Start date of chunk")
-    @api.param("end", "End date of chunk")
-    def get(self, bucket_id):
-        """
-        Get chunked events from a bucket
-        """
-        args = request.args
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
-
-        if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
-
-        logger.debug("Received chunk request for bucket '{}' between '{}' and '{}'".format(bucket_id, start, end))
-        events = app.db[bucket_id].get(-1, start, end)
-        return transforms.chunk(events)
-
-
 @api.route("/0/buckets/<string:bucket_id>/events/replace_last")
 class ReplaceLastEventResource(Resource):
     """

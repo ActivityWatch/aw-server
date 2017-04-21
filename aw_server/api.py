@@ -387,7 +387,7 @@ class QueryViewResource(Resource):
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
         try:
-            result = views.query_view(viewname, app.db, limit, start, end)
+            result = views.query_view(viewname, app.db, start, end)
         except QueryException as qe:
             return {"msg": str(qe)}, 500
         return result, 200

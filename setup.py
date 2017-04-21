@@ -17,7 +17,7 @@ setup(name='aw-server',
           # There is an issue in PyInstaller which doesn't like
           # some async stuff that was introduced in Jinja 2.9.
           # This is a workaround.
-          'jinja2==2.8.1',
+          'jinja2>=2.8,<2.9',
 
           'aw-core>=0.1',
           'flask>=0.10',

@@ -52,13 +52,13 @@ event = api.model('Event', {
     'duration': fields.Nested(fDuration),
     'count': fields.Integer(),
     'label': fields.String(description='Label on event'),
-    'keyvals': AnyJson,  # Can be any dict
+    'data': AnyJson,  # Can be any dict
 })
 
 heartbeat = api.model('Event', {
     'timestamp': fields.DateTime(required=True),
     'label': fields.String(description='Label on event'),
-    'keyvals': AnyJson,  # Can be any dict
+    'data': AnyJson,  # Can be any dict
 })
 
 bucket = api.model('Bucket', {

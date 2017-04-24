@@ -42,16 +42,9 @@ info = api.model('Info', {
     'testing': fields.Boolean(),
 })
 
-fDuration = api.model('Duration', {
-    'value': fields.Float(),
-    'unit': fields.String(),
-})
-
 event = api.model('Event', {
     'timestamp': fields.DateTime(required=True),
-    'duration': fields.Nested(fDuration),
-    'count': fields.Integer(),
-    'label': fields.String(description='Label on event'),
+    'duration': fields.Float,
     'data': AnyJson,  # Can be any dict
 })
 

@@ -223,16 +223,22 @@ class EventResource(Resource):
     @api.expect(event)
     def post(self, bucket_id):
         """
-        Create events for a bucket
+        Create events for a bucket. Can handle both single events and multiple ones.
         """
-        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
+        data = request.get_json()
+        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, data))
 
         if bucket_id not in app.db.buckets():
             msg = "There's no bucket named {}".format(bucket_id)
             raise BadRequest("NoSuchBucket", msg)
 
-        data = request.get_json()
-        events = [Event(**e) for e in data]
+        if isinstance(data, dict):
+            events = [Event(**data)]
+        elif isinstance(data, list):
+            events = [Event(**e) for e in data]
+        else:
+            raise BadRequest("Invalid POST data", "")
+
         app.db[bucket_id].insert(events)
         return {}, 200
 

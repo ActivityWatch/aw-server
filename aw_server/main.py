@@ -1,42 +1,44 @@
 import logging
 
-from aw_datastore import get_storage_methods, get_storage_method_names
+from aw_datastore import get_storage_methods
 from aw_core.log import setup_logging
 
 from .server import _start
+from .config import config
 from .log import config_flask_logging
 
 
 def main():
     """Called from the executable and __main__.py"""
 
-    args, storage_method = parse_args()
+    settings, storage_method = parse_settings()
 
     # FIXME: The LogResource API endpoint relies on the log being in JSON format
     # at the path specified by aw_core.log.get_log_file_path(). We probably want
     # to write the LogResource API so that it does not depend on any physical file
     # but instead add a logging handler that it can use privately.
     # That is why log_file_json=True currently.
-    setup_logging("aw-server", testing=args.testing, verbose=args.verbose,
+    setup_logging("aw-server", testing=settings.testing, verbose=settings.verbose,
                   log_stderr=True, log_file=True, log_file_json=True)
     config_flask_logging()
 
     logger = logging.getLogger("main")
-    logger.info("Using storage method: {}".format(args.storage))
+    logger.info("Using storage method: {}".format(settings.storage))
 
-    if args.testing:
+    if settings.testing:
         logger.info("Will run in testing mode")
 
     logger.info("Starting up...")
-    _start(port=args.port, testing=args.testing, storage_method=storage_method)
+    _start(host=settings.host, port=settings.port,
+           testing=settings.testing, storage_method=storage_method)
 
 
-def parse_args():
+def parse_settings():
     import argparse
 
     storage_methods = get_storage_methods()
-    storage_method_names = get_storage_method_names()
 
+    """ CLI Arguments """
     parser = argparse.ArgumentParser(description='Starts an ActivityWatch server')
     parser.add_argument('--testing',
                         action='store_true',
@@ -47,18 +49,28 @@ def parse_args():
     parser.add_argument('--log-json',
                         action='store_true',
                         help='Output the logs in JSON format')
+    parser.add_argument('--host',
+                        dest='host',
+                        help='Which host address to bind the server to')
     parser.add_argument('--port',
                         dest='port',
                         type=int,
-                        default=None,
                         help='Which port to run the server on')
     parser.add_argument('--storage', dest='storage',
-                        choices=storage_method_names,
-                        default=storage_method_names[0],
                         help='The method to use for storing data. Some methods (such as MongoDB) require specific Python packages to be available (in the MongoDB case: pymongo)')
-
     args = parser.parse_args()
-    if not args.port:
-        args.port = 5600 if not args.testing else 5666
-    storage_method = storage_methods[storage_method_names.index(args.storage)]
-    return args, storage_method
+
+    """ Parse config file """
+    configsection = "server" if not args.testing else "server-testing"
+    settings = argparse.Namespace()
+    settings.host = config[configsection]["host"]
+    settings.port = config[configsection].getint("port")
+    settings.storage = config[configsection]["storage"]
+
+    """ If a argument is not none, override the config value """
+    for key, value in vars(args).items():
+        if value != None:
+            vars(settings)[key] = value
+
+    storage_method = storage_methods[settings.storage]
+    return settings, storage_method

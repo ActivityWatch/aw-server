@@ -30,7 +30,10 @@ app.register_blueprint(blueprint)
 
 class AnyJson(fields.Raw):
     def format(self, value):
-        return json.loads(value)
+        if type(value) == dict:
+            return value
+        else:
+            return json.loads(value)
 
 # TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
 
@@ -39,21 +42,16 @@ info = api.model('Info', {
     'testing': fields.Boolean(),
 })
 
-fDuration = api.model('Duration', {
-    'value': fields.Float(),
-    'unit': fields.String(),
-})
-
 event = api.model('Event', {
-    'timestamp': fields.List(fields.DateTime(required=True)),
-    'duration': fields.List(fields.Nested(fDuration)),
-    'count': fields.List(fields.Integer()),
-    'label': fields.List(fields.String(description='Labels on event'))
+    'timestamp': fields.DateTime(required=True),
+    'duration': fields.Float,
+    'data': AnyJson,  # Can be any dict
 })
 
 heartbeat = api.model('Event', {
-    'timestamp': fields.List(fields.DateTime(required=True)),
-    'label': fields.List(fields.String(description='Labels on event'))
+    'timestamp': fields.DateTime(required=True),
+    'label': fields.String(description='Label on event'),
+    'data': AnyJson,  # Can be any dict
 })
 
 bucket = api.model('Bucket', {
@@ -164,6 +162,30 @@ class BucketResource(Resource):
         return {}, 200
 
 
+@api.route("/0/buckets/<string:bucket_id>/delete")
+class DeleteBucketResource(Resource):
+    """
+    Used to delete buckets
+    """
+
+    def get(self, bucket_id):
+        """
+        Delete a bucket (only possible when run in testing mode)
+        """
+        testing = app.config['DEBUG']
+        if not testing:
+            msg = "Deleting buckets is only permitted if aw-server is running in testing mode"
+            raise BadRequest("PermissionDenied", msg)
+
+        if bucket_id not in app.db.buckets():
+            msg = "There's no bucket named {}".format(bucket_id)
+            raise BadRequest("NoSuchBucket", msg)
+
+        bucket = app.db.delete_bucket(bucket_id)
+        logger.warning("Deleted bucket '{}'".format(bucket_id))
+        return {}, 200
+
+
 """
 
     EVENTS
@@ -210,7 +232,7 @@ class EventResource(Resource):
             raise BadRequest("NoSuchBucket", msg)
 
         data = request.get_json()
-        events = Event.from_json_obj(data)
+        events = [Event(**e) for e in data]
         app.db[bucket_id].insert(events)
         return {}, 200
 
@@ -358,7 +380,7 @@ class QueryViewResource(Resource):
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
         try:
-            result = views.query_view(viewname, app.db, limit, start, end)
+            result = views.query_view(viewname, app.db, start, end)
         except QueryException as qe:
             return {"msg": str(qe)}, 500
         return result, 200

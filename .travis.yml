@@ -11,4 +11,4 @@ install:
  - "make build"
 
 script:
- - "python3 -c 'import aw_server'"
+ - "make test"

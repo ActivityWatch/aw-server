@@ -378,7 +378,7 @@ class QueryViewResource(Resource):
         """
             Executes a view query and returns the result
         """
-        if viewname not in views.views:
+        if viewname not in views.get_views():
             return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
         args = request.args
         limit = int(args["limit"]) if "limit" in args else -1
@@ -399,7 +399,7 @@ class InfoViewResource(Resource):
     """
 
     def get(self, viewname):
-        if viewname not in views.views:
+        if viewname not in views.get_views():
             return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
         return views.get_view(viewname), 200
 

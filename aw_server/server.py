@@ -45,4 +45,4 @@ def _start(storage_method, host, port, testing=False):
         logger.warning("CORS is enabled when ran in testing mode")
 
     app.db = Datastore(storage_method, testing=testing)
-    app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler)
+    app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False)

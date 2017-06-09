@@ -34,7 +34,7 @@ def check_bucket_exists(f):
     def g(self, bucket_id, *args, **kwargs):
         if bucket_id not in app.db.buckets():
             raise BadRequest("NoSuchBucket", "There's no bucket named {}".format(bucket_id))
-        f(self, bucket_id, *args, **kwargs)
+        return f(self, bucket_id, *args, **kwargs)
     return g
 
 
@@ -43,7 +43,7 @@ def check_view_exists(f):
     def g(self, view_id, *args, **kwargs):
         if view_id not in views.get_views():
             raise BadRequest("NoSuchView", "There's no view named {}".format(view_id))
-        f(self, view_id, *args, **kwargs)
+        return f(self, view_id, *args, **kwargs)
     return g
 
 
@@ -166,7 +166,7 @@ class BucketResource(Resource):
             raise BadRequest("PermissionDenied", msg)
 
         app.db.delete_bucket(bucket_id)
-        logger.warning("Deleted bucket '{}'".format(bucket_id))
+        logger.debug("Deleted bucket '{}'".format(bucket_id))
         return {}, 200
 
 
@@ -179,8 +179,11 @@ class BucketResource(Resource):
 class EventResource(Resource):
     """Used to get and create events in a particular bucket."""
 
+    # For some reason this doesn't work with the JSONSchema variant
+    # Marshalling doesn't work with JSONSchema events
+    # @api.marshal_list_with(event)
     @check_bucket_exists
-    @api.marshal_list_with(event)
+    @api.doc(model=event)
     @api.param("limit", "the maximum number of requests to get")
     @api.param("start", "Start date of events")
     @api.param("end", "End date of events")
@@ -195,7 +198,7 @@ class EventResource(Resource):
 
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
         events = [event.to_json_dict() for event in app.db[bucket_id].get(limit, start, end)]
-        return events
+        return events, 200
 
     @check_bucket_exists
     @api.expect(event)  # TODO: How to tell expect that it could be a list of events? Until then we can't use validate.

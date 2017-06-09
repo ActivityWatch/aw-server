@@ -1,6 +1,8 @@
 import logging
-import unittest
 from datetime import datetime, timezone
+import random
+
+import pytest
 
 from aw_client import ActivityWatchClient
 from aw_core.models import Event
@@ -8,23 +10,54 @@ from aw_core.models import Event
 logging.basicConfig(level=logging.WARN)
 
 
-# FIXME: This client test needs to use a synchronous version of
-#        the ActivityWatchClient in order for errors to propagate.
-class ClientTest(unittest.TestCase):
-    def setUp(self):
-        self.client = ActivityWatchClient("unittest", testing=True)
-        self.client.setup_bucket("test", "testevents")
-        self.client.connect()
+@pytest.fixture(scope="session")
+def client():
+    yield ActivityWatchClient("unittest", testing=True)
 
-    def test_send_event(self):
-        self.client.send_event("test", Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"}))
 
-    def test_send_events(self):
-        self.client.send_events("test", [
-            Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"}),
-            Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test2"}),
-        ])
+@pytest.fixture(scope="function")
+def bucket(client):
+    bucket_id = "test-" + str(random.randint(0, 10**5))
+    event_type = "testevents"
+    client.create_bucket(bucket_id, event_type)
+    yield bucket_id
+    client.delete_bucket(bucket_id)
+
+
+@pytest.fixture
+def queued_bucket(client):
+    client.connect()
+    yield
+    client.disconnect()
+
+
+def test_get_info(client):
+    info = client.get_info()
+    assert info['testing']
+
+
+def test_list_buckets(client, bucket):
+    buckets = client.get_buckets()
+    print(buckets.keys())
+    assert bucket in buckets.keys()
+
+
+def test_send_event(client, bucket):
+    event = Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"})
+    client.send_event(bucket, event)
+    recv_events = client.get_events(bucket)
+    assert [event] == recv_events
+
+
+def test_send_events(client, bucket):
+    events = [
+        Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"}),
+        Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test2"}),
+    ]
+    client.send_events(bucket, events)
+    recv_events = client.get_events(bucket)
+    assert events == sorted(recv_events, reverse=True, key=lambda e: e.timestamp)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main()

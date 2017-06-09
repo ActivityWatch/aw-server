@@ -117,14 +117,10 @@ class InfoResource(Resource):
 
 @api.route("/0/buckets/")
 class BucketsResource(Resource):
-    """
-    Used to list buckets.
-    """
 
+    # TODO: Add response marshalling/validation
     def get(self) -> Dict[str, Dict]:
-        """
-        Get dict {bucket_name: Bucket} of all buckets
-        """
+        """Get dict {bucket_name: Bucket} of all buckets"""
         logger.debug("Received get request for buckets")
         buckets = app.db.buckets()
         for b in buckets:
@@ -138,7 +134,6 @@ class BucketsResource(Resource):
 
 @api.route("/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):
-    """Used to get metadata about buckets and create them."""
 
     @check_bucket_exists
     @api.marshal_with(bucket)
@@ -162,16 +157,13 @@ class BucketResource(Resource):
         )
         return {}, 200
 
+    @check_bucket_exists
     def delete(self, bucket_id):
         """Delete a bucket (only possible when run in testing mode)"""
         testing = app.config['DEBUG']
         if not testing:
             msg = "Deleting buckets is only permitted if aw-server is running in testing mode"
             raise BadRequest("PermissionDenied", msg)
-
-        if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
 
         app.db.delete_bucket(bucket_id)
         logger.warning("Deleted bucket '{}'".format(bucket_id))
@@ -240,12 +232,6 @@ class ReplaceLastEventResource(Resource):
         return {}, 200
 
 
-# TODO: Could this be used in place of api.param and api.expect in heartbeat?
-heartbeat_parser = api.parser()
-heartbeat_parser.add_argument('event', type=event, help='The heartbeat event', location="json", required=True)
-heartbeat_parser.add_argument('pulsetime', type=float, help='The maximum time allowed between heartbeats', location='args', required=True)
-
-
 @api.route("/0/buckets/<string:bucket_id>/heartbeat")
 class HeartbeatResource(Resource):
     """
@@ -270,7 +256,6 @@ class HeartbeatResource(Resource):
     """
 
     # TODO: We *really* need integration tests for all this.
-    # TODO: Try using heartbeat_parser for param validation (can it also validate Event?)
     @check_bucket_exists
     @api.expect(event, validate=True)
     @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
@@ -283,25 +268,15 @@ class HeartbeatResource(Resource):
         else:
             raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
 
-        logger.debug("Received heartbeat in bucket '{}' with\n\ttimestamp: {}\n\tdata: {}".format(bucket_id, heartbeat.timestamp, heartbeat.data))
+        logger.debug("Received heartbeat in bucket '{}'\n\ttimestamp: {}\n\tdata: {}".format(
+                     bucket_id, heartbeat.timestamp, heartbeat.data))
 
         # The endtime here is set such that in the event that the heartbeat is older than an
         # existing event we should try to merge it with the last event before the heartbeat instead.
         # FIXME: This gets rid of the "heartbeat was older than last event"-type warning and
         #        also causes any already existing "newer" events to be overwritten in the
         #        replace_last call below.
-        events = app.db[bucket_id].get(limit=3, endtime=heartbeat.timestamp)
-
-        # FIXME: The below is needed due to the weird fact that for some reason
-        # events[0] turns out to be the *oldest* event,
-        # events[1] turns out to be the latest,
-        # events[2] the second latest, etc.
-        events = sorted(events, key=lambda e: e.timestamp, reverse=True)
-
-        # Uncomment this to verify my above claim:
-        #  for e in events:
-        #      print(e.timestamp)
-        #      print(e.labels)
+        events = app.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
 
         if len(events) >= 1:
             last_event = events[0]
@@ -312,7 +287,7 @@ class HeartbeatResource(Resource):
                 return merged.to_json_dict(), 200
 
         # Heartbeat should be stored as new event
-        logger.debug("last event either didn't have identical labels, was too old or didn't exist. heartbeat will be stored as new event")
+        logger.info("Received heartbeat which was much newer than the last, creating as a new event.")
         app.db[bucket_id].insert(heartbeat)
         return heartbeat.to_json_dict(), 200
 
@@ -324,9 +299,10 @@ class HeartbeatResource(Resource):
 
 @api.route("/0/views/")
 class ViewListResource(Resource):
-    def get(self):
-        """Retuns names of all views"""
-        return views.get_views(), 200
+    def get(self) -> Dict[str, dict]:
+        """Returns a dict {viewname: view}"""
+        viewdict = {viewname: views.get_view(viewname) for viewname in views.get_views}
+        return viewdict, 200
 
 
 @api.route("/0/views/<string:viewname>")
@@ -357,17 +333,6 @@ class QueryViewResource(Resource):
             view["created"] = datetime.now(timezone.utc).isoformat()
         views.create_view(view)
         return {}, 200
-
-
-@api.route("/0/views/<string:viewname>/info")
-class InfoViewResource(Resource):
-    """
-        Sends information about the specified view
-    """
-
-    @check_view_exists
-    def get(self, viewname):
-        return views.get_view(viewname), 200
 
 
 """

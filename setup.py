@@ -16,7 +16,7 @@ setup(name='aw-server',
           # This is a workaround.
           'jinja2>=2.8,<2.9',
 
-          'aw-core>=0.1',
+          'aw-core>=0.4',
           'flask>=0.10',
           'flask-restplus>=0.9.2',
           'flask-cors>=2.1',
@@ -25,7 +25,7 @@ setup(name='aw-server',
           'python-json-logger>=0.1.5',
       ],
       dependency_links=[
-          'https://github.com/ActivityWatch/aw-core/tarball/master#egg=aw-core-0.1.0'
+          'https://github.com/ActivityWatch/aw-core/archive/dev/server-next.zip#egg=aw-core-0.4.0'
       ],
       entry_points={
           'console_scripts': ['aw-server = aw_server:main']

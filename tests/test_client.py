@@ -1,6 +1,7 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import random
+from time import sleep
 
 import pytest
 
@@ -25,15 +26,57 @@ def bucket(client):
 
 
 @pytest.fixture
-def queued_bucket(client):
+def queued_bucket(client, bucket):
     client.connect()
-    yield
+    yield bucket
     client.disconnect()
 
 
 def test_get_info(client):
     info = client.get_info()
     assert info['testing']
+
+
+def _create_heartbeat_events():
+    e1_ts = datetime.now(tz=timezone.utc)
+    e2_ts = e1_ts + timedelta(seconds=9)
+
+    # Needed since server drops precision up to milliseconds
+    e1_ts = e1_ts.replace(microsecond=round(e1_ts.microsecond / 1000) * 1000)
+    e2_ts = e2_ts.replace(microsecond=round(e2_ts.microsecond / 1000) * 1000)
+
+    e1 = Event(timestamp=e1_ts, data={"label": "test"})
+    e2 = Event(timestamp=e2_ts, data={"label": "test"})
+
+    return e1, e2
+
+
+def test_heartbeat(client, bucket):
+    bucket_id = bucket
+
+    e1, e2 = _create_heartbeat_events()
+
+    client.heartbeat(bucket_id, e1, pulsetime=0)
+    client.heartbeat(bucket_id, e2, pulsetime=10)
+    event = client.get_events(bucket_id, limit=1)[0]
+
+    assert event.timestamp == e1.timestamp
+    assert event.duration == e2.timestamp - e1.timestamp
+
+
+def test_queued_heartbeat(client, queued_bucket):
+    bucket_id = queued_bucket
+
+    e1, e2 = _create_heartbeat_events()
+
+    client.heartbeat(bucket_id, e1, pulsetime=0, queued=True)
+    client.heartbeat(bucket_id, e2, pulsetime=10, queued=True)
+    # Needed since the dispatcher thread might introduce some delay
+    sleep(1)
+    event = client.get_events(bucket_id, limit=1)[0]
+
+    assert event.timestamp == e1.timestamp
+    assert event.duration == e2.timestamp - e1.timestamp
 
 
 def test_list_buckets(client, bucket):

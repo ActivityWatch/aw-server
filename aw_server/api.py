@@ -104,16 +104,6 @@ class ServerAPI:
         self.db[bucket_id].insert(events)
         return None
 
-    # DEPRECATED
-    @check_bucket_exists
-    def post(self, bucket_id: str, event):
-        """Replace last event inserted into the bucket"""
-        logger.debug("Received {} for event in bucket '{}' with\n\ttimestamp: {}\n\tdata: {}".format(
-                     self.__class__.__name__, bucket_id, event.timestamp, event.data))
-
-        self.db[bucket_id].replace_last(event)
-        return None
-
     @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """

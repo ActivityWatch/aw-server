@@ -160,20 +160,6 @@ class EventResource(Resource):
         return {}, 200
 
 
-# DEPRECATED
-@api.route("/0/buckets/<string:bucket_id>/events/replace_last")
-class ReplaceLastEventResource(Resource):
-    @api.expect(event, validate=True)
-    def post(self, bucket_id):
-        """Replace last event inserted into the bucket"""
-        event = Event(**request.get_json())
-        logger.debug("Received {} for event in bucket '{}' with\n\ttimestamp: {}\n\tdata: {}".format(
-                     self.__class__.__name__, bucket_id, event.timestamp, event.data))
-
-        app.db[bucket_id].replace_last(event)
-        return {}, 200
-
-
 @api.route("/0/buckets/<string:bucket_id>/heartbeat")
 class HeartbeatResource(Resource):
     @api.expect(event, validate=True)

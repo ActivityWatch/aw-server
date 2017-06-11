@@ -65,13 +65,13 @@ class ServerAPI:
         bucket = self.db[bucket_id]
         return bucket.metadata()
 
-    def create_bucket(self, bucket_id: str, bucket_type: str, client: str, hostname: str) -> None:
+    def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> None:
         """Create bucket."""
         if bucket_id in self.db.buckets():
             raise BadRequest("BucketExists", "A bucket with this name already exists, cannot create it")
         self.db.create_bucket(
             bucket_id,
-            type=bucket_type,
+            type=event_type,
             client=client,
             hostname=hostname,
             created=datetime.now()

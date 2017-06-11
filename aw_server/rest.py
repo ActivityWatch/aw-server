@@ -112,7 +112,7 @@ class BucketResource(Resource):
     @copy_doc(ServerAPI.create_bucket)
     def post(self, bucket_id):
         data = request.get_json()
-        app.api.create_bucket(bucket_id, event_type=data["type"])
+        app.api.create_bucket(bucket_id, event_type=data["type"], client=data["client"], hostname=data["hostname"])
         return {}, 200
 
     @copy_doc(ServerAPI.delete_bucket)
@@ -156,7 +156,7 @@ class EventResource(Resource):
         else:
             raise BadRequest("Invalid POST data", "")
 
-        app.api.create_events(events)
+        app.api.create_events(bucket_id, events)
         return {}, 200
 
 

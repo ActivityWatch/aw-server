@@ -41,9 +41,13 @@ def _create_heartbeat_events():
     e1_ts = datetime.now(tz=timezone.utc)
     e2_ts = e1_ts + timedelta(seconds=9)
 
-    # Needed since server drops precision up to milliseconds
-    e1_ts = e1_ts.replace(microsecond=round(e1_ts.microsecond / 1000) * 1000)
-    e2_ts = e2_ts.replace(microsecond=round(e2_ts.microsecond / 1000) * 1000)
+    # Needed since server (or underlying datastore) drops precision up to milliseconds.
+    # Update: Even with millisecond precision it sometimes fails. (tried using `round` and `int`)
+    #         Now rounding down to 10ms precision to prevent random failure.
+    #         10ms precision at least seems to work well.
+    # TODO: Figure out why it sometimes fails with millisecond precision.
+    e1_ts = e1_ts.replace(microsecond=int(e1_ts.microsecond / 10000) * 100)
+    e2_ts = e2_ts.replace(microsecond=int(e2_ts.microsecond / 10000) * 100)
 
     e1 = Event(timestamp=e1_ts, data={"label": "test"})
     e2 = Event(timestamp=e2_ts, data={"label": "test"})

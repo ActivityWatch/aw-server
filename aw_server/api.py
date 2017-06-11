@@ -40,6 +40,7 @@ class ServerAPI:
         self.testing = testing
 
     def get_info(self) -> Dict[str, Dict]:
+        """Get server info"""
         payload = {
             'hostname': gethostname(),
             'testing': self.testing
@@ -179,8 +180,6 @@ class ServerAPI:
         view["name"] = viewname
         if "created" not in view:
             view["created"] = datetime.now(timezone.utc).isoformat()
-        logger.info("lolol")
-        print("lolol")
         views.create_view(view)
 
     # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...

@@ -1,6 +1,7 @@
 from typing import Dict
 from datetime import datetime, timezone
 import json
+import functools
 
 from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
@@ -12,6 +13,7 @@ from aw_core.log import get_log_file_path
 from aw_core.query import QueryException
 
 from . import app, logger
+from .api import ServerAPI
 from .exceptions import BadRequest
 
 
@@ -69,13 +71,23 @@ view = api.model('View', {
 })
 
 
+def copy_doc(api_method):
+    """Decorator that copies another functions docstring to the decorated function.
+       Used to copy the docstrings in ServerAPI over to the flask-restplus Resources.
+       (The copied docstrings are then used by flask-restplus/swagger)"""
+    def decorator(f):
+        f.__doc__ = api_method.__doc__
+        return f
+    return decorator
+
+
 # SERVER INFO
 
 @api.route("/0/info/")
 class InfoResource(Resource):
     @api.marshal_with(info)
+    @copy_doc(ServerAPI.get_info)
     def get(self) -> Dict[str, Dict]:
-        """Lists info about the aw-server."""
         return app.api.get_info()
 
 
@@ -84,6 +96,7 @@ class InfoResource(Resource):
 @api.route("/0/buckets/")
 class BucketsResource(Resource):
     # TODO: Add response marshalling/validation
+    @copy_doc(ServerAPI.get_buckets)
     def get(self) -> Dict[str, Dict]:
         return app.api.get_buckets()
 
@@ -91,16 +104,18 @@ class BucketsResource(Resource):
 @api.route("/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):
     @api.marshal_with(bucket)
+    @copy_doc(ServerAPI.get_bucket_metadata)
     def get(self, bucket_id):
-        """Get metadata about bucket."""
         return app.api.get_bucket_metadata(bucket_id)
 
     @api.expect(create_bucket)
+    @copy_doc(ServerAPI.create_bucket)
     def post(self, bucket_id):
-        """Create bucket."""
-        app.api.create_bucket(bucket_id, **request.get_json())
+        data = request.get_json()
+        app.api.create_bucket(bucket_id, event_type=data["type"])
         return {}, 200
 
+    @copy_doc(ServerAPI.delete_bucket)
     def delete(self, bucket_id):
         app.api.delete_bucket(bucket_id)
         return {}, 200
@@ -117,8 +132,8 @@ class EventResource(Resource):
     @api.param("limit", "the maximum number of requests to get")
     @api.param("start", "Start date of events")
     @api.param("end", "End date of events")
+    @copy_doc(ServerAPI.get_events)
     def get(self, bucket_id):
-        """Get events from a bucket"""
         args = request.args
         limit = int(args["limit"]) if "limit" in args else 100
         start = iso8601.parse_date(args["start"]) if "start" in args else None
@@ -129,8 +144,8 @@ class EventResource(Resource):
 
     # TODO: How to tell expect that it could be a list of events? Until then we can't use validate.
     @api.expect(event)
+    @copy_doc(ServerAPI.create_events)
     def post(self, bucket_id):
-        """Create events for a bucket. Can handle both single events and multiple ones."""
         data = request.get_json()
         logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, data))
 
@@ -163,8 +178,8 @@ class ReplaceLastEventResource(Resource):
 class HeartbeatResource(Resource):
     @api.expect(event, validate=True)
     @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
+    @copy_doc(ServerAPI.heartbeat)
     def post(self, bucket_id):
-        """Where heartbeats are sent."""
         heartbeat = Event(**request.get_json())
 
         if "pulsetime" in request.args:
@@ -180,18 +195,17 @@ class HeartbeatResource(Resource):
 
 @api.route("/0/views/")
 class ViewListResource(Resource):
+    @copy_doc(ServerAPI.get_views)
     def get(self):
-        """Returns a dict {viewname: view}"""
-        viewdict = {viewname: views.get_view(viewname) for viewname in views.get_views}
-        return viewdict, 200
+        return app.api.get_views(), 200
 
 
 @api.route("/0/views/<string:viewname>")
 class ViewResource(Resource):
     @api.param("start", "Start datetime of events to query over")
     @api.param("end", "End datetime of events to query over")
+    @copy_doc(ServerAPI.query_view)
     def get(self, viewname):
-        """Executes a view query and returns the result"""
         args = request.args
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
@@ -200,8 +214,8 @@ class ViewResource(Resource):
         return result, 200
 
     @api.expect(view)
+    @copy_doc(ServerAPI.create_view)
     def post(self, viewname):
-        """Creates a view"""
         view = request.get_json()
         app.api.create_view(viewname, view)
         return {}, 200
@@ -211,7 +225,7 @@ class ViewResource(Resource):
 
 @api.route("/0/log")
 class LogResource(Resource):
-    @api.expect()
+    @copy_doc(ServerAPI.get_log)
     def get(self):
         """Get the server log in json format"""
         return app.api.get_log(), 200

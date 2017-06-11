@@ -55,6 +55,17 @@ def _create_heartbeat_events():
     return e1, e2
 
 
+def _create_periodic_events(num_events, start=datetime.now(tz=timezone.utc),
+                            delta=timedelta(hours=1)):
+    num_events = 1000
+    events = num_events * [None]
+
+    for i, dt in ((i, start + i * delta) for i in range(len(events))):
+        events[i] = Event(timestamp=dt, data={"label": "test"})
+
+    return events
+
+
 def test_heartbeat(client, bucket):
     bucket_id = bucket
 
@@ -104,6 +115,30 @@ def test_send_events(client, bucket):
     client.send_events(bucket, events)
     recv_events = client.get_events(bucket)
     assert events == sorted(recv_events, reverse=True, key=lambda e: e.timestamp)
+
+
+def test_get_events_interval(client, bucket):
+    start_dt = datetime.now(tz=timezone.utc)
+    delta = timedelta(hours=1)
+    events = _create_periodic_events(1000, delta=delta, start=start_dt)
+
+    client.send_events(bucket, events)
+
+    # start kwarg doesn't seem to be range-inclusive
+    recv_events = client.get_events(bucket, limit=50, start=start_dt, end=start_dt + timedelta(days=1))
+
+    assert len(recv_events) == 24
+    assert recv_events == sorted(events[1:25], reverse=True, key=lambda e: e.timestamp)
+
+
+def test_store_many_events(client, bucket):
+    events = _create_periodic_events(1000)
+
+    client.send_events(bucket, events)
+    recv_events = client.get_events(bucket, limit=-1)
+
+    assert len(events) == len(recv_events)
+    assert recv_events == sorted(events, reverse=True, key=lambda e: e.timestamp)
 
 
 if __name__ == "__main__":

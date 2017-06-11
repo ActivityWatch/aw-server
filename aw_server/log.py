@@ -1,7 +1,6 @@
 import logging
 
 from werkzeug import serving
-from werkzeug._internal import _log
 
 
 class FlaskLogHandler(serving.WSGIRequestHandler):

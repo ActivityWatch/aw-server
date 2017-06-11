@@ -1,38 +1,25 @@
-from typing import Dict
+from typing import Dict, List, Any
 from datetime import datetime, timezone
 from socket import gethostname
 import functools
 import json
-
-from flask import request, Blueprint
-from flask_restplus import Api, Resource, fields
-import werkzeug.exceptions
-import iso8601
+import logging
 
 from aw_core.models import Event
-from aw_core import transforms, views, schema
-from . import app, logger
+from aw_core import transforms, views
 from aw_core.log import get_log_file_path
 from aw_core.query import QueryException
 
+from .exceptions import BadRequest
 
-# SECURITY
-# As we work our way through features, disable (while this is False, we should only accept connections from localhost)
-SECURITY_ENABLED = False
 
-# For the planned zeroknowledge storage feature
-ZEROKNOWLEDGE_ENABLED = False
-
-blueprint = Blueprint('api', __name__, url_prefix='/api')
-api = Api(blueprint, doc='/')
-
-app.register_blueprint(blueprint)
+logger = logging.getLogger(__name__)
 
 
 def check_bucket_exists(f):
     @functools.wraps(f)
     def g(self, bucket_id, *args, **kwargs):
-        if bucket_id not in app.db.buckets():
+        if bucket_id not in self.db.buckets():
             raise BadRequest("NoSuchBucket", "There's no bucket named {}".format(bucket_id))
         return f(self, bucket_id, *args, **kwargs)
     return g
@@ -47,230 +34,109 @@ def check_view_exists(f):
     return g
 
 
-class AnyJson(fields.Raw):
-    def format(self, value):
-        if type(value) == dict:
-            return value
-        else:
-            return json.loads(value)
+class ServerAPI:
+    def __init__(self, db, testing):
+        self.db = db
+        self.testing = testing
 
-# TODO: Construct from JSONSchema
-info = api.model('Info', {
-    'hostname': fields.String(),
-    'testing': fields.Boolean(),
-})
-
-# Loads event schema from JSONSchema in aw_core
-event = api.schema_model('Event', schema.get_json_schema("event"))
-
-# TODO: Construct from JSONSchema
-bucket = api.model('Bucket', {
-    'id': fields.String(required=True, description='The buckets unique id'),
-    'name': fields.String(required=False, description='The buckets readable and renameable name'),
-    'type': fields.String(required=True, description='The buckets event type'),
-    'client': fields.String(required=True, description='The name of the watcher client'),
-    'hostname': fields.String(required=True, description='The hostname of the client that the bucket belongs to'),
-    'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
-})
-
-# TODO: Construct from JSONSchema
-create_bucket = api.model('CreateBucket', {
-    'client': fields.String(required=True),
-    'type': fields.String(required=True),
-    'hostname': fields.String(required=True),
-})
-
-# TODO: Construct from JSONSchema
-view = api.model('View', {
-    'name': fields.String,
-    'created': fields.DateTime,
-    'query': AnyJson,  # Can be any dict
-})
-
-
-class BadRequest(werkzeug.exceptions.BadRequest):
-    def __init__(self, type, message):
-        super().__init__(message)
-        self.type = type
-
-
-@api.route("/0/info/")
-class InfoResource(Resource):
-    """
-    Lists info about the aw-server.
-    """
-
-    @api.marshal_with(info)
-    def get(self) -> Dict[str, Dict]:
+    def get_info(self) -> Dict[str, Dict]:
         payload = {
             'hostname': gethostname(),
-            'testing': app.config['DEBUG']  # Checks if flask is run in debug mode, which it will depending on if it is in testing mode or not
-                                            # FIXME: The above is no longer true, the testing bool should be stored in the app object.
+            'testing': self.testing
         }
         return payload
 
-
-"""
-    BUCKETS
-"""
-
-
-@api.route("/0/buckets/")
-class BucketsResource(Resource):
-
-    # TODO: Add response marshalling/validation
-    def get(self) -> Dict[str, Dict]:
+    def get_buckets(self) -> Dict[str, Dict]:
         """Get dict {bucket_name: Bucket} of all buckets"""
         logger.debug("Received get request for buckets")
-        buckets = app.db.buckets()
+        buckets = self.db.buckets()
         for b in buckets:
-            last_events = app.db[b].get(limit=1)
+            last_events = self.db[b].get(limit=1)
             if len(last_events) > 0:
                 last_event = last_events[0]
                 last_updated = last_event.timestamp + last_event.duration
                 buckets[b]["last_updated"] = last_updated.isoformat()
         return buckets
 
-
-@api.route("/0/buckets/<string:bucket_id>")
-class BucketResource(Resource):
-
     @check_bucket_exists
-    @api.marshal_with(bucket)
-    def get(self, bucket_id):
+    def get_bucket_metadata(self, bucket_id: str) -> Dict[str, Any]:
         """Get metadata about bucket."""
-        bucket = app.db[bucket_id]
+        bucket = self.db[bucket_id]
         return bucket.metadata()
 
-    @api.expect(create_bucket)
-    def post(self, bucket_id):
+    def create_bucket(self, bucket_id: str, bucket_type: str, client: str, hostname: str) -> None:
         """Create bucket."""
-        data = request.get_json()
-        if bucket_id in app.db.buckets():
+        if bucket_id in self.db.buckets():
             raise BadRequest("BucketExists", "A bucket with this name already exists, cannot create it")
-        app.db.create_bucket(
+        self.db.create_bucket(
             bucket_id,
-            type=data["type"],
-            client=data["client"],
-            hostname=data["hostname"],
+            type=bucket_type,
+            client=client,
+            hostname=hostname,
             created=datetime.now()
         )
-        return {}, 200
+        return None
 
     @check_bucket_exists
-    def delete(self, bucket_id):
+    def delete_bucket(self, bucket_id: str) -> None:
         """Delete a bucket (only possible when run in testing mode)"""
-        testing = app.config['DEBUG']
-        if not testing:
+        if not self.testing:
             msg = "Deleting buckets is only permitted if aw-server is running in testing mode"
             raise BadRequest("PermissionDenied", msg)
 
-        app.db.delete_bucket(bucket_id)
+        self.db.delete_bucket(bucket_id)
         logger.debug("Deleted bucket '{}'".format(bucket_id))
-        return {}, 200
+        return None
 
-
-"""
-    EVENTS
-"""
-
-
-@api.route("/0/buckets/<string:bucket_id>/events")
-class EventResource(Resource):
-    """Used to get and create events in a particular bucket."""
-
-    # For some reason this doesn't work with the JSONSchema variant
-    # Marshalling doesn't work with JSONSchema events
-    # @api.marshal_list_with(event)
     @check_bucket_exists
-    @api.doc(model=event)
-    @api.param("limit", "the maximum number of requests to get")
-    @api.param("start", "Start date of events")
-    @api.param("end", "End date of events")
-    def get(self, bucket_id):
-        """
-        Get events from a bucket
-        """
-        args = request.args
-        limit = int(args["limit"]) if "limit" in args else 100
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
-
+    def get_events(self, bucket_id: str, limit: int = 100,
+                   start: datetime = None, end: datetime = None) -> List[Event]:
+        """Get events from a bucket"""
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
-        events = [event.to_json_dict() for event in app.db[bucket_id].get(limit, start, end)]
-        return events, 200
+        events = [event.to_json_dict() for event in
+                  self.db[bucket_id].get(limit, start, end)]
+        return events
 
     @check_bucket_exists
-    @api.expect(event)  # TODO: How to tell expect that it could be a list of events? Until then we can't use validate.
-    def post(self, bucket_id):
+    def create_events(self, bucket_id: str, events: List[Event]):
         """Create events for a bucket. Can handle both single events and multiple ones."""
-        data = request.get_json()
-        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, data))
+        self.db[bucket_id].insert(events)
+        return None
 
-        if isinstance(data, dict):
-            events = [Event(**data)]
-        elif isinstance(data, list):
-            events = [Event(**e) for e in data]
-        else:
-            raise BadRequest("Invalid POST data", "")
-
-        app.db[bucket_id].insert(events)
-        return {}, 200
-
-
-# DEPRECATED
-@api.route("/0/buckets/<string:bucket_id>/events/replace_last")
-class ReplaceLastEventResource(Resource):
-    """Replaces last event inserted into bucket"""
-
+    # DEPRECATED
     @check_bucket_exists
-    @api.expect(event, validate=True)
-    def post(self, bucket_id):
+    def post(self, bucket_id: str, event):
         """Replace last event inserted into the bucket"""
-        event = Event(**request.get_json())
         logger.debug("Received {} for event in bucket '{}' with\n\ttimestamp: {}\n\tdata: {}".format(
                      self.__class__.__name__, bucket_id, event.timestamp, event.data))
 
-        app.db[bucket_id].replace_last(event)
-        return {}, 200
+        self.db[bucket_id].replace_last(event)
+        return None
 
-
-@api.route("/0/buckets/<string:bucket_id>/heartbeat")
-class HeartbeatResource(Resource):
-    """
-    Heartbeats are useful when implementing watchers that simply keep
-    track of a state, how long it's in that state and when it changes.
-
-    Heartbeats are essentially events without durations.
-
-    If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
-    If the heartbeat differed, then a new event is created.
-
-    Such as:
-     - Active application and window title (aw-watcher-window)
-     - Active browser tab (aw-watcher-web)
-     - Currently open document (wakatime)
-
-    Might be badly suited for:
-     - Has activity occurred? (aw-watcher-afk)
-       Edit: Not anymore, aw-watcher-afk has now been rewritten to use heartbeats.
-
-    Inspired by: https://wakatime.com/developers#heartbeats
-    """
-
-    # TODO: We *really* need integration tests for all this.
     @check_bucket_exists
-    @api.expect(event, validate=True)
-    @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
-    def post(self, bucket_id):
-        """Where heartbeats are sent."""
-        heartbeat = Event(**request.get_json())
+    def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
+        """
+        Heartbeats are useful when implementing watchers that simply keep
+        track of a state, how long it's in that state and when it changes.
 
-        if "pulsetime" in request.args:
-            pulsetime = float(request.args["pulsetime"])
-        else:
-            raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
+        Heartbeats are essentially events without durations.
 
+        If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
+        If the heartbeat differed, then a new event is created.
+
+        Such as:
+         - Active application and window title
+           - Example: aw-watcher-window
+         - Currently open document/browser tab/playing song
+           - Example: wakatime
+           - Example: aw-watcher-web
+           - Example: aw-watcher-spotify
+         - Is the user active/inactive?
+           Send an event on some interval indicating if the user is active or not.
+           - Example: aw-watcher-afk
+
+        Inspired by: https://wakatime.com/developers#heartbeats
+        """
         logger.debug("Received heartbeat in bucket '{}'\n\ttimestamp: {}\n\tdata: {}".format(
                      bucket_id, heartbeat.timestamp, heartbeat.data))
 
@@ -279,76 +145,46 @@ class HeartbeatResource(Resource):
         # FIXME: This gets rid of the "heartbeat was older than last event"-type warning and
         #        also causes any already existing "newer" events to be overwritten in the
         #        replace_last call below.
-        events = app.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
+        events = self.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
 
         if len(events) >= 1:
             last_event = events[0]
             merged = transforms.heartbeat_merge(last_event, heartbeat, pulsetime)
             if merged is not None:
                 # Heartbeat was merged into last_event
-                app.db[bucket_id].replace_last(merged)
-                return merged.to_json_dict(), 200
+                self.db[bucket_id].replace_last(merged)
+                return merged
 
         # Heartbeat should be stored as new event
         logger.info("Received heartbeat which was much newer than the last, creating as a new event.")
-        app.db[bucket_id].insert(heartbeat)
-        return heartbeat.to_json_dict(), 200
+        self.db[bucket_id].insert(heartbeat)
+        return heartbeat
 
-
-"""
-    VIEWS
-"""
-
-
-@api.route("/0/views/")
-class ViewListResource(Resource):
-    def get(self) -> Dict[str, dict]:
+    def get_views(self) -> Dict[str, dict]:
         """Returns a dict {viewname: view}"""
-        viewdict = {viewname: views.get_view(viewname) for viewname in views.get_views}
-        return viewdict, 200
+        return {viewname: views.get_view(viewname) for viewname in views.get_views}
 
-
-@api.route("/0/views/<string:viewname>")
-class QueryViewResource(Resource):
-
+    # TODO: start and end should probably be the last day if None is given
     @check_view_exists
-    @api.param("limit", "the maximum number of requests to get")
-    @api.param("start", "Start date of events")
-    @api.param("end", "End date of events")
-    def get(self, viewname):
+    def query_view(self, viewname, start: datetime = None, end: datetime = None):
         """Executes a view query and returns the result"""
-        args = request.args
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
-
         try:
-            result = views.query_view(viewname, app.db, start, end)
+            result = views.query_view(viewname, self.db, start, end)
         except QueryException as qe:
-            return {"msg": str(qe)}, 500
-        return result, 200
+            raise BadRequest("QueryError", "Query error: {}".format(str(qe)))
+        return result
 
-    @api.expect(view)
-    def post(self, viewname):
+    def create_view(self, viewname: str, view: dict):
         """Creates a view"""
-        view = request.get_json()
         view["name"] = viewname
         if "created" not in view:
             view["created"] = datetime.now(timezone.utc).isoformat()
+        logger.info("lolol")
+        print("lolol")
         views.create_view(view)
-        return {}, 200
 
-
-"""
-    LOGGING
-"""
-
-
-@api.route("/0/log")
-class LogResource(Resource):
-    """Server log of the current instance in json format"""
-
-    @api.expect()
-    def get(self):
+    # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...
+    def get_log(self):
         """Get the server log in json format"""
         payload = []
         with open(get_log_file_path(), 'r') as log_file:

@@ -6,6 +6,8 @@ from aw_core.log import setup_logging
 from .server import _start
 from .config import config
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     """Called from the executable and __main__.py"""
@@ -20,7 +22,6 @@ def main():
     setup_logging("aw-server", testing=settings.testing, verbose=settings.verbose,
                   log_stderr=True, log_file=True, log_file_json=True)
 
-    logger = logging.getLogger("main")
     logger.info("Using storage method: {}".format(settings.storage))
 
     if settings.testing:

@@ -1,5 +1,5 @@
 from typing import Dict, List, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from socket import gethostname
 import functools
 import json
@@ -132,21 +132,31 @@ class ServerAPI:
 
         # The endtime here is set such that in the event that the heartbeat is older than an
         # existing event we should try to merge it with the last event before the heartbeat instead.
-        # FIXME: This gets rid of the "heartbeat was older than last event"-type warning and
-        #        also causes any already existing "newer" events to be overwritten in the
-        #        replace_last call below.
-        events = self.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
+        # FIXME: This (the endtime=heartbeat.timestamp) gets rid of the "heartbeat was older than last event"
+        #        warning and also causes a already existing "newer" event to be overwritten in the
+        #        replace_last call below. This is problematic.
+        # FIXME: I don't know if this limit=3 and subsequent sorting is needed,
+        #        but until someone tests it thorougly, I'm keeping it.
+        events = self.db[bucket_id].get(limit=3, endtime=heartbeat.timestamp)
+        events = sorted(events, reverse=True, key=lambda e: e.timestamp)
+        assert events[0].timestamp >= events[1].timestamp
 
         if len(events) >= 1:
             last_event = events[0]
-            merged = transforms.heartbeat_merge(last_event, heartbeat, pulsetime)
-            if merged is not None:
-                # Heartbeat was merged into last_event
-                self.db[bucket_id].replace_last(merged)
-                return merged
+            if last_event.data == heartbeat.data:
+                merged = transforms.heartbeat_merge(last_event, heartbeat, pulsetime)
+                if merged is not None:
+                    # Heartbeat was merged into last_event
+                    logger.debug("Received valid heartbeat, merging. (bucket: {})".format(bucket_id))
+                    self.db[bucket_id].replace_last(merged)
+                    return merged
+                else:
+                    logger.info("Received heartbeat after pulse window, inserting as new event. (bucket: {})".format(bucket_id))
+            else:
+                logger.debug("Received heartbeat with differing data, inserting as new event. (bucket: {})".format(bucket_id))
+        else:
+            logger.info("Received heartbeat, but bucket was previously empty, inserting as new event. (bucket: {})".format(bucket_id))
 
-        # Heartbeat should be stored as new event
-        logger.info("Received heartbeat which was much newer than the last, creating as a new event.")
         self.db[bucket_id].insert(heartbeat)
         return heartbeat
 

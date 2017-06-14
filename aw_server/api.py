@@ -162,7 +162,7 @@ class ServerAPI:
         try:
             result = views.query_view(viewname, self.db, start, end)
         except QueryException as qe:
-            raise BadRequest("QueryError", "Query error: {}".format(str(qe)))
+            raise BadRequest("QueryError", str(qe))
         return result
 
     def create_view(self, viewname: str, view: dict):

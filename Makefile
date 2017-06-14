@@ -1,4 +1,4 @@
-.PHONY: build
+.PHONY: build install test typecheck package
 
 build:
 	pip install mypy

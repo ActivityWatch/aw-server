@@ -7,18 +7,24 @@ from flask_cors import CORS
 from aw_datastore import Datastore
 
 from .log import FlaskLogHandler
+from .api import ServerAPI
 
+
+logger = logging.getLogger(__name__)
 
 app_folder = os.path.dirname(os.path.abspath(__file__))
 static_folder = os.path.join(app_folder, 'static')
 
-app = Flask("aw-server",
-            static_folder=static_folder, static_url_path='')
 
-logger = logging.getLogger("aw.server")
+class AWFlask(Flask):
+    def __init__(self, name, *args, **kwargs):
+        Flask.__init__(self, name, *args, **kwargs)
 
-# The following will be set when started
-app.db = None  # type: Datastore
+        # Is set on later initialization
+        self.api = None  # type: ServerAPI
+
+
+app = AWFlask("aw-server", static_folder=static_folder, static_url_path='')
 
 
 @app.route("/")
@@ -44,5 +50,6 @@ def _start(storage_method, host, port, testing=False):
         CORS(app)   # See: https://flask-cors.readthedocs.org/en/latest/
         logger.warning("CORS is enabled when ran in testing mode")
 
-    app.db = Datastore(storage_method, testing=testing)
+    db = Datastore(storage_method, testing=testing)
+    app.api = ServerAPI(db=db, testing=testing)
     app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False)

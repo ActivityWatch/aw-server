@@ -1,442 +1,179 @@
-from typing import Dict
+from typing import Dict, List, Any
 from datetime import datetime, timezone
 from socket import gethostname
+import functools
 import json
-import iso8601
-import werkzeug.exceptions
-
-from flask import request, Blueprint
-from flask_restplus import Api, Resource, fields
+import logging
 
 from aw_core.models import Event
 from aw_core import transforms, views
-from . import app, logger
 from aw_core.log import get_log_file_path
 from aw_core.query import QueryException
 
-
-# SECURITY
-# As we work our way through features, disable (while this is False, we should only accept connections from localhost)
-SECURITY_ENABLED = False
-
-# For the planned zeroknowledge storage feature
-ZEROKNOWLEDGE_ENABLED = False
-
-blueprint = Blueprint('api', __name__, url_prefix='/api')
-api = Api(blueprint, doc='/')
-
-app.register_blueprint(blueprint)
+from .exceptions import BadRequest
 
 
-class AnyJson(fields.Raw):
-    def format(self, value):
-        if type(value) == dict:
-            return value
-        else:
-            return json.loads(value)
-
-# TODO: Move to aw_core.models, construct from JSONSchema (if reasonably straight-forward)
-
-info = api.model('Info', {
-    'hostname': fields.String(),
-    'testing': fields.Boolean(),
-})
-
-event = api.model('Event', {
-    'timestamp': fields.DateTime(required=True),
-    'duration': fields.Float,
-    'data': AnyJson,  # Can be any dict
-})
-
-heartbeat = api.model('Event', {
-    'timestamp': fields.DateTime(required=True),
-    'label': fields.String(description='Label on event'),
-    'data': AnyJson,  # Can be any dict
-})
-
-bucket = api.model('Bucket', {
-    'id': fields.String(required=True, description='The buckets unique id'),
-    'name': fields.String(required=False, description='The buckets readable and renameable name'),
-    'type': fields.String(required=True, description='The buckets event type'),
-    'client': fields.String(required=True, description='The name of the watcher client'),
-    'hostname': fields.String(required=True, description='The hostname of the client that the bucket belongs to'),
-    'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
-})
-
-create_bucket = api.model('CreateBucket', {
-    'client': fields.String(required=True),
-    'type': fields.String(required=True),
-    'hostname': fields.String(required=True),
-})
-
-view = api.model('View', {
-    'name': fields.String,
-    'created': fields.DateTime,
-    'query': AnyJson,  # Can be any dict
-})
+logger = logging.getLogger(__name__)
 
 
-class BadRequest(werkzeug.exceptions.BadRequest):
-    def __init__(self, type, message):
-        super().__init__(message)
-        self.type = type
+def check_bucket_exists(f):
+    @functools.wraps(f)
+    def g(self, bucket_id, *args, **kwargs):
+        if bucket_id not in self.db.buckets():
+            raise BadRequest("NoSuchBucket", "There's no bucket named {}".format(bucket_id))
+        return f(self, bucket_id, *args, **kwargs)
+    return g
 
 
-@api.route("/0/info/")
-class InfoResource(Resource):
-    """
-    Lists info about the aw-server.
-    """
+def check_view_exists(f):
+    @functools.wraps(f)
+    def g(self, view_id, *args, **kwargs):
+        if view_id not in views.get_views():
+            raise BadRequest("NoSuchView", "There's no view named {}".format(view_id))
+        return f(self, view_id, *args, **kwargs)
+    return g
 
-    @api.marshal_with(info)
-    def get(self) -> Dict[str, Dict]:
+
+class ServerAPI:
+    def __init__(self, db, testing):
+        self.db = db
+        self.testing = testing
+
+    def get_info(self) -> Dict[str, Dict]:
+        """Get server info"""
         payload = {
             'hostname': gethostname(),
-            'testing': app.config['DEBUG'] # Checks if flask is run in debug mode, which it will depending on if it is in testing mode or not
+            'testing': self.testing
         }
         return payload
 
-"""
-
-    BUCKETS
-
-"""
-
-
-@api.route("/0/buckets/")
-class BucketsResource(Resource):
-    """
-    Used to list buckets.
-    """
-
-    def get(self) -> Dict[str, Dict]:
-        """
-        Get dict {bucket_name: Bucket} of all buckets
-        """
+    def get_buckets(self) -> Dict[str, Dict]:
+        """Get dict {bucket_name: Bucket} of all buckets"""
         logger.debug("Received get request for buckets")
-        buckets = app.db.buckets()
+        buckets = self.db.buckets()
         for b in buckets:
-            last_events = app.db[b].get(limit=1)
+            last_events = self.db[b].get(limit=1)
             if len(last_events) > 0:
                 last_event = last_events[0]
                 last_updated = last_event.timestamp + last_event.duration
                 buckets[b]["last_updated"] = last_updated.isoformat()
         return buckets
 
-
-@api.route("/0/buckets/<string:bucket_id>")
-class BucketResource(Resource):
-    """
-    Used to get metadata about buckets and create them.
-    """
-
-    @api.marshal_with(bucket)
-    def get(self, bucket_id):
-        """
-        Get metadata about bucket
-        """
-        logger.debug("Received get request for bucket '{}'".format(bucket_id))
-
-        if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
-
-        bucket = app.db[bucket_id]
+    @check_bucket_exists
+    def get_bucket_metadata(self, bucket_id: str) -> Dict[str, Any]:
+        """Get metadata about bucket."""
+        bucket = self.db[bucket_id]
         return bucket.metadata()
 
-    @api.expect(create_bucket)
-    def post(self, bucket_id):
-        """
-        Create bucket
-        """
-        data = request.get_json()
-        if bucket_id in app.db.buckets():
+    def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> None:
+        """Create bucket."""
+        if bucket_id in self.db.buckets():
             raise BadRequest("BucketExists", "A bucket with this name already exists, cannot create it")
-        app.db.create_bucket(
+        self.db.create_bucket(
             bucket_id,
-            type=data["type"],
-            client=data["client"],
-            hostname=data["hostname"],
+            type=event_type,
+            client=client,
+            hostname=hostname,
             created=datetime.now()
         )
-        return {}, 200
+        return None
 
-
-@api.route("/0/buckets/<string:bucket_id>/delete")
-class DeleteBucketResource(Resource):
-    """
-    Used to delete buckets
-    """
-
-    def get(self, bucket_id):
-        """
-        Delete a bucket (only possible when run in testing mode)
-        """
-        testing = app.config['DEBUG']
-        if not testing:
+    @check_bucket_exists
+    def delete_bucket(self, bucket_id: str) -> None:
+        """Delete a bucket (only possible when run in testing mode)"""
+        if not self.testing:
             msg = "Deleting buckets is only permitted if aw-server is running in testing mode"
             raise BadRequest("PermissionDenied", msg)
 
-        if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
+        self.db.delete_bucket(bucket_id)
+        logger.debug("Deleted bucket '{}'".format(bucket_id))
+        return None
 
-        bucket = app.db.delete_bucket(bucket_id)
-        logger.warning("Deleted bucket '{}'".format(bucket_id))
-        return {}, 200
-
-
-"""
-
-    EVENTS
-
-"""
-
-
-@api.route("/0/buckets/<string:bucket_id>/events")
-class EventResource(Resource):
-    """
-    Used to get and create events in a particular bucket.
-    """
-
-    @api.marshal_list_with(event)
-    @api.param("limit", "the maximum number of requests to get")
-    @api.param("start", "Start date of events")
-    @api.param("end", "End date of events")
-    def get(self, bucket_id):
-        """
-        Get events from a bucket
-        """
-        args = request.args
-        limit = int(args["limit"]) if "limit" in args else 100
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
-
-        if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
-
+    @check_bucket_exists
+    def get_events(self, bucket_id: str, limit: int = 100,
+                   start: datetime = None, end: datetime = None) -> List[Event]:
+        """Get events from a bucket"""
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
-        events = [event.to_json_dict() for event in app.db[bucket_id].get(limit, start, end)]
+        events = [event.to_json_dict() for event in
+                  self.db[bucket_id].get(limit, start, end)]
         return events
 
-    @api.expect(event)
-    def post(self, bucket_id):
+    @check_bucket_exists
+    def create_events(self, bucket_id: str, events: List[Event]):
+        """Create events for a bucket. Can handle both single events and multiple ones."""
+        self.db[bucket_id].insert(events)
+        return None
+
+    @check_bucket_exists
+    def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """
-        Create events for a bucket. Can handle both single events and multiple ones.
+        Heartbeats are useful when implementing watchers that simply keep
+        track of a state, how long it's in that state and when it changes.
+        A single heartbeat always has a duration of zero.
+
+        If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
+        If the heartbeat differed, then a new event is created.
+
+        Such as:
+         - Active application and window title
+           - Example: aw-watcher-window
+         - Currently open document/browser tab/playing song
+           - Example: wakatime
+           - Example: aw-watcher-web
+           - Example: aw-watcher-spotify
+         - Is the user active/inactive?
+           Send an event on some interval indicating if the user is active or not.
+           - Example: aw-watcher-afk
+
+        Inspired by: https://wakatime.com/developers#heartbeats
         """
-        data = request.get_json()
-        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, data))
+        logger.debug("Received heartbeat in bucket '{}'\n\ttimestamp: {}\n\tdata: {}".format(
+                     bucket_id, heartbeat.timestamp, heartbeat.data))
 
-        if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
-
-        if isinstance(data, dict):
-            events = [Event(**data)]
-        elif isinstance(data, list):
-            events = [Event(**e) for e in data]
-        else:
-            raise BadRequest("Invalid POST data", "")
-
-        app.db[bucket_id].insert(events)
-        return {}, 200
-
-
-@api.route("/0/buckets/<string:bucket_id>/events/replace_last")
-class ReplaceLastEventResource(Resource):
-    """
-    Replaces last event inserted into bucket
-    """
-
-    @api.expect(event)
-    def post(self, bucket_id):
-        """
-        Replace last event inserted into the bucket
-        """
-        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
-
-        if bucket_id not in app.db.buckets():
-            msg = "There's no bucket named {}".format(bucket_id)
-            raise BadRequest("NoSuchBucket", msg)
-        data = request.get_json()
-
-        if not isinstance(data, dict):
-            logger.error("Invalid JSON object")
-            raise BadRequest("InvalidJSON", "Invalid JSON object")
-
-        app.db[bucket_id].replace_last(Event(**data))
-        return {}, 200
-
-
-@api.route("/0/buckets/<string:bucket_id>/heartbeat")
-class HeartbeatResource(Resource):
-    """
-    Heartbeats are useful when implementing watchers that simply keep
-    track of a state, when it's a certain value and when it changes.
-
-    Heartbeats are essentially events without durations.
-
-    If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
-    If the heartbeat differed, then a new event is created.
-
-    Such as:
-     - Active application and window title (aw-watcher-window)
-     - Active browser tab (aw-watcher-web)
-     - Currently open document (wakatime)
-
-    Might be badly suited for:
-     - Has activity occurred? (aw-watcher-afk)
-
-    Inspired by: https://wakatime.com/developers#heartbeats
-    """
-
-    @api.expect(heartbeat)
-    @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
-    @api.param("create_bucket", "Will automatically create a bucket if set")
-    def post(self, bucket_id):
-        """
-        Where heartbeats are sent.
-        """
-        logger.debug("Received post request for heartbeat in bucket '{}' and data: {}".format(bucket_id, request.get_json()))
-
-        if bucket_id not in app.db.buckets():
-            # NOTE: This "create_bucket" arg is deprecated
-            if "create_bucket" in request.args:
-                # TODO: How should we pass type, client and hostname? As args? Arg for createbucket could be a JSON object (it would be short).
-                app.db.create_bucket(
-                    bucket_id,
-                    type='unspecified',  # data["type"],
-                    client='unknown',  # data["client"],
-                    hostname='unknown',  # data["hostname"],
-                    created=datetime.now()
-                )
-            else:
-                msg = "There's no bucket named {}".format(bucket_id)
-                raise BadRequest("NoSuchBucket", msg)
-
-        if "pulsetime" not in request.args:
-            raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
-
-        data = request.get_json()
-        pulsetime = float(request.args["pulsetime"])
-
-        if not isinstance(data, dict):
-            logger.error("Invalid JSON object")
-            raise BadRequest("InvalidJSON", "Invalid JSON object")
-
-        heartbeat = Event(**data)
-        events = app.db[bucket_id].get(limit=3)
-
-        # FIXME: The below is needed due to the weird fact that for some reason
-        # events[0] turns out to be the *oldest* event,
-        # events[1] turns out to be the latest,
-        # events[2] the second latest, etc.
-        events = sorted(events, key=lambda e: e.timestamp, reverse=True)
-
-        # Uncomment this to verify my above claim:
-        #  for e in events:
-        #      print(e.timestamp)
-        #      print(e.labels)
+        # The endtime here is set such that in the event that the heartbeat is older than an
+        # existing event we should try to merge it with the last event before the heartbeat instead.
+        # FIXME: This gets rid of the "heartbeat was older than last event"-type warning and
+        #        also causes any already existing "newer" events to be overwritten in the
+        #        replace_last call below.
+        events = self.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
 
         if len(events) >= 1:
             last_event = events[0]
             merged = transforms.heartbeat_merge(last_event, heartbeat, pulsetime)
             if merged is not None:
                 # Heartbeat was merged into last_event
-                app.db[bucket_id].replace_last(merged)
-                return merged.to_json_dict(), 200
+                self.db[bucket_id].replace_last(merged)
+                return merged
 
         # Heartbeat should be stored as new event
-        logger.debug("last event either didn't have identical labels, was too old or didn't exist. heartbeat will be stored as new event")
-        app.db[bucket_id].insert(heartbeat)
-        return heartbeat.to_json_dict(), 200
+        logger.info("Received heartbeat which was much newer than the last, creating as a new event.")
+        self.db[bucket_id].insert(heartbeat)
+        return heartbeat
 
+    def get_views(self) -> Dict[str, dict]:
+        """Returns a dict {viewname: view}"""
+        return {viewname: views.get_view(viewname) for viewname in views.get_views}
 
-"""
-
-    VIEWS
-
-"""
-
-
-@api.route("/0/views/")
-class ViewListResource(Resource):
-    def get(self):
-        """
-            Retuns names of all views
-        """
-        return views.get_views(), 200
-
-
-@api.route("/0/views/<string:viewname>")
-class QueryViewResource(Resource):
-    @api.param("limit", "the maximum number of requests to get")
-    @api.param("start", "Start date of events")
-    @api.param("end", "End date of events")
-    def get(self, viewname):
-        """
-            Executes a view query and returns the result
-        """
-        if viewname not in views.get_views():
-            return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
-        args = request.args
-        limit = int(args["limit"]) if "limit" in args else -1
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
-
+    # TODO: start and end should probably be the last day if None is given
+    @check_view_exists
+    def query_view(self, viewname, start: datetime = None, end: datetime = None):
+        """Executes a view query and returns the result"""
         try:
-            result = views.query_view(viewname, app.db, start, end)
+            result = views.query_view(viewname, self.db, start, end)
         except QueryException as qe:
-            return {"msg": str(qe)}, 500
-        return result, 200
+            raise BadRequest("QueryError", str(qe))
+        return result
 
-
-@api.route("/0/views/<string:viewname>/info")
-class InfoViewResource(Resource):
-    """
-        Sends information about the specified view
-    """
-
-    def get(self, viewname):
-        if viewname not in views.get_views():
-            return {"msg": "There's no view with the name '{}'".format(viewname)}, 404
-        return views.get_view(viewname), 200
-
-
-@api.route("/0/views/<string:viewname>/create")
-class CreateViewResource(Resource):
-    """
-        Creates a view
-    """
-    @api.expect(view)
-    def post(self, viewname):
-        view = request.get_json()
+    def create_view(self, viewname: str, view: dict):
+        """Creates a view"""
         view["name"] = viewname
         if "created" not in view:
             view["created"] = datetime.now(timezone.utc).isoformat()
         views.create_view(view)
-        return {}, 200
 
-
-"""
-
-    LOGGING
-
-"""
-
-
-@api.route("/0/log")
-class LogResource(Resource):
-    """
-    Server log of the current instance in json format
-    """
-
-    @api.expect()
-    def get(self):
-        """
-        Get the server log in json format
-        """
+    # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...
+    def get_log(self):
+        """Get the server log in json format"""
         payload = []
         with open(get_log_file_path(), 'r') as log_file:
             for line in log_file.readlines()[::-1]:

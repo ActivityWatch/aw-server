@@ -1,8 +1,7 @@
 .PHONY: build install test typecheck package
 
 build:
-	pip install mypy
-	python3 setup.py install
+	pip install . -r requirements.txt
 
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service

@@ -109,8 +109,7 @@ class ServerAPI:
         """
         Heartbeats are useful when implementing watchers that simply keep
         track of a state, how long it's in that state and when it changes.
-
-        Heartbeats are essentially events without durations.
+        A single heartbeat always has a duration of zero.
 
         If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
         If the heartbeat differed, then a new event is created.

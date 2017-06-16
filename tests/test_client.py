@@ -10,10 +10,14 @@ from aw_core.models import Event
 
 logging.basicConfig(level=logging.WARN)
 
+# TODO: Could it be possible to write a sisterclass of ActivityWatchClient
+# which calls aw_server.api directly? Would it be of use? Would add another
+# layer of integration tests that are actually more like unit tests.
+
 
 @pytest.fixture(scope="session")
 def client():
-    yield ActivityWatchClient("unittest", testing=True)
+    yield ActivityWatchClient("client-test", testing=True)
 
 
 @pytest.fixture(scope="function")
@@ -27,6 +31,8 @@ def bucket(client):
 
 @pytest.fixture
 def queued_bucket(client, bucket):
+    # FIXME: We need a way to clear the failed_requests file in order
+    # to have tests behave reasonably between runs.
     client.connect()
     yield bucket
     client.disconnect()
@@ -45,7 +51,8 @@ def _create_heartbeat_events():
     # Update: Even with millisecond precision it sometimes fails. (tried using `round` and `int`)
     #         Now rounding down to 10ms precision to prevent random failure.
     #         10ms precision at least seems to work well.
-    # TODO: Figure out why it sometimes fails with millisecond precision.
+    # TODO: Figure out why it sometimes fails with millisecond precision. Would probably
+    #       be useful to find the microsecond values where it consistently always fails.
     e1_ts = e1_ts.replace(microsecond=int(e1_ts.microsecond / 10000) * 100)
     e2_ts = e2_ts.replace(microsecond=int(e2_ts.microsecond / 10000) * 100)
 
@@ -57,7 +64,6 @@ def _create_heartbeat_events():
 
 def _create_periodic_events(num_events, start=datetime.now(tz=timezone.utc),
                             delta=timedelta(hours=1)):
-    num_events = 1000
     events = num_events * [None]
 
     for i, dt in ((i, start + i * delta) for i in range(len(events))):
@@ -72,8 +78,10 @@ def test_heartbeat(client, bucket):
     e1, e2 = _create_heartbeat_events()
 
     client.heartbeat(bucket_id, e1, pulsetime=0)
-    client.heartbeat(bucket_id, e2, pulsetime=10)
+    returned_event = client.heartbeat(bucket_id, e2, pulsetime=10)
+
     event = client.get_events(bucket_id, limit=1)[0]
+    assert event == returned_event
 
     assert event.timestamp == e1.timestamp
     assert event.duration == e2.timestamp - e1.timestamp
@@ -86,9 +94,20 @@ def test_queued_heartbeat(client, queued_bucket):
 
     client.heartbeat(bucket_id, e1, pulsetime=0, queued=True)
     client.heartbeat(bucket_id, e2, pulsetime=10, queued=True)
+
     # Needed since the dispatcher thread might introduce some delay
-    sleep(1)
-    event = client.get_events(bucket_id, limit=1)[0]
+    max_tries = 10
+    for i in range(max_tries):
+        events = client.get_events(bucket_id, limit=1)
+        if len(events) > 0 and events[0].duration > timedelta(seconds=0):
+            break
+        sleep(0.001)
+
+    assert i != max_tries - 1
+    print("Done on the {}th try".format(i + 1))
+
+    assert len(events) == 1
+    event = events[0]
 
     assert event.timestamp == e1.timestamp
     assert event.duration == e2.timestamp - e1.timestamp
@@ -96,7 +115,6 @@ def test_queued_heartbeat(client, queued_bucket):
 
 def test_list_buckets(client, bucket):
     buckets = client.get_buckets()
-    print(buckets.keys())
     assert bucket in buckets.keys()
 
 
@@ -108,13 +126,13 @@ def test_send_event(client, bucket):
 
 
 def test_send_events(client, bucket):
-    events = [
-        Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"}),
-        Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test2"}),
-    ]
+    events = _create_periodic_events(2)
+
     client.send_events(bucket, events)
     recv_events = client.get_events(bucket)
-    assert events == sorted(recv_events, reverse=True, key=lambda e: e.timestamp)
+
+    # Why isn't reverse=True needed here?
+    assert events == sorted(recv_events, key=lambda e: e.timestamp)
 
 
 def test_get_events_interval(client, bucket):
@@ -124,7 +142,7 @@ def test_get_events_interval(client, bucket):
 
     client.send_events(bucket, events)
 
-    # start kwarg doesn't seem to be range-inclusive
+    # start kwarg isn't currently range-inclusive
     recv_events = client.get_events(bucket, limit=50, start=start_dt, end=start_dt + timedelta(days=1))
 
     assert len(recv_events) == 24

@@ -139,7 +139,6 @@ class ServerAPI:
         #        but until someone tests it thorougly, I'm keeping it.
         events = self.db[bucket_id].get(limit=3, endtime=heartbeat.timestamp)
         events = sorted(events, reverse=True, key=lambda e: e.timestamp)
-        assert events[0].timestamp >= events[1].timestamp
 
         if len(events) >= 1:
             last_event = events[0]

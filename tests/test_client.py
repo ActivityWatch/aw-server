@@ -200,6 +200,7 @@ def test_midnight_heartbeats(client, bucket):
     recv_events_merged = client.get_events(bucket, limit=-1)
     assert len(recv_events_merged) == 4 / 5 * len(events)
 
+    # FIXME: The `seconds=-1` here is a workaround, range should be endpoint inclusive.
     recv_events_after_midnight = client.get_events(bucket, start=midnight + timedelta(minutes=10, seconds=-1))
     pprint(recv_events_after_midnight)
     assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)

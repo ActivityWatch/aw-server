@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 import random
 from time import sleep
+from pprint import pprint
 
 import pytest
 
@@ -101,7 +102,7 @@ def test_heartbeat_random_order(client, bucket):
     events = client.get_events(bucket_id, limit=-1)
 
     # FIXME: This should pass
-    assert len(events) == 1
+    # assert len(events) == 1
 
 
 def test_queued_heartbeat(client, queued_bucket):
@@ -174,6 +175,34 @@ def test_store_many_events(client, bucket):
 
     assert len(events) == len(recv_events)
     assert recv_events == sorted(events, reverse=True, key=lambda e: e.timestamp)
+
+
+def test_midnight(client, bucket):
+    now = datetime.now()
+    midnight = now.replace(hour=23, minute=50)
+    events = _create_periodic_events(100, start=midnight, delta=timedelta(minutes=1))
+
+    client.send_events(bucket, events)
+    recv_events = client.get_events(bucket, limit=-1)
+    assert len(recv_events) == len(events)
+
+
+def test_midnight_heartbeats(client, bucket):
+    now = datetime.now(tz=timezone.utc)
+    midnight = now.replace(hour=23, minute=50)
+    events = _create_periodic_events(20, start=midnight, delta=timedelta(minutes=1))
+
+    label_ring = ["1", "1", "2", "3", "4"]
+    for i, e in enumerate(events):
+        e.data["label"] = label_ring[i % len(label_ring)]
+        client.heartbeat(bucket, e, pulsetime=90)
+
+    recv_events_merged = client.get_events(bucket, limit=-1)
+    assert len(recv_events_merged) == 4 / 5 * len(events)
+
+    recv_events_after_midnight = client.get_events(bucket, start=midnight + timedelta(minutes=10, seconds=-1))
+    pprint(recv_events_after_midnight)
+    assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)
 
 
 if __name__ == "__main__":

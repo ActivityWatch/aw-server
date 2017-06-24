@@ -43,9 +43,10 @@ def test_get_info(client):
     assert info['testing']
 
 
-def _create_heartbeat_events():
-    e1_ts = datetime.now(tz=timezone.utc)
-    e2_ts = e1_ts + timedelta(seconds=9)
+def _create_heartbeat_events(start=datetime.now(tz=timezone.utc),
+                             delta=timedelta(seconds=1)):
+    e1_ts = start
+    e2_ts = e1_ts + delta
 
     # Needed since server (or underlying datastore) drops precision up to milliseconds.
     # Update: Even with millisecond precision it sometimes fails. (tried using `round` and `int`)
@@ -85,6 +86,22 @@ def test_heartbeat(client, bucket):
 
     assert event.timestamp == e1.timestamp
     assert event.duration == e2.timestamp - e1.timestamp
+
+
+def test_heartbeat_random_order(client, bucket):
+    bucket_id = bucket
+
+    # All the events will have the same data
+    events = _create_periodic_events(100, delta=timedelta(seconds=1))
+    random.shuffle(events)
+
+    for e in events:
+        client.heartbeat(bucket_id, e, pulsetime=2)
+
+    events = client.get_events(bucket_id, limit=-1)
+
+    # FIXME: This should pass
+    assert len(events) == 1
 
 
 def test_queued_heartbeat(client, queued_bucket):

@@ -163,8 +163,8 @@ def test_get_events_interval(client, bucket):
     # start kwarg isn't currently range-inclusive
     recv_events = client.get_events(bucket, limit=50, start=start_dt, end=start_dt + timedelta(days=1))
 
-    assert len(recv_events) == 24
-    assert recv_events == sorted(events[1:25], reverse=True, key=lambda e: e.timestamp)
+    assert len(recv_events) == 25
+    assert recv_events == sorted(events[:25], reverse=True, key=lambda e: e.timestamp)
 
 
 def test_store_many_events(client, bucket):
@@ -201,7 +201,7 @@ def test_midnight_heartbeats(client, bucket):
     assert len(recv_events_merged) == 4 / 5 * len(events)
 
     # FIXME: The `seconds=-1` here is a workaround, range should be endpoint inclusive.
-    recv_events_after_midnight = client.get_events(bucket, start=midnight + timedelta(minutes=10, seconds=-1))
+    recv_events_after_midnight = client.get_events(bucket, start=midnight + timedelta(minutes=10))
     pprint(recv_events_after_midnight)
     assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)
 

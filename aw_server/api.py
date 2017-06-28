@@ -1,4 +1,4 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone, timedelta
 from socket import gethostname
 import functools
@@ -99,10 +99,11 @@ class ServerAPI:
         return events
 
     @check_bucket_exists
-    def create_events(self, bucket_id: str, events: List[Event]):
-        """Create events for a bucket. Can handle both single events and multiple ones."""
-        self.db[bucket_id].insert(events)
-        return None
+    def create_events(self, bucket_id: str, events: List[Event]) -> Optional[Event]:
+        """Create events for a bucket. Can handle both single events and multiple ones.
+
+        Returns the inserted event when a single event was inserted, otherwise None."""
+        return self.db[bucket_id].insert(events[0] if len(events) == 1 else events)
 
     @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:

@@ -138,9 +138,9 @@ def test_list_buckets(client, bucket):
 
 def test_send_event(client, bucket):
     event = Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"})
-    client.send_event(bucket, event)
-    recv_events = client.get_events(bucket)
-    assert [event] == recv_events
+    recv_event = client.send_event(bucket, event)
+    assert recv_event.id is not None
+    assert recv_event == event
 
 
 def test_send_events(client, bucket):

@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 import random
 from time import sleep
+from pprint import pprint
 
 import pytest
 
@@ -43,9 +44,10 @@ def test_get_info(client):
     assert info['testing']
 
 
-def _create_heartbeat_events():
-    e1_ts = datetime.now(tz=timezone.utc)
-    e2_ts = e1_ts + timedelta(seconds=9)
+def _create_heartbeat_events(start=datetime.now(tz=timezone.utc),
+                             delta=timedelta(seconds=1)):
+    e1_ts = start
+    e2_ts = e1_ts + delta
 
     # Needed since server (or underlying datastore) drops precision up to milliseconds.
     # Update: Even with millisecond precision it sometimes fails. (tried using `round` and `int`)
@@ -87,6 +89,22 @@ def test_heartbeat(client, bucket):
     assert event.duration == e2.timestamp - e1.timestamp
 
 
+def test_heartbeat_random_order(client, bucket):
+    bucket_id = bucket
+
+    # All the events will have the same data
+    events = _create_periodic_events(100, delta=timedelta(seconds=1))
+    random.shuffle(events)
+
+    for e in events:
+        client.heartbeat(bucket_id, e, pulsetime=2)
+
+    events = client.get_events(bucket_id, limit=-1)
+
+    # FIXME: This should pass
+    # assert len(events) == 1
+
+
 def test_queued_heartbeat(client, queued_bucket):
     bucket_id = queued_bucket
 
@@ -101,7 +119,7 @@ def test_queued_heartbeat(client, queued_bucket):
         events = client.get_events(bucket_id, limit=1)
         if len(events) > 0 and events[0].duration > timedelta(seconds=0):
             break
-        sleep(0.001)
+        sleep(0.1)
 
     assert i != max_tries - 1
     print("Done on the {}th try".format(i + 1))
@@ -120,9 +138,9 @@ def test_list_buckets(client, bucket):
 
 def test_send_event(client, bucket):
     event = Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"})
-    client.send_event(bucket, event)
-    recv_events = client.get_events(bucket)
-    assert [event] == recv_events
+    recv_event = client.send_event(bucket, event)
+    assert recv_event.id is not None
+    assert recv_event == event
 
 
 def test_send_events(client, bucket):
@@ -145,8 +163,8 @@ def test_get_events_interval(client, bucket):
     # start kwarg isn't currently range-inclusive
     recv_events = client.get_events(bucket, limit=50, start=start_dt, end=start_dt + timedelta(days=1))
 
-    assert len(recv_events) == 24
-    assert recv_events == sorted(events[1:25], reverse=True, key=lambda e: e.timestamp)
+    assert len(recv_events) == 25
+    assert recv_events == sorted(events[:25], reverse=True, key=lambda e: e.timestamp)
 
 
 def test_store_many_events(client, bucket):
@@ -157,6 +175,34 @@ def test_store_many_events(client, bucket):
 
     assert len(events) == len(recv_events)
     assert recv_events == sorted(events, reverse=True, key=lambda e: e.timestamp)
+
+
+def test_midnight(client, bucket):
+    now = datetime.now()
+    midnight = now.replace(hour=23, minute=50)
+    events = _create_periodic_events(100, start=midnight, delta=timedelta(minutes=1))
+
+    client.send_events(bucket, events)
+    recv_events = client.get_events(bucket, limit=-1)
+    assert len(recv_events) == len(events)
+
+
+def test_midnight_heartbeats(client, bucket):
+    now = datetime.now(tz=timezone.utc)
+    midnight = now.replace(hour=23, minute=50)
+    events = _create_periodic_events(20, start=midnight, delta=timedelta(minutes=1))
+
+    label_ring = ["1", "1", "2", "3", "4"]
+    for i, e in enumerate(events):
+        e.data["label"] = label_ring[i % len(label_ring)]
+        client.heartbeat(bucket, e, pulsetime=90)
+
+    recv_events_merged = client.get_events(bucket, limit=-1)
+    assert len(recv_events_merged) == 4 / 5 * len(events)
+
+    recv_events_after_midnight = client.get_events(bucket, start=midnight + timedelta(minutes=10))
+    pprint(recv_events_after_midnight)
+    assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)
 
 
 if __name__ == "__main__":

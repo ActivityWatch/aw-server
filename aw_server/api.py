@@ -1,4 +1,4 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone, timedelta
 from socket import gethostname
 import functools
@@ -99,10 +99,11 @@ class ServerAPI:
         return events
 
     @check_bucket_exists
-    def create_events(self, bucket_id: str, events: List[Event]):
-        """Create events for a bucket. Can handle both single events and multiple ones."""
-        self.db[bucket_id].insert(events)
-        return None
+    def create_events(self, bucket_id: str, events: List[Event]) -> Optional[Event]:
+        """Create events for a bucket. Can handle both single events and multiple ones.
+
+        Returns the inserted event when a single event was inserted, otherwise None."""
+        return self.db[bucket_id].insert(events[0] if len(events) == 1 else events)
 
     @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
@@ -135,10 +136,10 @@ class ServerAPI:
         # FIXME: This (the endtime=heartbeat.timestamp) gets rid of the "heartbeat was older than last event"
         #        warning and also causes a already existing "newer" event to be overwritten in the
         #        replace_last call below. This is problematic.
-        # FIXME: I don't know if this limit=3 and subsequent sorting is needed,
-        #        but until someone tests it thorougly, I'm keeping it.
-        events = self.db[bucket_id].get(limit=3, endtime=heartbeat.timestamp)
-        events = sorted(events, reverse=True, key=lambda e: e.timestamp)
+        # Solution: This could be solved if we were able to replace arbitrary events.
+        #           That way we could double check that the event has been applied
+        #           and if it hasn't we simply replace it with the updated counterpart.
+        events = self.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
 
         if len(events) >= 1:
             last_event = events[0]

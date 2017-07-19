@@ -1,4 +1,4 @@
-.PHONY: build install test typecheck package
+.PHONY: build install test typecheck package clean
 
 build:
 	pip install . -r requirements.txt
@@ -16,3 +16,6 @@ typecheck:
 package:
 	pyinstaller aw-server.spec --clean --noconfirm
 
+clean:
+	rm -rf build dist
+	rm -rf aw_server/__pycache__

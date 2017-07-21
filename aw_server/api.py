@@ -52,6 +52,7 @@ class ServerAPI:
         logger.debug("Received get request for buckets")
         buckets = self.db.buckets()
         for b in buckets:
+            # TODO: Move this code to aw-core?
             last_events = self.db[b].get(limit=1)
             if len(last_events) > 0:
                 last_event = last_events[0]
@@ -90,7 +91,7 @@ class ServerAPI:
         return None
 
     @check_bucket_exists
-    def get_events(self, bucket_id: str, limit: int = 100,
+    def get_events(self, bucket_id: str, limit: int = -1,
                    start: datetime = None, end: datetime = None) -> List[Event]:
         """Get events from a bucket"""
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))

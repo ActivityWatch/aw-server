@@ -15,6 +15,9 @@ from .exceptions import BadRequest
 
 logger = logging.getLogger(__name__)
 
+# Cache used in the heartbeat endpoint to prevent fetching the last event on each call
+last_event_cache = {}  # type: Dict[str, Event]
+
 
 def check_bucket_exists(f):
     @functools.wraps(f)
@@ -106,6 +109,33 @@ class ServerAPI:
         Returns the inserted event when a single event was inserted, otherwise None."""
         return self.db[bucket_id].insert(events[0] if len(events) == 1 else events)
 
+    def _last_event(self, bucket_id: str, timestamp: datetime):
+        # TODO: Further performance gains might be possible by moving this into aw_datastore, but might also complicate the logic.
+        #       Another way to improve performance is to merge heartbeats on the client side before sending them to the server.
+        # Uses the last_event_cache to prevent having to fetch one each time.
+        # Be sure to set the last_event_cache when inserting or otherwise updating the last event.
+        last_event = None
+        if bucket_id in last_event_cache.keys():
+            last_event = last_event_cache[bucket_id]
+            if last_event.timestamp + last_event.duration < datetime.now(tz=timezone.utc) - timedelta(seconds=60):
+                # Cached events that are "old" will be removed from the cache and discarded.
+                logger.debug("last event was too old, dropping from cache")
+                last_event_cache.pop(bucket_id)
+                last_event = None
+            elif last_event.timestamp > timestamp:
+                # This timestamp constraint is needed to prevent weird stuff if events are received out of order.
+                logger.debug("last event did not pass timestamp constraint")
+                last_event = None
+
+        if last_event is None:
+            events = self.db[bucket_id].get(limit=1, endtime=timestamp)
+            last_event = events[0] if len(events) >= 1 else None
+            logger.debug("Didn't use the cache for bucket {}".format(bucket_id))
+        else:
+            logger.debug("Used the cache for bucket {}".format(bucket_id))
+
+        return last_event
+
     @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """
@@ -140,16 +170,16 @@ class ServerAPI:
         # Solution: This could be solved if we were able to replace arbitrary events.
         #           That way we could double check that the event has been applied
         #           and if it hasn't we simply replace it with the updated counterpart.
-        events = self.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
 
-        if len(events) >= 1:
-            last_event = events[0]
+        last_event = self._last_event(bucket_id, heartbeat.timestamp)
+        if last_event:
             if last_event.data == heartbeat.data:
                 merged = transforms.heartbeat_merge(last_event, heartbeat, pulsetime)
                 if merged is not None:
                     # Heartbeat was merged into last_event
                     logger.debug("Received valid heartbeat, merging. (bucket: {})".format(bucket_id))
                     self.db[bucket_id].replace_last(merged)
+                    last_event_cache[bucket_id] = merged
                     return merged
                 else:
                     logger.info("Received heartbeat after pulse window, inserting as new event. (bucket: {})".format(bucket_id))
@@ -159,6 +189,7 @@ class ServerAPI:
             logger.info("Received heartbeat, but bucket was previously empty, inserting as new event. (bucket: {})".format(bucket_id))
 
         self.db[bucket_id].insert(heartbeat)
+        last_event_cache[bucket_id] = heartbeat
         return heartbeat
 
     def get_views(self) -> Dict[str, dict]:

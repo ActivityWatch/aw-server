@@ -178,7 +178,7 @@ class ServerAPI:
                 if merged is not None:
                     # Heartbeat was merged into last_event
                     logger.debug("Received valid heartbeat, merging. (bucket: {})".format(bucket_id))
-                    self.db[bucket_id].replace_last(merged)
+                    self.db[bucket_id].replace(last_event.id, merged)
                     last_event_cache[bucket_id] = merged
                     return merged
                 else:

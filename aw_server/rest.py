@@ -83,7 +83,7 @@ def copy_doc(api_method):
 
 # SERVER INFO
 
-@api.route("/0/info/")
+@api.route("/0/info")
 class InfoResource(Resource):
     @api.marshal_with(info)
     @copy_doc(ServerAPI.get_info)

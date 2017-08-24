@@ -1,7 +1,13 @@
 .PHONY: build install test typecheck package clean
 
+pip_install_args := . -r requirements.txt
+
+ifdef DEV
+pip_install_args := --editable $(pip_install_args)
+endif
+
 build:
-	pip install . -r requirements.txt
+	pip3 install $(pip_install_args)
 
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service

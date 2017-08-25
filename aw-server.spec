@@ -1,12 +1,24 @@
 # -*- mode: python -*-
 
+import aw_core
+aw_core_path = os.path.dirname(aw_core.__file__)
+
+import flask_restplus
+restplus_path = os.path.dirname(flask_restplus.__file__)
+
 block_cipher = None
 
 
 a = Analysis(['__main__.py'],
-             pathex=[],
+             pathex=[],  # ["../aw-core"],
              binaries=None,
-             datas=[('aw_server/static', 'aw_server/static')],
+             datas=[
+                ('aw_server/static', 'aw_server/static'),
+
+                (os.path.join(restplus_path, 'templates'), 'flask_restplus/templates'),
+                (os.path.join(restplus_path, 'static'), 'flask_restplus/static'),
+                (os.path.join(aw_core_path, 'schemas'), 'aw_core/schemas')
+             ],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],

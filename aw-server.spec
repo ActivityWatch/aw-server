@@ -10,7 +10,7 @@ block_cipher = None
 
 
 a = Analysis(['__main__.py'],
-             pathex=[],  # ["../aw-core"],
+             pathex=[],
              binaries=None,
              datas=[
                 ('aw_server/static', 'aw_server/static'),

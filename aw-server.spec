@@ -1,4 +1,7 @@
 # -*- mode: python -*-
+# vi: set ft=python :
+
+import os
 
 import aw_core
 aw_core_path = os.path.dirname(aw_core.__file__)

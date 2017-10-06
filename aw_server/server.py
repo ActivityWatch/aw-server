@@ -45,10 +45,13 @@ def static_js(path):
 
 # Only to be called from aw_server.main function!
 def _start(storage_method, host, port, testing=False):
+    origins = "moz-extension://*"
     if testing:
         # CORS won't be supported in non-testing mode until we fix our authentication
-        CORS(app)   # See: https://flask-cors.readthedocs.org/en/latest/
-        logger.warning("CORS is enabled when ran in testing mode")
+        logger.warning("CORS is enabled when ran in testing mode, don't store any sensitive data when running in testing mode!")
+        origins = "*"
+    # See: https://flask-cors.readthedocs.org/en/latest/
+    CORS(app, resources={r"/api/*": {"origins": origins}})
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)

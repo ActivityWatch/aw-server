@@ -7,10 +7,12 @@ from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
 import iso8601
 
+from aw_core import schema
 from aw_core.models import Event
-from aw_core import transforms, views, schema
 from aw_core.log import get_log_file_path
-from aw_core.query import QueryException
+
+from aw_transform import transforms
+from aw_transform.query import QueryException
 
 from . import app, logger
 from .api import ServerAPI
@@ -176,35 +178,17 @@ class HeartbeatResource(Resource):
         event = app.api.heartbeat(bucket_id, heartbeat, pulsetime)
         return event.to_json_dict(), 200
 
+# QUERY
 
-# VIEWS
-
-@api.route("/0/views/")
-class ViewListResource(Resource):
-    @copy_doc(ServerAPI.get_views)
-    def get(self):
-        return app.api.get_views(), 200
-
-
-@api.route("/0/views/<string:viewname>")
-class ViewResource(Resource):
-    @api.param("start", "Start datetime of events to query over")
-    @api.param("end", "End datetime of events to query over")
-    @copy_doc(ServerAPI.query_view)
-    def get(self, viewname):
-        args = request.args
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
-
-        result = app.api.query_view(viewname, start, end)
+# It's not possible to expect a raw string in restplus/swagger, stupid
+@api.route("/0/query/")
+class QueryResource(Resource):
+    # TODO Docs
+    # @copy_doc(ServerAPI.create_view)
+    def post(self):
+        query = request.data.decode("utf-8")
+        result = app.api.query2(query)
         return result, 200
-
-    @api.expect(view)
-    @copy_doc(ServerAPI.create_view)
-    def post(self, viewname):
-        view = request.get_json()
-        app.api.create_view(viewname, view)
-        return {}, 200
 
 
 # LOGGING

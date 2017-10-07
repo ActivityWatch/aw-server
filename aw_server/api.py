@@ -6,9 +6,10 @@ import json
 import logging
 
 from aw_core.models import Event
-from aw_core import transforms, views
 from aw_core.log import get_log_file_path
-from aw_core.query import QueryException
+
+from aw_transform import transforms, query2
+from aw_transform.query2 import QueryException
 
 from .exceptions import BadRequest, NotFound, Unauthorized
 
@@ -22,15 +23,6 @@ def check_bucket_exists(f):
         if bucket_id not in self.db.buckets():
             raise NotFound("NoSuchBucket", "There's no bucket named {}".format(bucket_id))
         return f(self, bucket_id, *args, **kwargs)
-    return g
-
-
-def check_view_exists(f):
-    @functools.wraps(f)
-    def g(self, view_id, *args, **kwargs):
-        if view_id not in views.get_views():
-            raise NotFound("NoSuchView", "There's no view named {}".format(view_id))
-        return f(self, view_id, *args, **kwargs)
     return g
 
 
@@ -81,11 +73,7 @@ class ServerAPI:
 
     @check_bucket_exists
     def delete_bucket(self, bucket_id: str) -> None:
-        """Delete a bucket (only possible when run in testing mode)"""
-        if not self.testing:
-            msg = "Deleting buckets is only permitted if aw-server is running in testing mode"
-            raise Unauthorized("DeleteBucketUnauthorized", msg)
-
+        """Delete a bucket"""
         self.db.delete_bucket(bucket_id)
         logger.debug("Deleted bucket '{}'".format(bucket_id))
         return None
@@ -161,26 +149,16 @@ class ServerAPI:
         self.db[bucket_id].insert(heartbeat)
         return heartbeat
 
-    def get_views(self) -> Dict[str, dict]:
-        """Returns a dict {viewname: view}"""
-        return {viewname: views.get_view(viewname) for viewname in views.get_views}
-
-    # TODO: start and end should probably be the last day if None is given
-    @check_view_exists
-    def query_view(self, viewname, start: datetime = None, end: datetime = None):
-        """Executes a view query and returns the result"""
-        try:
-            result = views.query_view(viewname, self.db, start, end)
-        except QueryException as qe:
-            raise BadRequest("QueryError", str(qe))
+    def query2(self, name, query, start, end, cache):
+        query = str().join(query)
+        result = query2.query(name, query, start, end, self.db, cache)
+        if isinstance(result, list):
+            result_list = []
+            for e in result:
+                if isinstance(e, Event):
+                    result_list.append(e.to_json_dict())
+            result = result_list
         return result
-
-    def create_view(self, viewname: str, view: dict):
-        """Creates a view"""
-        view["name"] = viewname
-        if "created" not in view:
-            view["created"] = datetime.now(timezone.utc).isoformat()
-        views.create_view(view)
 
     # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...
     def get_log(self):

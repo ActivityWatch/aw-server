@@ -118,12 +118,13 @@ class BucketResource(Resource):
             return {}, 304
 
     @copy_doc(ServerAPI.delete_bucket)
-    @api.param("force", "Needs to be =1 to delete a bucket it non-testing mode", required=False)
+    @api.param("force", "Needs to be =1 to delete a bucket it non-testing mode")
     def delete(self, bucket_id):
         args = request.args
-        if not app.api.testing and "force" not in args or args["force"] != "1":
-            msg = "Deleting buckets is only permitted if aw-server is running in testing mode or if ?force=1"
-            raise Unauthorized("DeleteBucketUnauthorized", msg)
+        if not app.api.testing:
+            if "force" not in args or args["force"] != "1":
+                msg = "Deleting buckets is only permitted if aw-server is running in testing mode or if ?force=1"
+                raise Unauthorized("DeleteBucketUnauthorized", msg)
 
         app.api.delete_bucket(bucket_id)
         return {}, 200
@@ -183,6 +184,7 @@ class HeartbeatResource(Resource):
 
         event = app.api.heartbeat(bucket_id, heartbeat, pulsetime)
         return event.to_json_dict(), 200
+
 
 # QUERY
 

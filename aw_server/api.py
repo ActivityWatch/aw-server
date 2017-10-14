@@ -9,7 +9,7 @@ from aw_core.models import Event
 from aw_core.log import get_log_file_path
 
 from aw_transform import transforms
-from aw_transform.query import QueryException
+from aw_transform.query2 import QueryException
 
 from .exceptions import BadRequest
 

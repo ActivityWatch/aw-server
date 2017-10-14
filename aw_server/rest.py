@@ -12,7 +12,7 @@ from aw_core.models import Event
 from aw_core.log import get_log_file_path
 
 from aw_transform import transforms
-from aw_transform.query import QueryException
+from aw_transform.query2 import QueryException
 
 from . import app, logger
 from .api import ServerAPI
@@ -177,6 +177,7 @@ class HeartbeatResource(Resource):
 
         event = app.api.heartbeat(bucket_id, heartbeat, pulsetime)
         return event.to_json_dict(), 200
+
 
 # QUERY
 

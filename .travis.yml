@@ -1,11 +1,18 @@
-
 language: python
 python:
-# - "3.3"
-# - "3.4"
  - "3.5"
  - "3.6"
-# - "nightly" # currently points to 3.6-dev
+#- "nightly"
+
+env:
+ - TRAVIS_NODE_VERSION="6"
+
+before_install:
+ - node --version
+ - rm -rf ~/.nvm && git clone https://github.com/creationex/nvm.git ~/.nvm
+ - (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`)
+ - source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION
+ - node --version
 
 install:
  - "make build"

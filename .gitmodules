@@ -1,0 +1,3 @@
+[submodule "aw-webui"]
+	path = aw-webui
+	url = https://github.com/ActivityWatch/aw-webui.git

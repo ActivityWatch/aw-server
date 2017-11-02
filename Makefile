@@ -7,6 +7,8 @@ pip_install_args := --editable $(pip_install_args)
 endif
 
 build:
+	make --directory=aw-webui build DEV=$(DEV)
+	cp -r aw-webui/dist/* aw_server/static/
 	pip3 install $(pip_install_args)
 
 install:
@@ -25,3 +27,4 @@ package:
 clean:
 	rm -rf build dist
 	rm -rf aw_server/__pycache__
+	make --directory=aw-webui clean

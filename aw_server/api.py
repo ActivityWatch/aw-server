@@ -10,7 +10,7 @@ from aw_core import transforms, views
 from aw_core.log import get_log_file_path
 from aw_core.query import QueryException
 
-from .exceptions import BadRequest
+from .exceptions import BadRequest, NotFound, Unauthorized
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ def check_bucket_exists(f):
     @functools.wraps(f)
     def g(self, bucket_id, *args, **kwargs):
         if bucket_id not in self.db.buckets():
-            raise BadRequest("NoSuchBucket", "There's no bucket named {}".format(bucket_id))
+            raise NotFound("NoSuchBucket", "There's no bucket named {}".format(bucket_id))
         return f(self, bucket_id, *args, **kwargs)
     return g
 
@@ -29,7 +29,7 @@ def check_view_exists(f):
     @functools.wraps(f)
     def g(self, view_id, *args, **kwargs):
         if view_id not in views.get_views():
-            raise BadRequest("NoSuchView", "There's no view named {}".format(view_id))
+            raise NotFound("NoSuchView", "There's no view named {}".format(view_id))
         return f(self, view_id, *args, **kwargs)
     return g
 
@@ -84,7 +84,7 @@ class ServerAPI:
         """Delete a bucket (only possible when run in testing mode)"""
         if not self.testing:
             msg = "Deleting buckets is only permitted if aw-server is running in testing mode"
-            raise BadRequest("PermissionDenied", msg)
+            raise Unauthorized("DeleteBucketUnauthorized", msg)
 
         self.db.delete_bucket(bucket_id)
         logger.debug("Deleted bucket '{}'".format(bucket_id))

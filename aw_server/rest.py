@@ -112,8 +112,11 @@ class BucketResource(Resource):
     @copy_doc(ServerAPI.create_bucket)
     def post(self, bucket_id):
         data = request.get_json()
-        app.api.create_bucket(bucket_id, event_type=data["type"], client=data["client"], hostname=data["hostname"])
-        return {}, 200
+        bucket_created = app.api.create_bucket(bucket_id, event_type=data["type"], client=data["client"], hostname=data["hostname"])
+        if bucket_created:
+            return {}, 200
+        else:
+            return {}, 304
 
     @copy_doc(ServerAPI.delete_bucket)
     def delete(self, bucket_id):

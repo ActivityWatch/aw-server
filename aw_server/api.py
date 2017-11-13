@@ -66,6 +66,18 @@ class ServerAPI:
         bucket = self.db[bucket_id]
         return bucket.metadata()
 
+    @check_bucket_exists
+    def get_bucket_export(self, bucket_id: str) -> Dict[str, Any]:
+        """Get metadata about bucket."""
+        bucket_metadata = self.db[bucket_id].metadata()
+        events = [event.to_json_dict() for event in
+                  self.db[bucket_id].get(limit=-1)]
+        export = {
+            "bucket": bucket_metadata,
+            "events": events
+        }
+        return export
+
     def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> None:
         """Create bucket."""
         if bucket_id in self.db.buckets():

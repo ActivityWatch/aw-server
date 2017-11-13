@@ -121,6 +121,14 @@ class BucketResource(Resource):
         return {}, 200
 
 
+@api.route("/0/buckets/<string:bucket_id>/export")
+class BucketExportResource(Resource):
+    # @api.marshal_with(bucket)
+    @copy_doc(ServerAPI.get_bucket_export)
+    def get(self, bucket_id):
+        return app.api.get_bucket_export(bucket_id)
+
+
 # EVENTS
 
 @api.route("/0/buckets/<string:bucket_id>/events")

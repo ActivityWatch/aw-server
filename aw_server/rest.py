@@ -207,11 +207,17 @@ class ViewResource(Resource):
         return {}, 200
 
 
+@api.route("/0/export")
+class LogResource(Resource):
+    @copy_doc(ServerAPI.export_all)
+    def get(self):
+        return app.api.export_all(), 200
+
+
 # LOGGING
 
 @api.route("/0/log")
 class LogResource(Resource):
     @copy_doc(ServerAPI.get_log)
     def get(self):
-        """Get the server log in json format"""
         return app.api.get_log(), 200

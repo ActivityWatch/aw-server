@@ -18,7 +18,14 @@ logging.basicConfig(level=logging.WARN)
 
 @pytest.fixture(scope="session")
 def client():
-    yield ActivityWatchClient("client-test", testing=True)
+    c = ActivityWatchClient("client-test", testing=True)
+    yield c
+
+    # Delete test buckets after all tests needing the fixture have been run
+    buckets = c.get_buckets()
+    for bucket_id in buckets:
+        if bucket_id.startswith("test-"):
+            c.delete_bucket(bucket_id)
 
 
 @pytest.fixture(scope="function")
@@ -42,6 +49,15 @@ def queued_bucket(client, bucket):
 def test_get_info(client):
     info = client.get_info()
     assert info['testing']
+
+
+def test_export(client):
+    export = client._get("export").json()
+    for bucket_id, bucket in export.items():
+        assert bucket["id"]
+        assert bucket["hostname"]
+        assert "events" in bucket
+    print(export)
 
 
 def _create_heartbeat_events(start=datetime.now(tz=timezone.utc),

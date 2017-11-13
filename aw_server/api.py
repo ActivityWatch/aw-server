@@ -35,7 +35,7 @@ def check_view_exists(f):
 
 
 class ServerAPI:
-    def __init__(self, db, testing):
+    def __init__(self, db, testing) -> None:
         self.db = db
         self.testing = testing
 
@@ -95,6 +95,8 @@ class ServerAPI:
                    start: datetime = None, end: datetime = None) -> List[Event]:
         """Get events from a bucket"""
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
+        if limit is None:  # Let limit = None also mean "no limit"
+            limit = -1
         events = [event.to_json_dict() for event in
                   self.db[bucket_id].get(limit, start, end)]
         return events
@@ -190,3 +192,14 @@ class ServerAPI:
             for line in log_file.readlines()[::-1]:
                 payload.append(json.loads(line))
         return payload, 200
+
+    def export_all(self):
+        """Exports all buckets and their events to a format consistent across versions"""
+        buckets = self.get_buckets()
+        for bid in buckets.keys():
+            events = self.get_events(bid, start=None, end=None, limit=-1)
+            # Scrub event IDs
+            for event in events:
+                del event["id"]
+            buckets[bid]["events"] = events
+        return buckets

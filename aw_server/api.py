@@ -67,16 +67,14 @@ class ServerAPI:
         return bucket.metadata()
 
     @check_bucket_exists
-    def get_bucket_export(self, bucket_id: str) -> Dict[str, Any]:
-        """Get metadata about bucket."""
-        bucket_metadata = self.db[bucket_id].metadata()
-        events = [event.to_json_dict() for event in
-                  self.db[bucket_id].get(limit=-1)]
-        export = {
-            "bucket": bucket_metadata,
-            "events": events
-        }
-        return export
+    def export_bucket(self, bucket_id: str) -> Dict[str, Any]:
+        """Export a bucket to a dataformat consistent across versions, including all events in it."""
+        bucket = self.get_bucket_metadata(bucket_id)
+        bucket["events"] = self.get_events(bucket_id, limit=-1)
+        # Scrub event IDs
+        for event in bucket["events"]:
+            del event["id"]
+        return bucket
 
     def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> None:
         """Create bucket."""
@@ -205,13 +203,9 @@ class ServerAPI:
                 payload.append(json.loads(line))
         return payload, 200
 
-    def export_all(self):
+    def export_all(self) -> Dict[str, dict]:
         """Exports all buckets and their events to a format consistent across versions"""
         buckets = self.get_buckets()
         for bid in buckets.keys():
-            events = self.get_events(bid, start=None, end=None, limit=-1)
-            # Scrub event IDs
-            for event in events:
-                del event["id"]
-            buckets[bid]["events"] = events
+            buckets[bid] = self.export_bucket(bid)
         return buckets

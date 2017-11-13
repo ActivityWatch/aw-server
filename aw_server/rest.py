@@ -121,14 +121,6 @@ class BucketResource(Resource):
         return {}, 200
 
 
-@api.route("/0/buckets/<string:bucket_id>/export")
-class BucketExportResource(Resource):
-    # @api.marshal_with(bucket)
-    @copy_doc(ServerAPI.get_bucket_export)
-    def get(self, bucket_id):
-        return app.api.get_bucket_export(bucket_id)
-
-
 # EVENTS
 
 @api.route("/0/buckets/<string:bucket_id>/events")
@@ -215,11 +207,21 @@ class ViewResource(Resource):
         return {}, 200
 
 
+# EXPORTING
+
 @api.route("/0/export")
-class LogResource(Resource):
+class ExportAllResource(Resource):
     @copy_doc(ServerAPI.export_all)
     def get(self):
         return app.api.export_all(), 200
+
+
+# TODO: Perhaps we don't need this, could be done with a query argument to /0/export instead
+@api.route("/0/buckets/<string:bucket_id>/export")
+class BucketExportResource(Resource):
+    @copy_doc(ServerAPI.export_bucket)
+    def get(self, bucket_id):
+        return app.api.export_bucket(bucket_id)
 
 
 # LOGGING

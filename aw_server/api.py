@@ -66,7 +66,7 @@ class ServerAPI:
         bucket = self.db[bucket_id]
         return bucket.metadata()
 
-    def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> None:
+    def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> bool:
         """Create bucket."""
         if bucket_id in self.db.buckets():
             return False

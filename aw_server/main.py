@@ -68,7 +68,7 @@ def parse_settings():
 
     """ If a argument is not none, override the config value """
     for key, value in vars(args).items():
-        if value != None:
+        if value is not None:
             vars(settings)[key] = value
 
     storage_method = storage_methods[settings.storage]

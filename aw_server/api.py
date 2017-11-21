@@ -8,7 +8,7 @@ import logging
 from aw_core.models import Event
 from aw_core.log import get_log_file_path
 
-from aw_transform import transforms
+from aw_transform import transforms, query2
 from aw_transform.query2 import QueryException
 
 from .exceptions import BadRequest
@@ -153,12 +153,15 @@ class ServerAPI:
         self.db[bucket_id].insert(heartbeat)
         return heartbeat
 
-    def query2(self, query):
-        from aw_transform import query2
-        events = query2.query(query, self.db)
-        result = []
-        for e in events:
-            result.append(e.to_json_dict())
+    def query2(self, name, query, start, end, cache):
+        query = str().join(query)
+        result = query2.query(name, query, start, end, self.db, cache)
+        if isinstance(result, list):
+            result_list = []
+            for e in result:
+                if isinstance(e, Event):
+                    result_list.append(e.to_json_dict())
+            result = result_list
         return result
 
     # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...

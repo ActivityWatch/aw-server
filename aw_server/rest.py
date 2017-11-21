@@ -66,10 +66,8 @@ create_bucket = api.model('CreateBucket', {
     'hostname': fields.String(required=True),
 })
 
-view = api.model('View', {
-    'name': fields.String,
-    'created': fields.DateTime,
-    'query': AnyJson,  # Can be any dict
+query = api.model('Query', {
+    'query': fields.List(fields.String, required=True, description='String list of query statements'),
 })
 
 
@@ -181,14 +179,25 @@ class HeartbeatResource(Resource):
 
 # QUERY
 
-# It's not possible to expect a raw string in restplus/swagger, stupid
 @api.route("/0/query/")
 class QueryResource(Resource):
     # TODO Docs
-    # @copy_doc(ServerAPI.create_view)
+    @api.expect(query, validate=True)
+    @api.param("name", "Name of the query (required if using cache)")
+    @api.param("start", "Start date of events", required=True)
+    @api.param("end", "End date of events", required=True)
+    @api.param("cache", "If the query should be cached or not")
     def post(self):
-        query = request.data.decode("utf-8")
-        result = app.api.query2(query)
+        start = iso8601.parse_date(request.args["start"])
+        end = iso8601.parse_date(request.args["end"])
+        name = ""
+        if "name" in request.args:
+            name = request.args["name"]
+        cache = False
+        if "cache" in request.args and request.args["cache"] == "1":
+            cache = True
+        query = request.get_json()
+        result = app.api.query2(name, query["query"], start, end, cache)
         return result, 200
 
 

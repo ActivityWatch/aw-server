@@ -209,6 +209,7 @@ class QueryResource(Resource):
         result = app.api.query2(name, query["query"], start, end, cache)
         return result, 200
 
+
 # LOGGING
 
 @api.route("/0/log")

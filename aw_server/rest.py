@@ -127,7 +127,7 @@ class BucketResource(Resource):
 # EVENTS
 
 @api.route("/0/buckets/<string:bucket_id>/events")
-class EventResource(Resource):
+class EventsResource(Resource):
     # For some reason this doesn't work with the JSONSchema variant
     # Marshalling doesn't work with JSONSchema events
     # @api.marshal_list_with(event)
@@ -161,6 +161,24 @@ class EventResource(Resource):
 
         event = app.api.create_events(bucket_id, events)
         return event.to_json_dict() if event else None, 200
+
+
+@api.route("/0/buckets/<string:bucket_id>/events/<string:event_id>")
+class EventResource(Resource):
+    # For some reason this doesn't work with the JSONSchema variant
+    # Marshalling doesn't work with JSONSchema events
+    # @api.marshal_list_with(event)
+    # @api.doc(model=event)
+    # @copy_doc(ServerAPI.get_event)
+    # def get(self, bucket_id, event_id):
+    #     events = app.api.get_events(bucket_id, limit=limit, start=start, end=end)
+    #     return events, 200
+
+    @copy_doc(ServerAPI.delete_event)
+    def delete(self, bucket_id, event_id):
+        logger.debug("Received delete request for event with id '{}' in bucket '{}'".format(event_id, bucket_id))
+        success = app.api.delete_event(bucket_id, event_id)
+        return {"success": success}, 200
 
 
 @api.route("/0/buckets/<string:bucket_id>/heartbeat")

@@ -107,6 +107,11 @@ class ServerAPI:
         return self.db[bucket_id].insert(events[0] if len(events) == 1 else events)
 
     @check_bucket_exists
+    def delete_event(self, bucket_id: str, event_id) -> bool:
+        """Delete a single event from a bucket"""
+        return self.db[bucket_id].delete(event_id)
+
+    @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """
         Heartbeats are useful when implementing watchers that simply keep

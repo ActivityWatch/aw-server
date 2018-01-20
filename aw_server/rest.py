@@ -169,6 +169,21 @@ class EventResource(Resource):
         return event.to_json_dict() if event else None, 200
 
 
+@api.route("/0/buckets/<string:bucket_id>/events/count")
+class EventResource(Resource):
+    @api.doc(model=fields.Integer)
+    @api.param("start", "Start date of eventcount")
+    @api.param("end", "End date of eventcount")
+    @copy_doc(ServerAPI.get_eventcount)
+    def get(self, bucket_id):
+        args = request.args
+        start = iso8601.parse_date(args["start"]) if "start" in args else None
+        end = iso8601.parse_date(args["end"]) if "end" in args else None
+
+        events = app.api.get_eventcount(bucket_id, start=start, end=end)
+        return events, 200
+
+
 @api.route("/0/buckets/<string:bucket_id>/heartbeat")
 class HeartbeatResource(Resource):
     @api.expect(event, validate=True)

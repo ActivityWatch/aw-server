@@ -98,6 +98,13 @@ class ServerAPI:
         return self.db[bucket_id].insert(events[0] if len(events) == 1 else events)
 
     @check_bucket_exists
+    def get_eventcount(self, bucket_id: str,
+                   start: datetime = None, end: datetime = None) -> int:
+        """Get eventcount from a bucket"""
+        logger.debug("Received get request for eventcount in bucket '{}'".format(bucket_id))
+        return self.db[bucket_id].get_eventcount(start, end)
+
+    @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """
         Heartbeats are useful when implementing watchers that simply keep
@@ -154,7 +161,7 @@ class ServerAPI:
 
     def query2(self, name, query, start, end, cache):
         query = str().join(query)
-        result = query2.query(name, query, start, end, self.db, cache)
+        result = query2.query(name, query, start, end, self.db)
         if isinstance(result, list):
             result_list = []
             for e in result:

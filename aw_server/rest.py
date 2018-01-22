@@ -1,7 +1,5 @@
 from typing import Dict
-from datetime import datetime, timezone
 import json
-import functools
 
 from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
@@ -9,10 +7,6 @@ import iso8601
 
 from aw_core import schema
 from aw_core.models import Event
-from aw_core.log import get_log_file_path
-
-from aw_transform import transforms
-from aw_transform.query2 import QueryException
 
 from . import app, logger
 from .api import ServerAPI
@@ -170,7 +164,7 @@ class EventResource(Resource):
 
 
 @api.route("/0/buckets/<string:bucket_id>/events/count")
-class EventResource(Resource):
+class EventCountResource(Resource):
     @api.doc(model=fields.Integer)
     @api.param("start", "Start date of eventcount")
     @api.param("end", "End date of eventcount")

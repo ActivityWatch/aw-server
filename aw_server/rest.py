@@ -1,20 +1,16 @@
 from typing import Dict
-from datetime import datetime, timezone
 import json
-import functools
 
 from flask import request, Blueprint
 from flask_restplus import Api, Resource, fields
 import iso8601
 
+from aw_core import schema
 from aw_core.models import Event
-from aw_core import transforms, views, schema
-from aw_core.log import get_log_file_path
-from aw_core.query import QueryException
 
 from . import app, logger
 from .api import ServerAPI
-from .exceptions import BadRequest
+from .exceptions import BadRequest, Unauthorized
 
 
 # SECURITY
@@ -64,12 +60,9 @@ create_bucket = api.model('CreateBucket', {
     'hostname': fields.String(required=True),
 })
 
-view = api.model('View', {
-    'name': fields.String,
-    'created': fields.DateTime,
-    'query': AnyJson,  # Can be any dict
+query = api.model('Query', {
+    'query': fields.List(fields.String, required=True, description='String list of query statements'),
 })
-
 
 def copy_doc(api_method):
     """Decorator that copies another functions docstring to the decorated function.
@@ -119,7 +112,14 @@ class BucketResource(Resource):
             return {}, 304
 
     @copy_doc(ServerAPI.delete_bucket)
+    @api.param("force", "Needs to be =1 to delete a bucket it non-testing mode")
     def delete(self, bucket_id):
+        args = request.args
+        if not app.api.testing:
+            if "force" not in args or args["force"] != "1":
+                msg = "Deleting buckets is only permitted if aw-server is running in testing mode or if ?force=1"
+                raise Unauthorized("DeleteBucketUnauthorized", msg)
+
         app.api.delete_bucket(bucket_id)
         return {}, 200
 
@@ -163,6 +163,21 @@ class EventResource(Resource):
         return event.to_json_dict() if event else None, 200
 
 
+@api.route("/0/buckets/<string:bucket_id>/events/count")
+class EventCountResource(Resource):
+    @api.doc(model=fields.Integer)
+    @api.param("start", "Start date of eventcount")
+    @api.param("end", "End date of eventcount")
+    @copy_doc(ServerAPI.get_eventcount)
+    def get(self, bucket_id):
+        args = request.args
+        start = iso8601.parse_date(args["start"]) if "start" in args else None
+        end = iso8601.parse_date(args["end"]) if "end" in args else None
+
+        events = app.api.get_eventcount(bucket_id, start=start, end=end)
+        return events, 200
+
+
 @api.route("/0/buckets/<string:bucket_id>/heartbeat")
 class HeartbeatResource(Resource):
     @api.expect(event, validate=True)
@@ -180,34 +195,28 @@ class HeartbeatResource(Resource):
         return event.to_json_dict(), 200
 
 
-# VIEWS
+# QUERY
 
-@api.route("/0/views/")
-class ViewListResource(Resource):
-    @copy_doc(ServerAPI.get_views)
-    def get(self):
-        return app.api.get_views(), 200
-
-
-@api.route("/0/views/<string:viewname>")
-class ViewResource(Resource):
-    @api.param("start", "Start datetime of events to query over")
-    @api.param("end", "End datetime of events to query over")
-    @copy_doc(ServerAPI.query_view)
-    def get(self, viewname):
-        args = request.args
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
-
-        result = app.api.query_view(viewname, start, end)
+@api.route("/0/query/")
+class QueryResource(Resource):
+    # TODO Docs
+    @api.expect(query, validate=True)
+    @api.param("name", "Name of the query (required if using cache)")
+    @api.param("start", "Start date of events", required=True)
+    @api.param("end", "End date of events", required=True)
+    @api.param("cache", "If the query should be cached or not")
+    def post(self):
+        start = iso8601.parse_date(request.args["start"])
+        end = iso8601.parse_date(request.args["end"])
+        name = ""
+        if "name" in request.args:
+            name = request.args["name"]
+        cache = False
+        if "cache" in request.args and request.args["cache"] == "1":
+            cache = True
+        query = request.get_json()
+        result = app.api.query2(name, query["query"], start, end, cache)
         return result, 200
-
-    @api.expect(view)
-    @copy_doc(ServerAPI.create_view)
-    def post(self, viewname):
-        view = request.get_json()
-        app.api.create_view(viewname, view)
-        return {}, 200
 
 
 # LOGGING

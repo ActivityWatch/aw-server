@@ -1,5 +1,5 @@
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from socket import gethostname
 import functools
 import json
@@ -8,11 +8,7 @@ import logging
 from aw_core.models import Event
 from aw_core.log import get_log_file_path
 
-from aw_transform import transforms, query2
-from aw_transform.query2 import QueryException
-
-from aw_transform import transforms, query2
-from aw_transform.query2 import QueryException
+from aw_transform import heartbeat_merge, query2
 
 from .exceptions import BadRequest, NotFound, Unauthorized
 
@@ -99,7 +95,7 @@ class ServerAPI:
 
     @check_bucket_exists
     def get_eventcount(self, bucket_id: str,
-                   start: datetime = None, end: datetime = None) -> int:
+                       start: datetime = None, end: datetime = None) -> int:
         """Get eventcount from a bucket"""
         logger.debug("Received get request for eventcount in bucket '{}'".format(bucket_id))
         return self.db[bucket_id].get_eventcount(start, end)
@@ -143,7 +139,7 @@ class ServerAPI:
         if len(events) >= 1:
             last_event = events[0]
             if last_event.data == heartbeat.data:
-                merged = transforms.heartbeat_merge(last_event, heartbeat, pulsetime)
+                merged = heartbeat_merge(last_event, heartbeat, pulsetime)
                 if merged is not None:
                     # Heartbeat was merged into last_event
                     logger.debug("Received valid heartbeat, merging. (bucket: {})".format(bucket_id))

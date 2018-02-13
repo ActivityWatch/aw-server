@@ -59,4 +59,8 @@ def _start(storage_method, host, port, testing=False):
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)
-    app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False)
+    try:
+        app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False)
+    except OSError as e:
+        logger.error(e)
+        raise e

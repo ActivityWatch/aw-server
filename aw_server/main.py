@@ -19,8 +19,9 @@ def main():
     # to write the LogResource API so that it does not depend on any physical file
     # but instead add a logging handler that it can use privately.
     # That is why log_file_json=True currently.
+    # UPDATE: The LogResource API is no longer available so log_file_json is now False.
     setup_logging("aw-server", testing=settings.testing, verbose=settings.verbose,
-                  log_stderr=True, log_file=True, log_file_json=True)
+                  log_stderr=True, log_file=True, log_file_json=False)
 
     logger.info("Using storage method: {}".format(settings.storage))
 

@@ -4,6 +4,7 @@ from socket import gethostname
 import functools
 import json
 import logging
+import iso8601
 
 from aw_core.models import Event
 from aw_core.log import get_log_file_path
@@ -156,15 +157,14 @@ class ServerAPI:
         self.db[bucket_id].insert(heartbeat)
         return heartbeat
 
-    def query2(self, name, query, start, end, cache):
-        query = str().join(query)
-        result = query2.query(name, query, start, end, self.db)
-        if isinstance(result, list):
-            result_list = []
-            for e in result:
-                if isinstance(e, Event):
-                    result_list.append(e.to_json_dict())
-            result = result_list
+    def query2(self, name, query, timeperiods, cache):
+        result = []
+        for timeperiod in timeperiods:
+            period = timeperiod.split("/")[:2]; # iso8601 timeperiods are separated by a slash
+            starttime = iso8601.parse_date(period[0])
+            endtime = iso8601.parse_date(period[1])
+            query = str().join(query)
+            result.append(query2.query(name, query, starttime, endtime, self.db))
         return result
 
     # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...

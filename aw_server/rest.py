@@ -1,9 +1,10 @@
 from typing import Dict
 import json
 
-from flask import request, Blueprint
+from flask import request, Blueprint, jsonify
 from flask_restplus import Api, Resource, fields
 import iso8601
+from datetime import datetime, timedelta
 
 from aw_core import schema
 from aw_core.models import Event
@@ -22,6 +23,22 @@ ZEROKNOWLEDGE_ENABLED = False
 
 blueprint = Blueprint('api', __name__, url_prefix='/api')
 api = Api(blueprint, doc='/')
+
+# TODO: Clean up JSONEncoder code?
+class CustomJSONEncoder(json.JSONEncoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
+    def default(self, obj, *args, **kwargs):
+        try:
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if isinstance(obj, timedelta):
+                return obj.total_seconds()
+        except TypeError:
+            pass
+        return json.JSONEncoder.default(self, obj)
+app.json_encoder = CustomJSONEncoder
 
 app.register_blueprint(blueprint)
 app.api  # type: api.ServerAPI
@@ -61,6 +78,7 @@ create_bucket = api.model('CreateBucket', {
 })
 
 query = api.model('Query', {
+    'timeperiods':  fields.List(fields.String, required=True, description='List of periods to query'),
     'query': fields.List(fields.String, required=True, description='String list of query statements'),
 })
 
@@ -202,21 +220,14 @@ class QueryResource(Resource):
     # TODO Docs
     @api.expect(query, validate=True)
     @api.param("name", "Name of the query (required if using cache)")
-    @api.param("start", "Start date of events", required=True)
-    @api.param("end", "End date of events", required=True)
-    @api.param("cache", "If the query should be cached or not")
     def post(self):
-        start = iso8601.parse_date(request.args["start"])
-        end = iso8601.parse_date(request.args["end"])
         name = ""
         if "name" in request.args:
             name = request.args["name"]
         cache = False
-        if "cache" in request.args and request.args["cache"] == "1":
-            cache = True
         query = request.get_json()
-        result = app.api.query2(name, query["query"], start, end, cache)
-        return result, 200
+        result = app.api.query2(name, query["query"], query["timeperiods"], False)
+        return jsonify(result)
 
 
 # LOGGING

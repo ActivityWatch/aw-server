@@ -120,7 +120,7 @@ def test_queued_heartbeat(client, queued_bucket):
         events = client.get_events(bucket_id, limit=1)
         if len(events) > 0 and events[0].duration > timedelta(seconds=0):
             break
-        sleep(0.1)
+        sleep(0.5)
 
     assert i != max_tries - 1
     print("Done on the {}th try".format(i + 1))

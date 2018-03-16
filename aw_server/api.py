@@ -103,6 +103,11 @@ class ServerAPI:
         return self.db[bucket_id].get_eventcount(start, end)
 
     @check_bucket_exists
+    def delete_event(self, bucket_id: str, event_id) -> bool:
+        """Delete a single event from a bucket"""
+        return self.db[bucket_id].delete(event_id)
+
+    @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """
         Heartbeats are useful when implementing watchers that simply keep
@@ -160,7 +165,7 @@ class ServerAPI:
     def query2(self, name, query, timeperiods, cache):
         result = []
         for timeperiod in timeperiods:
-            period = timeperiod.split("/")[:2]; # iso8601 timeperiods are separated by a slash
+            period = timeperiod.split("/")[:2]  # iso8601 timeperiods are separated by a slash
             starttime = iso8601.parse_date(period[0])
             endtime = iso8601.parse_date(period[1])
             query = str().join(query)

@@ -28,7 +28,7 @@ def check_bucket_exists(f):
 
 
 class ServerAPI:
-    def __init__(self, db, testing):
+    def __init__(self, db, testing) -> None:
         self.db = db
         self.testing = testing
 
@@ -59,8 +59,21 @@ class ServerAPI:
         bucket = self.db[bucket_id]
         return bucket.metadata()
 
+    @check_bucket_exists
+    def export_bucket(self, bucket_id: str) -> Dict[str, Any]:
+        """Export a bucket to a dataformat consistent across versions, including all events in it."""
+        bucket = self.get_bucket_metadata(bucket_id)
+        bucket["events"] = self.get_events(bucket_id, limit=-1)
+        # Scrub event IDs
+        for event in bucket["events"]:
+            del event["id"]
+        return bucket
+
     def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> bool:
-        """Create bucket."""
+        """
+        Create bucket.
+        Returns True if successful, otherwise false if a bucket with the given ID already existed.
+        """
         if bucket_id in self.db.buckets():
             return False
         self.db.create_bucket(
@@ -84,6 +97,8 @@ class ServerAPI:
                    start: datetime = None, end: datetime = None) -> List[Event]:
         """Get events from a bucket"""
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
+        if limit is None:  # Let limit = None also mean "no limit"
+            limit = -1
         events = [event.to_json_dict() for event in
                   self.db[bucket_id].get(limit, start, end)]
         return events
@@ -180,3 +195,10 @@ class ServerAPI:
             for line in log_file.readlines()[::-1]:
                 payload.append(json.loads(line))
         return payload, 200
+
+    def export_all(self) -> Dict[str, dict]:
+        """Exports all buckets and their events to a format consistent across versions"""
+        buckets = self.get_buckets()
+        for bid in buckets.keys():
+            buckets[bid] = self.export_bucket(bid)
+        return buckets

@@ -248,11 +248,27 @@ class QueryResource(Resource):
         return jsonify(result)
 
 
+# EXPORTING
+
+@api.route("/0/export")
+class ExportAllResource(Resource):
+    @copy_doc(ServerAPI.export_all)
+    def get(self):
+        return app.api.export_all(), 200
+
+
+# TODO: Perhaps we don't need this, could be done with a query argument to /0/export instead
+@api.route("/0/buckets/<string:bucket_id>/export")
+class BucketExportResource(Resource):
+    @copy_doc(ServerAPI.export_bucket)
+    def get(self, bucket_id):
+        return app.api.export_bucket(bucket_id)
+
+
 # LOGGING
 
 @api.route("/0/log")
 class LogResource(Resource):
     @copy_doc(ServerAPI.get_log)
     def get(self):
-        """Get the server log in json format"""
         return app.api.get_log(), 200

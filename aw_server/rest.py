@@ -4,7 +4,7 @@ import json
 from flask import request, Blueprint, jsonify
 from flask_restplus import Api, Resource, fields
 import iso8601
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from aw_core import schema
 from aw_core.models import Event
@@ -176,6 +176,10 @@ class EventsResource(Resource):
             events = [Event(**e) for e in data]
         else:
             raise BadRequest("Invalid POST data", "")
+
+        events = [e for e in events if e.timestamp + e.duration < datetime.now(tz=timezone.utc)]
+        if len(events) == 0:
+            raise BadRequest("Invalid Event data - event data reaches into the future", "")
 
         event = app.api.create_events(bucket_id, events)
         return event.to_json_dict() if event else None, 200

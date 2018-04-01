@@ -69,11 +69,25 @@ class ServerAPI:
             del event["id"]
         return bucket
 
-    def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> bool:
+    def import_bucket(self, bucket_data: Dict[str, Any]):
+        bucket_id = bucket_data["id"]
+        self.db.create_bucket(
+            bucket_id,
+            type=bucket_data["event_type"],
+            client=bucket_data["client"],
+            hostname=bucket_data["hostname"],
+            created=bucket_data["created"]
+        )
+        self.create_events(bucket_id, bucket_data["events"])
+
+    def create_bucket(self, bucket_id: str, event_type: str, client: str,
+                      hostname: str, created: Optional[datetime] = None)-> bool:
         """
         Create bucket.
         Returns True if successful, otherwise false if a bucket with the given ID already existed.
         """
+        if created is None:
+            created = datetime.now()
         if bucket_id in self.db.buckets():
             return False
         self.db.create_bucket(
@@ -81,7 +95,7 @@ class ServerAPI:
             type=event_type,
             client=client,
             hostname=hostname,
-            created=datetime.now()
+            created=created
         )
         return True
 

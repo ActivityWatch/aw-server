@@ -12,6 +12,7 @@ from aw_core.models import Event
 from . import app, logger
 from .api import ServerAPI
 from .exceptions import BadRequest, Unauthorized
+from aw_analysis.query2_error import QueryException
 
 
 # SECURITY
@@ -242,10 +243,12 @@ class QueryResource(Resource):
         name = ""
         if "name" in request.args:
             name = request.args["name"]
-        cache = False
         query = request.get_json()
-        result = app.api.query2(name, query["query"], query["timeperiods"], cache)
-        return jsonify(result)
+        try:
+            result = app.api.query2(name, query["query"], query["timeperiods"], False)
+            return jsonify(result)
+        except QueryException as qe:
+            return {"type": type(qe).__name__, "message": str(qe)}, 400
 
 
 # EXPORTING

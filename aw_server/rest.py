@@ -1,4 +1,5 @@
 from typing import Dict
+import traceback
 import json
 
 from flask import request, Blueprint, jsonify
@@ -248,6 +249,7 @@ class QueryResource(Resource):
             result = app.api.query2(name, query["query"], query["timeperiods"], False)
             return jsonify(result)
         except QueryException as qe:
+            traceback.print_exc()
             return {"type": type(qe).__name__, "message": str(qe)}, 400
 
 

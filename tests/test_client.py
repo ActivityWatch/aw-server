@@ -222,18 +222,5 @@ def test_midnight_heartbeats(client, bucket):
     assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)
 
 
-def test_filter_future_events(client, bucket):
-    future_start = datetime.now(tz=timezone.utc) + timedelta(minutes=1)
-    future_events = _create_periodic_events(100, start=future_start, delta=timedelta(minutes=1))
-
-    #All events take place in the future, so an exception will be raised
-    with pytest.raises(Exception):
-        client.send_events(bucket, future_events)
-
-    recv_events = client.get_events(bucket, limit=-1)
-
-    assert len(recv_events) == 0
-
-
 if __name__ == "__main__":
     pytest.main()

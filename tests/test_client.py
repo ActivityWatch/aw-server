@@ -161,7 +161,7 @@ def test_send_event(client, bucket):
 
 
 def test_send_events(client, bucket):
-    events = _create_periodic_events(2)
+    events = _create_periodic_events(2, start=datetime.now(tz=timezone.utc) - timedelta(days=1))
 
     client.send_events(bucket, events)
     recv_events = client.get_events(bucket)
@@ -171,7 +171,7 @@ def test_send_events(client, bucket):
 
 
 def test_get_events_interval(client, bucket):
-    start_dt = datetime.now(tz=timezone.utc)
+    start_dt = datetime.now(tz=timezone.utc) - timedelta(days=50)
     delta = timedelta(hours=1)
     events = _create_periodic_events(1000, delta=delta, start=start_dt)
 
@@ -185,7 +185,7 @@ def test_get_events_interval(client, bucket):
 
 
 def test_store_many_events(client, bucket):
-    events = _create_periodic_events(1000)
+    events = _create_periodic_events(1000, start=datetime.now(tz=timezone.utc) - timedelta(days=50))
 
     client.send_events(bucket, events)
     recv_events = client.get_events(bucket, limit=-1)
@@ -195,9 +195,9 @@ def test_store_many_events(client, bucket):
 
 
 def test_midnight(client, bucket):
-    now = datetime.now()
-    midnight = now.replace(hour=23, minute=50)
-    events = _create_periodic_events(100, start=midnight, delta=timedelta(minutes=1))
+    start_dt = datetime.now() - timedelta(days=1)
+    midnight = start_dt.replace(hour=23, minute=50)
+    events = _create_periodic_events(100, start=start_dt, delta=timedelta(minutes=1))
 
     client.send_events(bucket, events)
     recv_events = client.get_events(bucket, limit=-1)
@@ -205,7 +205,7 @@ def test_midnight(client, bucket):
 
 
 def test_midnight_heartbeats(client, bucket):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=timezone.utc) - timedelta(days=1)
     midnight = now.replace(hour=23, minute=50)
     events = _create_periodic_events(20, start=midnight, delta=timedelta(minutes=1))
 

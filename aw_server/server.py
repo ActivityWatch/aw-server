@@ -46,7 +46,7 @@ def static_js(path):
 # Only to be called from aw_server.main function!
 def _start(storage_method, host, port, testing=False):
     # TODO: This should probably be more specific
-    origins = "moz-extension://*"
+    origins = ["moz-extension://*", "dat://"]
     if testing:
         # CORS won't be supported in non-testing mode until we fix our authentication
         logger.warning("CORS is enabled when ran in testing mode, don't store any sensitive data when running in testing mode!")

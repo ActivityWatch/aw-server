@@ -50,7 +50,7 @@ def _config_cors(cors_origins: List[str], testing: bool):
 
     if testing:
         # Used for development of aw-webui
-        cors_origins.append("127.0.0.1:27180")
+        cors_origins.append("http://127.0.0.1:27180/*")
 
     # TODO: This could probably be more specific
     #       See https://github.com/ActivityWatch/aw-server/pull/43#issuecomment-386888769

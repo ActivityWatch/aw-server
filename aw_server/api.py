@@ -12,6 +12,8 @@ from aw_core.log import get_log_file_path
 from aw_analysis import query2
 from aw_transform import heartbeat_merge
 
+from .__about__ import __version__
+
 from .exceptions import BadRequest, NotFound, Unauthorized
 
 
@@ -36,6 +38,7 @@ class ServerAPI:
         """Get server info"""
         payload = {
             'hostname': gethostname(),
+            'version': __version__,
             'testing': self.testing
         }
         return payload

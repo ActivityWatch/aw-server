@@ -61,6 +61,7 @@ event = api.schema_model('Event', schema.get_json_schema("event"))
 #       A downside to contructing from JSONSchema: flask-restplus does not have marshalling support
 info = api.model('Info', {
     'hostname': fields.String(),
+    'version': fields.String(),
     'testing': fields.Boolean(),
 })
 

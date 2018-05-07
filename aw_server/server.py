@@ -44,21 +44,25 @@ def static_js(path):
     return send_from_directory(static_folder + '/js', path)
 
 
+def _config_cors(cors_origins: List[str], testing: bool):
+    if cors_origins:
+        logger.warning('Running with additional allowed CORS origins specified through config or CLI argument (could be a security risk): {}'.format(cors_origins))
+
+    if testing:
+        # Used for development of aw-webui
+        cors_origins.append("127.0.0.1:27180")
+
+    # TODO: This could probably be more specific
+    #       See https://github.com/ActivityWatch/aw-server/pull/43#issuecomment-386888769
+    cors_origins.append("moz-extension://*")
+
+    # See: https://flask-cors.readthedocs.org/en/latest/
+    CORS(app, resources={r"/api/*": {"origins": cors_origins}})
+
+
 # Only to be called from aw_server.main function!
 def _start(storage_method, host: str, port: int, testing: bool=False, cors_origins: List[str] = []):
-    if testing:
-        # CORS won't be supported in non-testing mode until we fix our authentication
-        logger.warning("CORS is enabled when ran in testing mode, don't store any sensitive data when running in testing mode!")
-        origins = "*"
-    else:
-        # TODO: This could probably be more specific
-        #       See https://github.com/ActivityWatch/aw-server/pull/43#issuecomment-386888769
-        origins = "moz-extension://*"
-        if cors_origins:
-            origins += ',' + ','.join(cors_origins)
-            logger.warning('Running with extra CORS origins: {}'.format(origins))
-    # See: https://flask-cors.readthedocs.org/en/latest/
-    CORS(app, resources={r"/api/*": {"origins": origins}})
+    _config_cors(cors_origins, testing)
 
     # Only pretty-print JSON if in testing mode (because of performance)
     app.config["JSONIFY_PRETTYPRINT_REGULAR"] = testing

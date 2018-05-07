@@ -13,9 +13,12 @@ before_install:
  - (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`)
  - source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION
  - node --version
+ - pip install --upgrade pip
+ - pip install pyinstaller
 
 install:
  - "make build"
 
 script:
  - "make test"
+ - "make package"

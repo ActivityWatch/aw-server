@@ -1,10 +1,5 @@
 git+https://github.com/ActivityWatch/aw-core.git@master#egg=aw-core
 
-# There is an issue in PyInstaller which doesn't like
-# some async stuff that was introduced in Jinja 2.9.
-# This is a workaround.
-jinja2>=2.8,<2.9
-
 flask>=0.10
 flask-restplus>=0.9.2
 flask-cors>=2.1

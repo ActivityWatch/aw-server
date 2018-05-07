@@ -30,13 +30,11 @@ def main():
 
     logger.info("Starting up...")
     _start(host=settings.host, port=settings.port,
-           testing=settings.testing, storage_method=storage_method)
+           testing=settings.testing, storage_method=storage_method, cors_origins=settings.cors_origins)
 
 
 def parse_settings():
     import argparse
-
-    storage_methods = get_storage_methods()
 
     """ CLI Arguments """
     parser = argparse.ArgumentParser(description='Starts an ActivityWatch server')
@@ -58,6 +56,9 @@ def parse_settings():
                         help='Which port to run the server on')
     parser.add_argument('--storage', dest='storage',
                         help='The method to use for storing data. Some methods (such as MongoDB) require specific Python packages to be available (in the MongoDB case: pymongo)')
+    parser.add_argument('--cors-origins',
+                        dest='cors_origins',
+                        help='CORS origins to allow (as a comma separated list)')
     args = parser.parse_args()
 
     """ Parse config file """
@@ -66,11 +67,16 @@ def parse_settings():
     settings.host = config[configsection]["host"]
     settings.port = config[configsection].getint("port")
     settings.storage = config[configsection]["storage"]
+    settings.cors_origins = config[configsection]["cors_origins"]
 
     """ If a argument is not none, override the config value """
     for key, value in vars(args).items():
         if value is not None:
             vars(settings)[key] = value
 
+    settings.cors_origins = [o for o in settings.cors_origins.split(',') if o]
+
+    storage_methods = get_storage_methods()
     storage_method = storage_methods[settings.storage]
+
     return settings, storage_method

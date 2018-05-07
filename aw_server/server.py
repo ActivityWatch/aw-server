@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import List
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
@@ -44,13 +45,18 @@ def static_js(path):
 
 
 # Only to be called from aw_server.main function!
-def _start(storage_method, host, port, testing=False):
-    # TODO: This should probably be more specific
-    origins = "moz-extension://*"
+def _start(storage_method, host: str, port: int, testing: bool=False, cors_origins: List[str] = []):
     if testing:
         # CORS won't be supported in non-testing mode until we fix our authentication
         logger.warning("CORS is enabled when ran in testing mode, don't store any sensitive data when running in testing mode!")
         origins = "*"
+    else:
+        # TODO: This could probably be more specific
+        #       See https://github.com/ActivityWatch/aw-server/pull/43#issuecomment-386888769
+        origins = "moz-extension://*"
+        if cors_origins:
+            origins += ',' + ','.join(cors_origins)
+            logger.warning('Running with extra CORS origins: {}'.format(origins))
     # See: https://flask-cors.readthedocs.org/en/latest/
     CORS(app, resources={r"/api/*": {"origins": origins}})
 
@@ -62,5 +68,5 @@ def _start(storage_method, host, port, testing=False):
     try:
         app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False)
     except OSError as e:
-        logger.error(e)
+        logger.error(str(e))
         raise e

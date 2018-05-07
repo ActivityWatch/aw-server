@@ -30,7 +30,7 @@ def main():
 
     logger.info("Starting up...")
     _start(host=settings.host, port=settings.port,
-           testing=settings.testing, storage_method=storage_method)
+           testing=settings.testing, storage_method=storage_method, cors_origins=settings.cors_origins)
 
 
 def parse_settings():
@@ -58,6 +58,10 @@ def parse_settings():
                         help='Which port to run the server on')
     parser.add_argument('--storage', dest='storage',
                         help='The method to use for storing data. Some methods (such as MongoDB) require specific Python packages to be available (in the MongoDB case: pymongo)')
+    parser.add_argument('--cors-origins',
+                        dest='cors_origins',
+                        default='',
+                        help='Additional CORS origins to allow (as a comma separated list)')
     args = parser.parse_args()
 
     """ Parse config file """
@@ -72,5 +76,6 @@ def parse_settings():
         if value is not None:
             vars(settings)[key] = value
 
+    settings.cors_origins = [o for o in settings.cors_origins.split(',') if o]
     storage_method = storage_methods[settings.storage]
     return settings, storage_method

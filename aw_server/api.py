@@ -31,6 +31,7 @@ class ServerAPI:
     def __init__(self, db, testing) -> None:
         self.db = db
         self.testing = testing
+        self.last_event = {}
 
     def get_info(self) -> Dict[str, Dict]:
         """Get server info"""
@@ -145,8 +146,8 @@ class ServerAPI:
 
         Inspired by: https://wakatime.com/developers#heartbeats
         """
-        logger.debug("Received heartbeat in bucket '{}'\n\ttimestamp: {}\n\tdata: {}".format(
-                     bucket_id, heartbeat.timestamp, heartbeat.data))
+        logger.debug("Received heartbeat in bucket '{}'\n\ttimestamp: {}, duration: {}, pulsetime: {}\n\tdata: {}".format(
+                     bucket_id, heartbeat.timestamp, heartbeat.duration, pulsetime, heartbeat.data))
 
         # The endtime here is set such that in the event that the heartbeat is older than an
         # existing event we should try to merge it with the last event before the heartbeat instead.
@@ -156,15 +157,22 @@ class ServerAPI:
         # Solution: This could be solved if we were able to replace arbitrary events.
         #           That way we could double check that the event has been applied
         #           and if it hasn't we simply replace it with the updated counterpart.
-        events = self.db[bucket_id].get(limit=1, endtime=heartbeat.timestamp)
 
-        if len(events) >= 1:
-            last_event = events[0]
+        last_event = None
+        if bucket_id not in self.last_event:
+            last_events = self.db[bucket_id].get(limit=1)
+            if len(last_events) > 0:
+                last_event = last_events[0]
+        else:
+            last_event = self.last_event[bucket_id]
+
+        if last_event:
             if last_event.data == heartbeat.data:
                 merged = heartbeat_merge(last_event, heartbeat, pulsetime)
                 if merged is not None:
                     # Heartbeat was merged into last_event
                     logger.debug("Received valid heartbeat, merging. (bucket: {})".format(bucket_id))
+                    self.last_event[bucket_id] = merged
                     self.db[bucket_id].replace_last(merged)
                     return merged
                 else:
@@ -175,6 +183,7 @@ class ServerAPI:
             logger.info("Received heartbeat, but bucket was previously empty, inserting as new event. (bucket: {})".format(bucket_id))
 
         self.db[bucket_id].insert(heartbeat)
+        self.last_event[bucket_id] = heartbeat
         return heartbeat
 
     def query2(self, name, query, timeperiods, cache):

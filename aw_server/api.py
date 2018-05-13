@@ -31,7 +31,7 @@ class ServerAPI:
     def __init__(self, db, testing) -> None:
         self.db = db
         self.testing = testing
-        self.last_event = {}
+        self.last_event = {} #type: dict
 
     def get_info(self) -> Dict[str, Dict]:
         """Get server info"""

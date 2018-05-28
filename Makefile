@@ -6,10 +6,13 @@ ifdef DEV
 pip_install_args := --editable $(pip_install_args)
 endif
 
-build:
-	make --directory=aw-webui build DEV=$(DEV)
-	cp -r aw-webui/dist/* aw_server/static/
+build: aw_server/static/*
 	pip3 install $(pip_install_args)
+
+aw_server/static/*:
+	make --directory=aw-webui build DEV=$(DEV)
+	mkdir -p aw_server/static/
+	cp -r aw-webui/dist/* aw_server/static/
 
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service
@@ -27,4 +30,5 @@ package:
 clean:
 	rm -rf build dist
 	rm -rf aw_server/__pycache__
+	rm -rf aw_server/static/*
 	make --directory=aw-webui clean

@@ -130,8 +130,11 @@ def test_queued_heartbeat(client, queued_bucket):
     client.heartbeat(bucket_id, e1, pulsetime=0, queued=True)
     client.heartbeat(bucket_id, e2, pulsetime=10, queued=True)
 
+    # Needed because of client-side heartbeat merging and delayed dispatch
+    client.heartbeat(bucket_id, Event(timestamp=e2.timestamp, data={"label": "something different"}), pulsetime=0, queued=True)
+
     # Needed since the dispatcher thread might introduce some delay
-    max_tries = 10
+    max_tries = 20
     for i in range(max_tries):
         events = client.get_events(bucket_id, limit=1)
         if len(events) > 0 and events[0].duration > timedelta(seconds=0):

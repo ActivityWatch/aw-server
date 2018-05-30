@@ -1,5 +1,6 @@
 import os
 import subprocess
+import pkg_resources
 
 
 def detect_version():
@@ -12,6 +13,11 @@ def detect_version():
     for env_var in ["TRAVIS_COMMIT", "APPVEYOR_REPO_COMMIT"]:
         if env_var in os.environ:
             return basever + "-" + os.environ[env_var]
+
+    try:
+        return pkg_resources.get_distribution("aw-server").version
+    except pkg_resources.DistributionNotFound:
+        pass
 
     try:
         return basever + "-dev-" + str(subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip(), "utf8")

@@ -14,10 +14,10 @@ from setuptools import setup
 here = os.path.abspath(os.path.dirname(__file__))
 
 about = {}  # type: Dict[str, Any]
-with open(os.path.join(here, 'aw_server', '__about__.py'), 'r') as f:
+with open(os.path.join(here, 'aw_server', '__about__.py'), 'r', encoding='utf-8') as f:
     exec(f.read(), about)
 
-with open('README.md', 'r') as f:
+with open('README.md', 'r', encoding='utf-8') as f:
     readme = f.read()
 
 requirements = parse_requirements("./requirements.txt", session=False)

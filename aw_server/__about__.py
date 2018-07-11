@@ -50,13 +50,13 @@ def assign_static_version():
     """Self-modifies the current script to lock in version"""
     version = detect_version()
     with open(__file__, "r") as f:
-        versionline = f"\n__version__ = '{version}'"
+        versionline = "\n__version__ = '{}'".format(version)
         data = re.sub(r"\n__version__ = [^\n;]+", versionline, f.read())
 
     with open(__file__, "w") as f:
         f.write(data)
 
-    print(f"Set versionline: {versionline}")
+    print("Set versionline: {}".format(versionline.strip()))
 
 
 if __name__ == "__main__":

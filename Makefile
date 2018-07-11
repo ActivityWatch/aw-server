@@ -25,10 +25,14 @@ typecheck:
 	mypy aw_server --ignore-missing-imports
 
 package:
+	make clean
+	python3 -m aw_server.__about__
+	make build
 	pyinstaller aw-server.spec --clean --noconfirm
 
 clean:
 	rm -rf build dist
 	rm -rf aw_server/__pycache__
 	rm -rf aw_server/static/*
+	pip3 uninstall -y aw_server
 	make --directory=aw-webui clean

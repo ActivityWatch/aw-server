@@ -1,4 +1,5 @@
 from typing import Dict
+import traceback
 import json
 
 from flask import request, Blueprint, jsonify
@@ -12,6 +13,7 @@ from aw_core.models import Event
 from . import app, logger
 from .api import ServerAPI
 from .exceptions import BadRequest, Unauthorized
+from aw_analysis.query2_error import QueryException
 
 
 # SECURITY
@@ -59,6 +61,7 @@ event = api.schema_model('Event', schema.get_json_schema("event"))
 #       A downside to contructing from JSONSchema: flask-restplus does not have marshalling support
 info = api.model('Info', {
     'hostname': fields.String(),
+    'version': fields.String(),
     'testing': fields.Boolean(),
 })
 
@@ -242,10 +245,13 @@ class QueryResource(Resource):
         name = ""
         if "name" in request.args:
             name = request.args["name"]
-        cache = False
         query = request.get_json()
-        result = app.api.query2(name, query["query"], query["timeperiods"], cache)
-        return jsonify(result)
+        try:
+            result = app.api.query2(name, query["query"], query["timeperiods"], False)
+            return jsonify(result)
+        except QueryException as qe:
+            traceback.print_exc()
+            return {"type": type(qe).__name__, "message": str(qe)}, 400
 
 
 # EXPORTING

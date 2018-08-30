@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 from socket import gethostname
 import functools
@@ -75,6 +75,8 @@ class ServerAPI:
 
     def import_bucket(self, bucket_data: Dict[str, Any]):
         bucket_id = bucket_data["id"]
+        logger.info(f"Importing bucket {bucket_id}")
+        # TODO: Check that bucket doesn't already exist
         self.db.create_bucket(
             bucket_id,
             type=bucket_data["event_type"],
@@ -83,6 +85,10 @@ class ServerAPI:
             created=bucket_data["created"]
         )
         self.create_events(bucket_id, bucket_data["events"])
+
+    def import_all(self, data: Dict[str, Any]):
+        for bucket in data["buckets"]:
+            self.import_bucket(bucket)
 
     def create_bucket(self, bucket_id: str, event_type: str, client: str,
                       hostname: str, created: Optional[datetime] = None)-> bool:

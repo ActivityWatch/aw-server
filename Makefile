@@ -1,4 +1,4 @@
-.PHONY: build install test typecheck package clean
+.PHONY: aw_webui build install test typecheck package clean
 
 pip_install_args := . -r requirements.txt --upgrade
 
@@ -6,13 +6,13 @@ ifdef DEV
 pip_install_args := --editable $(pip_install_args)
 endif
 
-build: aw_server/static/*
-	pip3 install $(pip_install_args)
-
-aw_server/static/*:
+aw_webui:
 	make --directory=aw-webui build DEV=$(DEV)
 	mkdir -p aw_server/static/
 	cp -r aw-webui/dist/* aw_server/static/
+
+build: aw_webui
+	pip3 install $(pip_install_args)
 
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service

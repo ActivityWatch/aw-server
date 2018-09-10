@@ -82,9 +82,11 @@ class ServerAPI:
             type=bucket_data["event_type"],
             client=bucket_data["client"],
             hostname=bucket_data["hostname"],
-            created=bucket_data["created"]
+            created=(bucket_data["created"]
+                     if isinstance(bucket_data["created"], datetime)
+                     else iso8601.parse_date(bucket_data["created"])),
         )
-        self.create_events(bucket_id, bucket_data["events"])
+        self.create_events(bucket_id, [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]])
 
     def import_all(self, data: Dict[str, Any]):
         for bucket in data["buckets"]:

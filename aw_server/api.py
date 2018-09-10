@@ -33,7 +33,7 @@ class ServerAPI:
     def __init__(self, db, testing) -> None:
         self.db = db
         self.testing = testing
-        self.last_event = {} #type: dict
+        self.last_event = {}  # type: dict
 
     def get_info(self) -> Dict[str, Dict]:
         """Get server info"""
@@ -75,7 +75,7 @@ class ServerAPI:
 
     def import_bucket(self, bucket_data: Dict[str, Any]):
         bucket_id = bucket_data["id"]
-        logger.info(f"Importing bucket {bucket_id}")
+        logger.info("Importing bucket {}".format(bucket_id))
         # TODO: Check that bucket doesn't already exist
         self.db.create_bucket(
             bucket_id,

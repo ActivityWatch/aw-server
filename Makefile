@@ -18,11 +18,16 @@ install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service
 
 test:
-	python3 -c 'import aw_server'
+	pipenv run python3 -c 'import aw_server'
+	pipenv run python3 -m pytest tests/conftest.py tests/test_server.py
 	make typecheck
 
 typecheck:
-	mypy aw_server --ignore-missing-imports
+	pipenv run mypy aw_server --ignore-missing-imports
+
+lock:
+	pipenv lock -r > requirements.txt
+	pipenv lock -r -d > dev-requirements.txt
 
 package:
 	make clean

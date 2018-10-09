@@ -14,7 +14,7 @@ before_install:
  - source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION
  - node --version
  - pip install pipenv
- - pip install pyinstaller
+ - pipenv install --dev
 
 install:
  - "make build"

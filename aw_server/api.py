@@ -5,6 +5,7 @@ import functools
 import json
 import logging
 import iso8601
+from dataclasses import dataclass
 
 from aw_core.models import Event
 from aw_core.log import get_log_file_path
@@ -15,6 +16,7 @@ from aw_transform import heartbeat_merge
 from .__about__ import __version__
 
 from .exceptions import BadRequest, NotFound, Unauthorized
+from .notifications import get_notifications
 
 
 logger = logging.getLogger(__name__)
@@ -33,14 +35,15 @@ class ServerAPI:
     def __init__(self, db, testing) -> None:
         self.db = db
         self.testing = testing
-        self.last_event = {} #type: dict
+        self.last_event = {}  # type: dict
 
     def get_info(self) -> Dict[str, Dict]:
         """Get server info"""
         payload = {
             'hostname': gethostname(),
             'version': __version__,
-            'testing': self.testing
+            'testing': self.testing,
+            'notifications': get_notifications(),
         }
         return payload
 
@@ -133,7 +136,7 @@ class ServerAPI:
         track of a state, how long it's in that state and when it changes.
         A single heartbeat always has a duration of zero.
 
-        If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration updated.
+        If the heartbeat was identical to the last (apart from timestamp), then the last event has its duration extended.
         If the heartbeat differed, then a new event is created.
 
         Such as:

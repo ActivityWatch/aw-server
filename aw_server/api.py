@@ -73,7 +73,7 @@ class ServerAPI:
             del event["id"]
         return bucket
 
-    def export_all(self) -> Dict[str, dict]:
+    def export_all(self) -> List[Any]:
         """Exports all buckets and their events to a format consistent across versions"""
         buckets = self.get_buckets()
         exported_buckets = []

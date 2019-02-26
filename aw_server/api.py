@@ -73,13 +73,21 @@ class ServerAPI:
             del event["id"]
         return bucket
 
-    def import_bucket(self, bucket_data: Dict[str, Any]):
+    def export_all(self) -> Dict[str, dict]:
+        """Exports all buckets and their events to a format consistent across versions"""
+        buckets = self.get_buckets()
+        exported_buckets = []
+        for bid in buckets.keys():
+            exported_buckets.append(self.export_bucket(bid))
+        return exported_buckets
+
+    def import_bucket(self, bucket_data: Any):
         bucket_id = bucket_data["id"]
         logger.info("Importing bucket {}".format(bucket_id))
         # TODO: Check that bucket doesn't already exist
         self.db.create_bucket(
             bucket_id,
-            type=bucket_data["event_type"],
+            type=bucket_data["type"],
             client=bucket_data["client"],
             hostname=bucket_data["hostname"],
             created=(bucket_data["created"]
@@ -88,8 +96,8 @@ class ServerAPI:
         )
         self.create_events(bucket_id, [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]])
 
-    def import_all(self, data: Dict[str, Any]):
-        for bucket in data["buckets"]:
+    def import_all(self, buckets: List[Any]):
+        for bucket in buckets:
             self.import_bucket(bucket)
 
     def create_bucket(self, bucket_id: str, event_type: str, client: str,
@@ -229,10 +237,3 @@ class ServerAPI:
             for line in log_file.readlines()[::-1]:
                 payload.append(json.loads(line))
         return payload, 200
-
-    def export_all(self) -> Dict[str, dict]:
-        """Exports all buckets and their events to a format consistent across versions"""
-        buckets = self.get_buckets()
-        for bid in buckets.keys():
-            buckets[bid] = self.export_bucket(bid)
-        return buckets

@@ -60,7 +60,7 @@ class AnyJson(fields.Raw):
 # Loads event and bucket schema from JSONSchema in aw_core
 event = api.schema_model('Event', schema.get_json_schema("event"))
 bucket = api.schema_model('Bucket', schema.get_json_schema("bucket"))
-export_full = api.schema_model('Export', schema.get_json_schema("export"))
+buckets_export = api.schema_model('Export', schema.get_json_schema("export"))
 
 # TODO: Construct all the models from JSONSchema?
 #       A downside to contructing from JSONSchema: flask-restplus does not have marshalling support
@@ -257,28 +257,29 @@ class QueryResource(Resource):
 
 @api.route("/0/export")
 class ExportAllResource(Resource):
-    @api.doc(model=export_full)
+    @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_all)
     def get(self):
-        return app.api.export_all(), 200
-
-
-@api.route("/0/import")
-class ImportAllResource(Resource):
-    @api.expect(export_full)
-    @copy_doc(ServerAPI.import_all)
-    def post(self):
-        data = request.get_json()
-        return app.api.import_all(data), 200
+        return {"buckets": app.api.export_all()}, 200
 
 
 # TODO: Perhaps we don't need this, could be done with a query argument to /0/export instead
 @api.route("/0/buckets/<string:bucket_id>/export")
 class BucketExportResource(Resource):
-    @api.doc(model=bucket)
+    @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
-        return app.api.export_bucket(bucket_id)
+        return {"buckets": [app.api.export_bucket(bucket_id)]}, 200
+
+
+@api.route("/0/import")
+class ImportAllResource(Resource):
+    @api.expect(buckets_export)
+    @copy_doc(ServerAPI.import_all)
+    def post(self):
+        data = request.get_json()
+        buckets = data["buckets"]
+        return app.api.import_all(buckets), 200
 
 
 # LOGGING

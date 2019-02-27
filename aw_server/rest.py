@@ -269,7 +269,8 @@ class BucketExportResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
-        return {"buckets": [app.api.export_bucket(bucket_id)]}, 200
+        bucket_export = app.api.export_bucket(bucket_id)
+        return {"buckets": {bucket_export["id"]: bucket_export}}, 200
 
 
 @api.route("/0/import")

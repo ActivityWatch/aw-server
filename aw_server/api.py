@@ -73,7 +73,7 @@ class ServerAPI:
             del event["id"]
         return bucket
 
-    def export_all(self) -> List[Any]:
+    def export_all(self) -> Dict[str, Any]:
         """Exports all buckets and their events to a format consistent across versions"""
         buckets = self.get_buckets()
         exported_buckets = {}
@@ -96,7 +96,7 @@ class ServerAPI:
         )
         self.create_events(bucket_id, [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]])
 
-    def import_all(self, buckets: List[Any]):
+    def import_all(self, buckets: Dict[str, Any]):
         for bid, bucket in buckets.items():
             self.import_bucket(bucket)
 

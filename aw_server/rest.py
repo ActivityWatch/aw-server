@@ -278,9 +278,18 @@ class ImportAllResource(Resource):
     @api.expect(buckets_export)
     @copy_doc(ServerAPI.import_all)
     def post(self):
-        data = request.get_json()
-        buckets = data["buckets"]
-        return app.api.import_all(buckets), 200
+        # If import comes from a form in th web-ui
+        if len(request.files) > 0:
+            # web-ui form only allows one file, but technically it's possible to
+            # upload multiple files at the same time
+            for filename, f in request.files.items():
+                buckets = json.loads(f.stream.read())["buckets"]
+                app.api.import_all(buckets)
+        # Normal import from body
+        else:
+            buckets = request.get_json()["buckets"]
+            app.api.import_all(buckets)
+        return None, 200
 
 
 # LOGGING

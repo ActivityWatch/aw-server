@@ -2,7 +2,7 @@ from typing import Dict
 import traceback
 import json
 
-from flask import request, Blueprint, jsonify
+from flask import request, Blueprint, jsonify, make_response
 from flask_restplus import Api, Resource, fields
 import iso8601
 from datetime import datetime, timedelta
@@ -260,7 +260,12 @@ class ExportAllResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_all)
     def get(self):
-        return {"buckets": app.api.export_all()}, 200
+        buckets_export = app.api.export_all()
+        payload = {"buckets": buckets_export}
+        response = make_response(json.dumps(payload))
+        filename = "aw-buckets-export.json"
+        response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
+        return response
 
 
 # TODO: Perhaps we don't need this, could be done with a query argument to /0/export instead
@@ -270,7 +275,11 @@ class BucketExportResource(Resource):
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
         bucket_export = app.api.export_bucket(bucket_id)
-        return {"buckets": {bucket_export["id"]: bucket_export}}, 200
+        payload = {"buckets": {bucket_export["id"]: bucket_export}}
+        response = make_response(json.dumps(payload))
+        filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
+        response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
+        return response
 
 
 @api.route("/0/import")

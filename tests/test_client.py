@@ -60,9 +60,8 @@ def test_export(aw_client):
     export = aw_client._get("export").json()
     for bucket_id, bucket in export.items():
         assert bucket["id"]
-        assert bucket["hostname"]
         assert "events" in bucket
-    print(export)
+    # print(export)
 
 
 def _create_heartbeat_events(start=datetime.now(tz=timezone.utc),

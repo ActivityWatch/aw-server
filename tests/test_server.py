@@ -5,15 +5,15 @@ import pytest
 
 
 @pytest.fixture()
-def bucket(client):
+def bucket(flask_client):
     "Context manager for creating and deleting a testing bucket"
     try:
         bucket_id = 'test'
-        r = client.post('/api/0/buckets/{}'.format(bucket_id), json={'client': 'test', 'type': 'test', 'hostname': 'test'})
+        r = flask_client.post('/api/0/buckets/{}'.format(bucket_id), json={'client': 'test', 'type': 'test', 'hostname': 'test'})
         assert r.status_code == 200
         yield bucket_id
     finally:
-        r = client.delete('/api/0/buckets/{}'.format(bucket_id))
+        r = flask_client.delete('/api/0/buckets/{}'.format(bucket_id))
         assert r.status_code == 200
 
 

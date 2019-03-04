@@ -10,6 +10,7 @@ aw_webui:
 	make --directory=aw-webui build DEV=$(DEV)
 	mkdir -p aw_server/static/
 	cp -r aw-webui/dist/* aw_server/static/
+	rm -r aw-webui/node_modules/.cache/uglifyjs-webpack-plugin  # Needed for https://github.com/ActivityWatch/activitywatch/pull/274
 
 build: aw_webui
 	pip3 install $(pip_install_args)

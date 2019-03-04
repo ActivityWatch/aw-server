@@ -1,62 +1,55 @@
 import random
 from datetime import datetime, timedelta
-from contextlib import contextmanager
+
+import pytest
 
 
-# Disabled since the web UI is no longer built in CI
-# def test_index(client, benchmark):
-#     def get_index():
-#         assert client.get('/index.html').status_code == 200
-#     benchmark(get_index)
-
-
-@contextmanager
-def _testing_bucket(client):
+@pytest.fixture()
+def bucket(client):
     "Context manager for creating and deleting a testing bucket"
     try:
-        r = client.post('/api/0/buckets/test', json={'client': 'test', 'type': 'test', 'hostname': 'test'})
+        bucket_id = 'test'
+        r = client.post('/api/0/buckets/{}'.format(bucket_id), json={'client': 'test', 'type': 'test', 'hostname': 'test'})
         assert r.status_code == 200
-        yield
+        yield bucket_id
     finally:
-        r = client.delete('/api/0/buckets/test')
+        r = client.delete('/api/0/buckets/{}'.format(bucket_id))
         assert r.status_code == 200
 
 
-def test_buckets(client, benchmark):
-    with _testing_bucket(client):
-        @benchmark
-        def list_buckets():
-            r = client.get('/api/0/buckets/')
-            assert r.status_code == 200
-            assert len(r.json) == 1
+def test_buckets(flask_client, bucket, benchmark):
+    @benchmark
+    def list_buckets():
+        r = flask_client.get('/api/0/buckets/')
+        print(r.json)
+        assert r.status_code == 200
+        assert len(r.json) == 1
 
 
-def test_heartbeats(client, benchmark):
+def test_heartbeats(flask_client, bucket, benchmark):
     # FIXME: Currently tests using the memory storage method
     # TODO: Test with a longer data section and see if there's a significant difference
     # TODO: Test with a larger bucket and see if there's a significant difference
-    with _testing_bucket(client):
-        @benchmark
-        def heartbeat():
-            now = datetime.now()
-            r = client.post('/api/0/buckets/test/heartbeat?pulsetime=1', json={'timestamp': now, 'duration': 0, 'data': {'random': random.random()}})
-            assert r.status_code == 200
+    @benchmark
+    def heartbeat():
+        now = datetime.now()
+        r = flask_client.post('/api/0/buckets/test/heartbeat?pulsetime=1'.format(bucket), json={'timestamp': now, 'duration': 0, 'data': {'random': random.random()}})
+        assert r.status_code == 200
 
 
-def test_get_events(client, benchmark):
-    with _testing_bucket(client):
-        n_events = 100
-        for i in range(n_events):
-            now = datetime.now() - timedelta(1)
-            r = client.post('/api/0/buckets/test/heartbeat?pulsetime=0', json={'timestamp': now, 'duration': 0, 'data': {'random': random.random()}})
-            assert r.status_code == 200
+def test_get_events(flask_client, bucket, benchmark):
+    n_events = 100
+    for i in range(n_events):
+        now = datetime.now() - timedelta(1)
+        r = flask_client.post('/api/0/buckets/test/heartbeat?pulsetime=0'.format(bucket), json={'timestamp': now, 'duration': 0, 'data': {'random': random.random()}})
+        assert r.status_code == 200
 
-        @benchmark
-        def get_events():
-            r = client.get('/api/0/buckets/test/events?limit=-1')
-            assert r.status_code == 200
-            assert r.json
-            assert len(r.json) == n_events
+    @benchmark
+    def get_events():
+        r = flask_client.get('/api/0/buckets/test/events?limit=-1'.format(bucket))
+        assert r.status_code == 200
+        assert r.json
+        assert len(r.json) == n_events
 
 
 # TODO: Add benchmark for basic AFK-filtering query

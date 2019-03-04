@@ -23,7 +23,7 @@ install:
 # Tip: Run with `pipenv run make test` to use pipenv
 test:
 	python3 -c 'import aw_server'
-	python3 -m pytest tests/conftest.py tests/test_server.py
+	python3 -m pytest tests/test_server.py
 
 typecheck:
 	python3 -m mypy aw_server --ignore-missing-imports

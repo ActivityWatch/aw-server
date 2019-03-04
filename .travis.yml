@@ -5,7 +5,7 @@ python:
 #- "nightly"
 
 env:
- - TRAVIS_NODE_VERSION="8" SKIP_WEBUI=true
+ - SKIP_WEBUI=true  # TRAVIS_NODE_VERSION="8"
 
 before_install:
 #- node --version

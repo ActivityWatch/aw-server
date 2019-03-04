@@ -58,7 +58,7 @@ def test_get_info(aw_client):
 
 def test_export(aw_client):
     export = aw_client._get("export").json()
-    for bucket_id, bucket in export.items():
+    for bucket_id, bucket in export["buckets"].items():
         assert bucket["id"]
         assert "events" in bucket
     # print(export)

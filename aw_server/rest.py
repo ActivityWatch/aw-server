@@ -2,7 +2,7 @@ from typing import Dict
 import traceback
 import json
 
-from flask import request, Blueprint, jsonify, make_response
+from flask import request, Blueprint, jsonify, current_app, make_response
 from flask_restplus import Api, Resource, fields
 import iso8601
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from aw_core import schema
 from aw_core.models import Event
 
-from . import app, logger
+from . import logger
 from .api import ServerAPI
 from .exceptions import BadRequest, Unauthorized
 from aw_analysis.query2_error import QueryException
@@ -28,6 +28,7 @@ api = Api(blueprint, doc='/')
 
 
 # TODO: Clean up JSONEncoder code?
+# Move to server.py
 class CustomJSONEncoder(json.JSONEncoder):
     def __init__(self, *args, **kwargs):
         super().__init__()
@@ -41,12 +42,6 @@ class CustomJSONEncoder(json.JSONEncoder):
         except TypeError:
             pass
         return json.JSONEncoder.default(self, obj)
-
-
-app.json_encoder = CustomJSONEncoder
-
-app.register_blueprint(blueprint)
-app.api  # type: api.ServerAPI
 
 
 class AnyJson(fields.Raw):
@@ -100,7 +95,7 @@ class InfoResource(Resource):
     @api.marshal_with(info)
     @copy_doc(ServerAPI.get_info)
     def get(self) -> Dict[str, Dict]:
-        return app.api.get_info()
+        return current_app.api.get_info()
 
 
 # BUCKETS
@@ -110,7 +105,7 @@ class BucketsResource(Resource):
     # TODO: Add response marshalling/validation
     @copy_doc(ServerAPI.get_buckets)
     def get(self) -> Dict[str, Dict]:
-        return app.api.get_buckets()
+        return current_app.api.get_buckets()
 
 
 @api.route("/0/buckets/<string:bucket_id>")
@@ -118,13 +113,13 @@ class BucketResource(Resource):
     @api.doc(model=bucket)
     @copy_doc(ServerAPI.get_bucket_metadata)
     def get(self, bucket_id):
-        return app.api.get_bucket_metadata(bucket_id)
+        return current_app.api.get_bucket_metadata(bucket_id)
 
     @api.expect(create_bucket)
     @copy_doc(ServerAPI.create_bucket)
     def post(self, bucket_id):
         data = request.get_json()
-        bucket_created = app.api.create_bucket(bucket_id, event_type=data["type"], client=data["client"], hostname=data["hostname"])
+        bucket_created = current_app.api.create_bucket(bucket_id, event_type=data["type"], client=data["client"], hostname=data["hostname"])
         if bucket_created:
             return {}, 200
         else:
@@ -134,12 +129,12 @@ class BucketResource(Resource):
     @api.param("force", "Needs to be =1 to delete a bucket it non-testing mode")
     def delete(self, bucket_id):
         args = request.args
-        if not app.api.testing:
+        if not current_app.api.testing:
             if "force" not in args or args["force"] != "1":
                 msg = "Deleting buckets is only permitted if aw-server is running in testing mode or if ?force=1"
                 raise Unauthorized("DeleteBucketUnauthorized", msg)
 
-        app.api.delete_bucket(bucket_id)
+        current_app.api.delete_bucket(bucket_id)
         return {}, 200
 
 
@@ -161,7 +156,7 @@ class EventsResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        events = app.api.get_events(bucket_id, limit=limit, start=start, end=end)
+        events = current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)
         return events, 200
 
     # TODO: How to tell expect that it could be a list of events? Until then we can't use validate.
@@ -178,7 +173,7 @@ class EventsResource(Resource):
         else:
             raise BadRequest("Invalid POST data", "")
 
-        event = app.api.create_events(bucket_id, events)
+        event = current_app.api.create_events(bucket_id, events)
         return event.to_json_dict() if event else None, 200
 
 
@@ -193,7 +188,7 @@ class EventCountResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        events = app.api.get_eventcount(bucket_id, start=start, end=end)
+        events = current_app.api.get_eventcount(bucket_id, start=start, end=end)
         return events, 200
 
 
@@ -205,13 +200,13 @@ class EventResource(Resource):
     # @api.doc(model=event)
     # @copy_doc(ServerAPI.get_event)
     # def get(self, bucket_id, event_id):
-    #     events = app.api.get_events(bucket_id, limit=limit, start=start, end=end)
+    #     events = current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)
     #     return events, 200
 
     @copy_doc(ServerAPI.delete_event)
     def delete(self, bucket_id, event_id):
         logger.debug("Received delete request for event with id '{}' in bucket '{}'".format(event_id, bucket_id))
-        success = app.api.delete_event(bucket_id, event_id)
+        success = current_app.api.delete_event(bucket_id, event_id)
         return {"success": success}, 200
 
 
@@ -228,7 +223,7 @@ class HeartbeatResource(Resource):
         else:
             raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
 
-        event = app.api.heartbeat(bucket_id, heartbeat, pulsetime)
+        event = current_app.api.heartbeat(bucket_id, heartbeat, pulsetime)
         return event.to_json_dict(), 200
 
 
@@ -245,7 +240,7 @@ class QueryResource(Resource):
             name = request.args["name"]
         query = request.get_json()
         try:
-            result = app.api.query2(name, query["query"], query["timeperiods"], False)
+            result = current_app.api.query2(name, query["query"], query["timeperiods"], False)
             return jsonify(result)
         except QueryException as qe:
             traceback.print_exc()
@@ -260,7 +255,7 @@ class ExportAllResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_all)
     def get(self):
-        buckets_export = app.api.export_all()
+        buckets_export = current_app.api.export_all()
         payload = {"buckets": buckets_export}
         response = make_response(json.dumps(payload))
         filename = "aw-buckets-export.json"
@@ -274,7 +269,7 @@ class BucketExportResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
-        bucket_export = app.api.export_bucket(bucket_id)
+        bucket_export = current_app.api.export_bucket(bucket_id)
         payload = {"buckets": {bucket_export["id"]: bucket_export}}
         response = make_response(json.dumps(payload))
         filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
@@ -293,11 +288,11 @@ class ImportAllResource(Resource):
             # upload multiple files at the same time
             for filename, f in request.files.items():
                 buckets = json.loads(f.stream.read())["buckets"]
-                app.api.import_all(buckets)
+                current_app.api.import_all(buckets)
         # Normal import from body
         else:
             buckets = request.get_json()["buckets"]
-            app.api.import_all(buckets)
+            current_app.api.import_all(buckets)
         return None, 200
 
 
@@ -307,4 +302,4 @@ class ImportAllResource(Resource):
 class LogResource(Resource):
     @copy_doc(ServerAPI.get_log)
     def get(self):
-        return app.api.get_log(), 200
+        return current_app.api.get_log(), 200

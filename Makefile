@@ -33,9 +33,7 @@ lock:
 	pipenv lock -r -d > dev-requirements.txt
 
 package:
-	make clean
 	python3 -m aw_server.__about__
-	make build
 	pyinstaller aw-server.spec --clean --noconfirm
 
 clean:

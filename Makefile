@@ -19,13 +19,14 @@ build: aw_webui
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service
 
+# Tip: Run with `pipenv run make test` to use pipenv
 test:
-	pipenv run python3 -c 'import aw_server'
-	pipenv run python3 -m pytest tests/conftest.py tests/test_server.py
+	python3 -c 'import aw_server'
+	python3 -m pytest tests/conftest.py tests/test_server.py
 	make typecheck
 
 typecheck:
-	pipenv run mypy aw_server --ignore-missing-imports
+	mypy aw_server --ignore-missing-imports
 
 lock:
 	pipenv lock -r > requirements.txt

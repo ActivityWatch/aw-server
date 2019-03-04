@@ -2,11 +2,11 @@ import random
 from datetime import datetime, timedelta
 
 
-def test_index(client, benchmark):
-    def get_index():
-        assert client.get('/index.html').status_code == 200
-
-    benchmark(get_index)
+# Disabled since the web UI is no longer built in CI
+# def test_index(client, benchmark):
+#     def get_index():
+#         assert client.get('/index.html').status_code == 200
+#     benchmark(get_index)
 
 
 def test_buckets(client, benchmark):

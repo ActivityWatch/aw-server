@@ -5,14 +5,14 @@ python:
 #- "nightly"
 
 env:
- - TRAVIS_NODE_VERSION="8"
+ - TRAVIS_NODE_VERSION="8" SKIP_WEBUI=true
 
 before_install:
- - node --version
- - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm
- - (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`)
- - source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION
- - node --version
+#- node --version
+#- rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm
+#- (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`)
+#- source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION
+#- node --version
  - pip install pipenv
  - pipenv install --dev
 

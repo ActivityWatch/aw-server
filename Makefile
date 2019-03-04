@@ -7,9 +7,11 @@ pip_install_args := --editable $(pip_install_args)
 endif
 
 aw_webui:
-	make --directory=aw-webui build DEV=$(DEV)
 	mkdir -p aw_server/static/
+ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
+	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
+endif
 
 build: aw_webui
 	pip3 install $(pip_install_args)

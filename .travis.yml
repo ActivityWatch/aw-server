@@ -20,5 +20,7 @@ install:
  - "make build"
 
 script:
+ - "pipenv check"
  - "make test"
+ - "make typecheck"
  - "make package"

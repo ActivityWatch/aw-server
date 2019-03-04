@@ -23,10 +23,9 @@ install:
 test:
 	python3 -c 'import aw_server'
 	python3 -m pytest tests/conftest.py tests/test_server.py
-	make typecheck
 
 typecheck:
-	mypy aw_server --ignore-missing-imports
+	python3 -m mypy aw_server --ignore-missing-imports
 
 lock:
 	pipenv lock -r > requirements.txt

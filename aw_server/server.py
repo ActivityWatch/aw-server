@@ -88,7 +88,7 @@ def _config_cors(cors_origins: List[str], testing: bool):
 def _start(storage_method, host: str, port: int, testing: bool=False, cors_origins: List[str] = []):
     app = create_app(storage_method=storage_method, testing=testing, cors_origins=cors_origins)
     try:
-        app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False)
+        app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False, threaded=False)
     except OSError as e:
         logger.error(str(e))
         raise e

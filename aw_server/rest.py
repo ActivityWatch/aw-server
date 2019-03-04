@@ -2,7 +2,7 @@ from typing import Dict
 import traceback
 import json
 
-from flask import request, Blueprint, jsonify, current_app
+from flask import request, Blueprint, jsonify, current_app, make_response
 from flask_restplus import Api, Resource, fields
 import iso8601
 from datetime import datetime, timedelta
@@ -28,6 +28,7 @@ api = Api(blueprint, doc='/')
 
 
 # TODO: Clean up JSONEncoder code?
+# Move to server.py
 class CustomJSONEncoder(json.JSONEncoder):
     def __init__(self, *args, **kwargs):
         super().__init__()
@@ -51,24 +52,18 @@ class AnyJson(fields.Raw):
             return json.loads(value)
 
 
-# Loads event schema from JSONSchema in aw_core
+# Loads event and bucket schema from JSONSchema in aw_core
 event = api.schema_model('Event', schema.get_json_schema("event"))
+bucket = api.schema_model('Bucket', schema.get_json_schema("bucket"))
+buckets_export = api.schema_model('Export', schema.get_json_schema("export"))
 
 # TODO: Construct all the models from JSONSchema?
 #       A downside to contructing from JSONSchema: flask-restplus does not have marshalling support
+
 info = api.model('Info', {
     'hostname': fields.String(),
     'version': fields.String(),
     'testing': fields.Boolean(),
-})
-
-bucket = api.model('Bucket', {
-    'id': fields.String(required=True, description='The buckets unique id'),
-    'name': fields.String(required=False, description='The buckets readable and renameable name'),
-    'type': fields.String(required=True, description='The buckets event type'),
-    'client': fields.String(required=True, description='The name of the watcher client'),
-    'hostname': fields.String(required=True, description='The hostname of the client that the bucket belongs to'),
-    'created': fields.DateTime(required=True, description='The creation datetime of the bucket'),
 })
 
 create_bucket = api.model('CreateBucket', {
@@ -115,7 +110,7 @@ class BucketsResource(Resource):
 
 @api.route("/0/buckets/<string:bucket_id>")
 class BucketResource(Resource):
-    @api.marshal_with(bucket)
+    @api.doc(model=bucket)
     @copy_doc(ServerAPI.get_bucket_metadata)
     def get(self, bucket_id):
         return current_app.api.get_bucket_metadata(bucket_id)
@@ -206,7 +201,7 @@ class EventResource(Resource):
     # @api.doc(model=event)
     # @copy_doc(ServerAPI.get_event)
     # def get(self, bucket_id, event_id):
-    #     events = app.api.get_events(bucket_id, limit=limit, start=start, end=end)
+    #     events = current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)
     #     return events, 200
 
     @copy_doc(ServerAPI.delete_event)
@@ -253,21 +248,53 @@ class QueryResource(Resource):
             return {"type": type(qe).__name__, "message": str(qe)}, 400
 
 
-# EXPORTING
+# EXPORT AND IMPORT
+
 
 @api.route("/0/export")
 class ExportAllResource(Resource):
+    @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_all)
     def get(self):
-        return current_app.api.export_all(), 200
+        buckets_export = current_app.api.export_all()
+        payload = {"buckets": buckets_export}
+        response = make_response(json.dumps(payload))
+        filename = "aw-buckets-export.json"
+        response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
+        return response
 
 
 # TODO: Perhaps we don't need this, could be done with a query argument to /0/export instead
 @api.route("/0/buckets/<string:bucket_id>/export")
 class BucketExportResource(Resource):
+    @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
-        return current_app.api.export_bucket(bucket_id)
+        bucket_export = current_app.api.export_bucket(bucket_id)
+        payload = {"buckets": {bucket_export["id"]: bucket_export}}
+        response = make_response(json.dumps(payload))
+        filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
+        response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
+        return response
+
+
+@api.route("/0/import")
+class ImportAllResource(Resource):
+    @api.expect(buckets_export)
+    @copy_doc(ServerAPI.import_all)
+    def post(self):
+        # If import comes from a form in th web-ui
+        if len(request.files) > 0:
+            # web-ui form only allows one file, but technically it's possible to
+            # upload multiple files at the same time
+            for filename, f in request.files.items():
+                buckets = json.loads(f.stream.read())["buckets"]
+                current_app.api.import_all(buckets)
+        # Normal import from body
+        else:
+            buckets = request.get_json()["buckets"]
+            current_app.api.import_all(buckets)
+        return None, 200
 
 
 # LOGGING

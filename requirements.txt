@@ -9,7 +9,7 @@ flask==1.0.2
 git+https://github.com/ActivityWatch/aw-core.git@fe1a64d531d9a9ce8134d917b2ccdbc4cb02fb52#egg=aw-core
 itsdangerous==1.1.0
 jinja2==2.10
-jsonschema==3.0.1
+jsonschema==2.6.0
 markupsafe==1.1.1
 pyrsistent==0.14.11
 python-json-logger==0.1.10

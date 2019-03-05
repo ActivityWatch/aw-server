@@ -1,6 +1,6 @@
 .PHONY: aw_webui build install test typecheck package clean
 
-pip_install_args := . -r requirements.txt --upgrade
+pip_install_args := . -r requirements.txt
 
 ifdef DEV
 pip_install_args := --editable $(pip_install_args)

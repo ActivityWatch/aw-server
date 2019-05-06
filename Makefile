@@ -1,33 +1,39 @@
-.PHONY: build install test typecheck package clean
+.PHONY: aw_webui build install test typecheck package clean
 
-pip_install_args := . -r requirements.txt --upgrade
+pip_install_args := . -r requirements.txt
 
 ifdef DEV
 pip_install_args := --editable $(pip_install_args)
 endif
 
-build: aw_server/static/*
-	pip3 install $(pip_install_args)
-
-aw_server/static/*:
-	make --directory=aw-webui build DEV=$(DEV)
+aw_webui:
 	mkdir -p aw_server/static/
+ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
+	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
+	rm -rf aw-webui/node_modules/.cache/uglifyjs-webpack-plugin  # Needed for https://github.com/ActivityWatch/activitywatch/pull/274
+endif
+
+build: aw_webui
+	pip3 install $(pip_install_args)
 
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service
 
+# Tip: Run with `pipenv run make test` to use pipenv
 test:
 	python3 -c 'import aw_server'
-	make typecheck
+	python3 -m pytest tests/test_server.py
 
 typecheck:
-	mypy aw_server --ignore-missing-imports
+	python3 -m mypy aw_server --ignore-missing-imports
+
+lock:
+	pipenv lock -r > requirements.txt
+	pipenv lock -r -d > dev-requirements.txt
 
 package:
-	make clean
 	python3 -m aw_server.__about__
-	make build
 	pyinstaller aw-server.spec --clean --noconfirm
 
 clean:

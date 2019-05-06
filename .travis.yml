@@ -1,24 +1,25 @@
 language: python
 python:
- - "3.5"
  - "3.6"
 #- "nightly"
 
 env:
- - TRAVIS_NODE_VERSION="8"
+ - SKIP_WEBUI=true  # TRAVIS_NODE_VERSION="8"
 
 before_install:
- - node --version
- - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm
- - (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`)
- - source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION
- - node --version
- - pip install --upgrade pip
- - pip install pyinstaller
+#- node --version
+#- rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm
+#- (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`)
+#- source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION
+#- node --version
+ - pip install pipenv
+ - pipenv install --dev
 
 install:
  - "make build"
 
 script:
+ - "pipenv check --ignore 36810"
  - "make test"
+ - "make typecheck"
  - "make package"

@@ -73,11 +73,41 @@ class ServerAPI:
             del event["id"]
         return bucket
 
-    def create_bucket(self, bucket_id: str, event_type: str, client: str, hostname: str) -> bool:
+    def export_all(self) -> Dict[str, Any]:
+        """Exports all buckets and their events to a format consistent across versions"""
+        buckets = self.get_buckets()
+        exported_buckets = {}
+        for bid in buckets.keys():
+            exported_buckets[bid] = self.export_bucket(bid)
+        return exported_buckets
+
+    def import_bucket(self, bucket_data: Any):
+        bucket_id = bucket_data["id"]
+        logger.info("Importing bucket {}".format(bucket_id))
+        # TODO: Check that bucket doesn't already exist
+        self.db.create_bucket(
+            bucket_id,
+            type=bucket_data["type"],
+            client=bucket_data["client"],
+            hostname=bucket_data["hostname"],
+            created=(bucket_data["created"]
+                     if isinstance(bucket_data["created"], datetime)
+                     else iso8601.parse_date(bucket_data["created"])),
+        )
+        self.create_events(bucket_id, [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]])
+
+    def import_all(self, buckets: Dict[str, Any]):
+        for bid, bucket in buckets.items():
+            self.import_bucket(bucket)
+
+    def create_bucket(self, bucket_id: str, event_type: str, client: str,
+                      hostname: str, created: Optional[datetime] = None)-> bool:
         """
         Create bucket.
         Returns True if successful, otherwise false if a bucket with the given ID already existed.
         """
+        if created is None:
+            created = datetime.now()
         if bucket_id in self.db.buckets():
             return False
         self.db.create_bucket(
@@ -85,7 +115,7 @@ class ServerAPI:
             type=event_type,
             client=client,
             hostname=hostname,
-            created=datetime.now()
+            created=created
         )
         return True
 
@@ -207,10 +237,3 @@ class ServerAPI:
             for line in log_file.readlines()[::-1]:
                 payload.append(json.loads(line))
         return payload, 200
-
-    def export_all(self) -> Dict[str, dict]:
-        """Exports all buckets and their events to a format consistent across versions"""
-        buckets = self.get_buckets()
-        for bid in buckets.keys():
-            buckets[bid] = self.export_bucket(bid)
-        return buckets

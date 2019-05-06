@@ -67,7 +67,7 @@ class ServerAPI:
     def export_bucket(self, bucket_id: str) -> Dict[str, Any]:
         """Export a bucket to a dataformat consistent across versions, including all events in it."""
         bucket = self.get_bucket_metadata(bucket_id)
-        bucket["events"] = self.get_events(bucket_id, limit=-1)
+        bucket["events"] = [e.to_json_dict() for e in self.get_events(bucket_id, limit=-1)]
         # Scrub event IDs
         for event in bucket["events"]:
             del event["id"]
@@ -133,8 +133,7 @@ class ServerAPI:
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
         if limit is None:  # Let limit = None also mean "no limit"
             limit = -1
-        events = [event.to_json_dict() for event in
-                  self.db[bucket_id].get(limit, start, end)]
+        events = self.db[bucket_id].get(limit, start, end)
         return events
 
     @check_bucket_exists

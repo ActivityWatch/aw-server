@@ -9,7 +9,7 @@ try:  # for pip >= 10
 except ImportError:  # for pip <= 9.0.3
     from pip.req import parse_requirements
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -22,6 +22,10 @@ with open('README.md', 'r', encoding='utf-8') as f:
 
 requirements = parse_requirements("./requirements.txt", session=False)
 
+packages = find_packages()
+if packages != ["aw_server", "aw_server.resources"]:
+    print(f"Found extra packages: {packages}")
+
 setup(name='aw-server',
       version=about["__version__"],
       description='ActivityWatch server',
@@ -29,7 +33,7 @@ setup(name='aw-server',
       author='Erik Bjäreholt',
       author_email='erik@bjareho.lt',
       url='https://github.com/ActivityWatch/aw-server',
-      packages=['aw_server'],
+      packages=packages,
       include_package_data=True,
       install_requires=[str(requirement.req) for requirement in requirements],
       entry_points={

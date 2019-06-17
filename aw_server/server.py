@@ -8,9 +8,9 @@ from flask_cors import CORS
 import aw_datastore
 from aw_datastore import Datastore
 
-from .log import FlaskLogHandler
-from .api import ServerAPI
-from . import rest
+from aw_server.log import FlaskLogHandler
+from aw_server.api import ServerAPI
+from aw_server.resources import rest
 
 
 logger = logging.getLogger(__name__)

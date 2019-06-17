@@ -8,6 +8,6 @@ from .__about__ import __version__
 from .server import create_app
 
 from . import api
-from . import rest
+from . import resources
 
 from .main import main

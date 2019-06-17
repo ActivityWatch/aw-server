@@ -1,6 +1,7 @@
 from typing import Dict
 import traceback
 import json
+import logging
 
 from flask import request, Blueprint, jsonify, current_app, make_response
 from flask_restplus import Api, Resource, fields
@@ -10,11 +11,11 @@ from datetime import datetime, timedelta
 from aw_core import schema
 from aw_core.models import Event
 
-from . import logger
-from .api import ServerAPI
-from .exceptions import BadRequest, Unauthorized
+from aw_server.api import ServerAPI
+from aw_server.exceptions import BadRequest, Unauthorized
 from aw_analysis.query2_error import QueryException
 
+logger = logging.getLogger(__name__)
 
 # SECURITY
 # As we work our way through features, disable (while this is False, we should only accept connections from localhost)

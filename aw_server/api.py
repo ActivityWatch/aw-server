@@ -152,9 +152,14 @@ class ServerAPI:
         return self.db[bucket_id].get_eventcount(start, end)
 
     @check_bucket_exists
-    def delete_event(self, bucket_id: str, event_id) -> bool:
+    def delete_event(self, bucket_id: str, event_id: int) -> bool:
         """Delete a single event from a bucket"""
         return self.db[bucket_id].delete(event_id)
+
+    @check_bucket_exists
+    def replace_event(self, bucket_id: str, event_id: int, event: Event) -> bool:
+        """Replace the specified event by a new one."""
+        return self.db[bucket_id].replace(event_id, event)
 
     @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:

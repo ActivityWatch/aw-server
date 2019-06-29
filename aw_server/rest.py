@@ -203,6 +203,19 @@ class EventResource(Resource):
     #     events = current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)
     #     return events, 200
 
+    @api.expect(event)
+    def put(self, bucket_id, event_id):
+        data = request.get_json()
+        logger.debug("Received put request for event with id '{}' in bucket '{}' and data: {}".format(event_id, bucket_id, data))
+
+        if isinstance(data, dict):
+            event = Event(**data)
+        else:
+            raise BadRequest("Invalid PUT data", "")
+
+        event = current_app.api.replace_event(bucket_id, event_id, event)
+        return event.to_json_dict() if event else None, 200
+
     @copy_doc(ServerAPI.delete_event)
     def delete(self, bucket_id, event_id):
         logger.debug("Received delete request for event with id '{}' in bucket '{}'".format(event_id, bucket_id))

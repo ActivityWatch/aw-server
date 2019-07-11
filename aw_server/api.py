@@ -9,7 +9,7 @@ import iso8601
 from aw_core.models import Event
 from aw_core.log import get_log_file_path
 
-from aw_analysis import query2
+from aw_query import query2
 from aw_transform import heartbeat_merge
 
 from .__about__ import __version__

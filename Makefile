@@ -30,7 +30,7 @@ typecheck:
 
 lock:
 	pipenv lock -r > requirements.txt
-	pipenv lock -r -d > dev-requirements.txt
+	pipenv lock -r -d > requirements-dev.txt
 
 package:
 	python3 -m aw_server.__about__

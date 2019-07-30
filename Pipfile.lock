@@ -38,7 +38,7 @@
         },
         "aw-core": {
             "git": "https://github.com/ActivityWatch/aw-core.git",
-            "ref": "bf85c0238a417ea48bf8a5907193ad2fe7445710"
+            "ref": "b7f1f6cd2bb24b80994b1a63e923390f7c60383b"
         },
         "click": {
             "hashes": [

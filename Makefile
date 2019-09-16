@@ -11,7 +11,7 @@ aw_webui:
 ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
 	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
-	rm -rf aw-webui/node_modules/.cache/uglifyjs-webpack-plugin  # Needed for https://github.com/ActivityWatch/activitywatch/pull/274
+	rm -rf aw-webui/node_modules/.cache  # Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279
 endif
 
 build: aw_webui
@@ -30,7 +30,7 @@ typecheck:
 
 lock:
 	pipenv lock -r > requirements.txt
-	pipenv lock -r -d > dev-requirements.txt
+	pipenv lock -r -d > requirements-dev.txt
 
 package:
 	python3 -m aw_server.__about__

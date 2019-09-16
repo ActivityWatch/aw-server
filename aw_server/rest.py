@@ -9,11 +9,11 @@ from datetime import datetime, timedelta
 
 from aw_core import schema
 from aw_core.models import Event
+from aw_query.exceptions import QueryException
 
 from . import logger
 from .api import ServerAPI
 from .exceptions import BadRequest, Unauthorized
-from aw_analysis.query2_error import QueryException
 
 
 # SECURITY

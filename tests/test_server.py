@@ -51,5 +51,25 @@ def test_get_events(flask_client, bucket, benchmark):
         assert r.json
         assert len(r.json) == n_events
 
+def test_get_events_from_start_time(flask_client, bucket, benchmark):
+    """
+        Issue #232: When using a start parameter, ignore the 100 limit by default. 
+    """
+    n_events = 150
+    start_time = datetime.now() - timedelta(1)
+    for i in range(n_events):
+        now = datetime.now() - timedelta(1)
+        r = flask_client.post('/api/0/buckets/test/heartbeat?pulsetime=0'.format(bucket), json={'timestamp': now, 'duration': 0, 'data': {'random': random.random()}})
+        # print(r.json)
+        assert r.status_code == 200
+
+    @benchmark
+    def get_all_events_from_start_query():
+        r = flask_client.get('/api/0/buckets/test/events?start={}'.format(start_time.isoformat()))
+        # print(r.json)
+        assert r.status_code == 200
+        assert r.json
+        assert len(r.json) == n_events
+
 
 # TODO: Add benchmark for basic AFK-filtering query

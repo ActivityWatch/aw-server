@@ -152,16 +152,7 @@ class EventsResource(Resource):
     @copy_doc(ServerAPI.get_events)
     def get(self, bucket_id):
         args = request.args
-        
-        if "limit" in args:
-            limit = int(args["limit"])
-        elif "start" in args:
-            # If a start object is defined in query string, 
-            # return all associated events.
-            limit = -1
-        else:
-            limit = 100
-        
+        limit = int(args["limit"]) if "limit" in args else -1
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 

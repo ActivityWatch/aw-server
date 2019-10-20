@@ -56,6 +56,11 @@ def test_get_events(flask_client, bucket, benchmark):
         assert r.status_code == 200
         assert r.json
         assert len(r.json) == n_events
+
+        r = flask_client.get('/api/0/buckets/test/events?limit=10'.format(bucket))
+        assert r.status_code == 200
+        assert r.json
+        assert len(r.json) == 10
         
         r = flask_client.get('/api/0/buckets/test/events?limit=100'.format(bucket))
         assert r.status_code == 200

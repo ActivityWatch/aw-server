@@ -39,6 +39,7 @@ def test_heartbeats(flask_client, bucket, benchmark):
 
 def test_get_events(flask_client, bucket, benchmark):
     n_events = 100
+    start_time = datetime.now() - timedelta(1)
     for i in range(n_events):
         now = datetime.now() - timedelta(1)
         r = flask_client.post('/api/0/buckets/test/heartbeat?pulsetime=0'.format(bucket), json={'timestamp': now, 'duration': 0, 'data': {'random': random.random()}})
@@ -46,10 +47,32 @@ def test_get_events(flask_client, bucket, benchmark):
 
     @benchmark
     def get_events():
+        r = flask_client.get('/api/0/buckets/test/events'.format(bucket))
+        assert r.status_code == 200
+        assert r.json
+        assert len(r.json) == n_events
+
         r = flask_client.get('/api/0/buckets/test/events?limit=-1'.format(bucket))
         assert r.status_code == 200
         assert r.json
         assert len(r.json) == n_events
 
+        r = flask_client.get('/api/0/buckets/test/events?limit=10'.format(bucket))
+        assert r.status_code == 200
+        assert r.json
+        assert len(r.json) == 10
+        
+        r = flask_client.get('/api/0/buckets/test/events?limit=100'.format(bucket))
+        assert r.status_code == 200
+        assert r.json
+        assert len(r.json) == n_events
+
+        r = flask_client.get('/api/0/buckets/test/events?limit=1000'.format(bucket))
+        assert r.status_code == 200
+        assert r.json
+        assert len(r.json) == n_events
+
+        
+    
 
 # TODO: Add benchmark for basic AFK-filtering query

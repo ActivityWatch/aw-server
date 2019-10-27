@@ -64,6 +64,7 @@ info = api.model('Info', {
     'hostname': fields.String(),
     'version': fields.String(),
     'testing': fields.Boolean(),
+    'device_id': fields.String(),
 })
 
 create_bucket = api.model('CreateBucket', {

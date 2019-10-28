@@ -1,6 +1,8 @@
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 from socket import gethostname
+from pathlib import Path
+from uuid import uuid4
 import functools
 import json
 import logging
@@ -8,6 +10,7 @@ import iso8601
 
 from aw_core.models import Event
 from aw_core.log import get_log_file_path
+from aw_core.dirs import get_data_dir
 
 from aw_query import query2
 from aw_transform import heartbeat_merge
@@ -18,6 +21,18 @@ from .exceptions import BadRequest, NotFound, Unauthorized
 
 
 logger = logging.getLogger(__name__)
+
+
+def get_device_id() -> str:
+    path = Path(get_data_dir("aw-server")) / "device_id"
+    if path.exists():
+        with open(path, 'r') as f:
+            return f.read()
+    else:
+        uuid = str(uuid4())
+        with open(path, 'w') as f:
+            f.write(uuid)
+        return uuid
 
 
 def check_bucket_exists(f):
@@ -40,7 +55,8 @@ class ServerAPI:
         payload = {
             'hostname': gethostname(),
             'version': __version__,
-            'testing': self.testing
+            'testing': self.testing,
+            'device_id': get_device_id(),
         }
         return payload
 

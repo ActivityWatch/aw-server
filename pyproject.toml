@@ -5,6 +5,9 @@ description = ""
 authors = ["Erik Bjäreholt <erik@bjareho.lt>"]
 license = "MPL-2.0"
 
+[tool.poetry.scripts]
+aw-server = "aw_server:main"
+
 [tool.poetry.dependencies]
 python = "^3.6"
 aw-core = {git = "https://github.com/ActivityWatch/aw-core.git"}

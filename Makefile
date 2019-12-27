@@ -1,6 +1,6 @@
 .PHONY: aw_webui build install test typecheck package clean
 
-pip_install_args := . -r requirements.txt
+pip_install_args := .
 
 ifdef DEV
 pip_install_args := --editable $(pip_install_args)
@@ -20,17 +20,12 @@ build: aw_webui
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service
 
-# Tip: Run with `pipenv run make test` to use pipenv
 test:
 	python3 -c 'import aw_server'
 	python3 -m pytest tests/test_server.py
 
 typecheck:
 	python3 -m mypy aw_server --ignore-missing-imports
-
-lock:
-	pipenv lock -r > requirements.txt
-	pipenv lock -r -d > requirements-dev.txt
 
 package:
 	python3 -m aw_server.__about__

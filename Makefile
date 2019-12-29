@@ -1,10 +1,13 @@
 .PHONY: aw_webui build install test typecheck package clean
 
-pip_install_args := .
-
 ifdef DEV
-pip_install_args := --editable $(pip_install_args)
+installcmd := poetry install
+else
+installcmd := pip install .
 endif
+
+build: aw_webui
+	$(installcmd)
 
 aw_webui:
 	mkdir -p aw_server/static/
@@ -13,9 +16,6 @@ ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
 	cp -r aw-webui/dist/* aw_server/static/
 	rm -rf aw-webui/node_modules/.cache  # Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279
 endif
-
-build: aw_webui
-	pip3 install $(pip_install_args)
 
 install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service

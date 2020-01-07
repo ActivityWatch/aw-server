@@ -3,7 +3,7 @@
 ifdef DEV
 installcmd := poetry install
 else
-installcmd := pip install .
+installcmd := pip3 install .
 endif
 
 build: aw_webui

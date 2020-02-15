@@ -12,7 +12,7 @@ aw-server = "aw_server:main"
 python = "^3.6"
 aw-core = {git = "https://github.com/ActivityWatch/aw-core.git"}
 aw-client = {git = "https://github.com/ActivityWatch/aw-client.git"}
-flask-restplus = "^0.13.0"
+flask-restx = "^0.1.1"
 appdirs = "^1.4.3"
 flask = "^1.1.1"
 flask-cors = "^3.0.8"

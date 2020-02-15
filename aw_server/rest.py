@@ -3,7 +3,7 @@ import traceback
 import json
 
 from flask import request, Blueprint, jsonify, current_app, make_response
-from flask_restplus import Api, Resource, fields
+from flask_restx import Api, Resource, fields
 import iso8601
 from datetime import datetime, timedelta
 

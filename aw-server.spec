@@ -6,8 +6,8 @@ import os
 import aw_core
 aw_core_path = os.path.dirname(aw_core.__file__)
 
-import flask_restplus
-restplus_path = os.path.dirname(flask_restplus.__file__)
+import flask_restx
+restx_path = os.path.dirname(flask_restx.__file__)
 
 block_cipher = None
 
@@ -18,8 +18,8 @@ a = Analysis(['__main__.py'],
              datas=[
                 ('aw_server/static', 'aw_server/static'),
 
-                (os.path.join(restplus_path, 'templates'), 'flask_restplus/templates'),
-                (os.path.join(restplus_path, 'static'), 'flask_restplus/static'),
+                (os.path.join(restx_path, 'templates'), 'flask_restx/templates'),
+                (os.path.join(restx_path, 'static'), 'flask_restx/static'),
                 (os.path.join(aw_core_path, 'schemas'), 'aw_core/schemas')
              ],
              hiddenimports=[],

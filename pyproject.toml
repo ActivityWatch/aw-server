@@ -16,6 +16,7 @@ flask-restx = "^0.1.1"
 appdirs = "^1.4.3"
 flask = "^1.1.1"
 flask-cors = "^3.0.8"
+werkzeug = "<1.0.0"
 
 [tool.poetry.dev-dependencies]
 pyinstaller = "^3.5"

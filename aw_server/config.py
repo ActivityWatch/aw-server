@@ -6,13 +6,13 @@ default_config = ConfigParser()
 default_config["server"] = {
     "host": "localhost",
     "port": "5600",
-    "storage": "peewee",
+    "storage": "sqlite",
     "cors_origins": ""
 }
 default_config["server-testing"] = {
     "host": "localhost",
     "port": "5666",
-    "storage": "peewee",
+    "storage": "sqlite",
     "cors_origins": ""
 }
 

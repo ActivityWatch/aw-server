@@ -14,7 +14,10 @@ aw_webui:
 ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
 	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
-	rm -rf aw-webui/node_modules/.cache  # Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279
+	# Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279
+	# https://github.com/ActivityWatch/activitywatch/pull/367 Other solutions have been tried but did not actually work. 
+	# If you aren't sure windows long paths are working, don't remove this
+	rm -rf aw-webui/node_modules/.cache  
 endif
 
 install:

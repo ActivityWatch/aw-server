@@ -5,7 +5,7 @@ import pkg_resources
 import re
 
 
-basever = "v0.8"
+basever = "v0.9"
 
 
 def detect_version_ci() -> Optional[str]:

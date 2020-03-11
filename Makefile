@@ -14,6 +14,7 @@ aw_webui:
 ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
 	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
+	rm -rf aw-webui/node_modules/.cache  # Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279
 endif
 
 install:

@@ -12,14 +12,13 @@ aw-server = "aw_server:main"
 python = "^3.6"
 aw-core = {git = "https://github.com/ActivityWatch/aw-core.git"}
 aw-client = {git = "https://github.com/ActivityWatch/aw-client.git"}
-flask-restx = "^0.1.1"
 appdirs = "^1.4.3"
 flask = "^1.1.1"
+flask-restx = "^0.1.1"
 flask-cors = "^3.0.8"
-werkzeug = "<1.0.0"
+werkzeug = "<1.0.0"  # 1.0.0 kept back due to bug in flask-restx, see: https://github.com/ActivityWatch/activitywatch/issues/346
 
 [tool.poetry.dev-dependencies]
-pyinstaller = "^3.5"
 mypy = "^0.761"
 pytest = "^5.3.2"
 pytest-flask = "^0.15.0"

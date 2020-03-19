@@ -1,13 +1,7 @@
 .PHONY: aw_webui build install test typecheck package clean
 
-ifdef DEV
-installcmd := poetry install
-else
-installcmd := pip3 install .
-endif
-
 build: aw_webui
-	$(installcmd)
+	poetry install
 
 aw_webui:
 	mkdir -p aw_server/static/
@@ -15,9 +9,9 @@ ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
 	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
 	# Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279
-	# https://github.com/ActivityWatch/activitywatch/pull/367 Other solutions have been tried but did not actually work. 
+	# https://github.com/ActivityWatch/activitywatch/pull/367 Other solutions have been tried but did not actually work.
 	# If you aren't sure windows long paths are working, don't remove this
-	rm -rf aw-webui/node_modules/.cache  
+	rm -rf aw-webui/node_modules/.cache
 endif
 
 install:

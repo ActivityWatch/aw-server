@@ -18,14 +18,14 @@ install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service
 
 test:
-	python3 -c 'import aw_server'
-	python3 -m pytest tests/test_server.py
+	python -c 'import aw_server'
+	python -m pytest tests/test_server.py
 
 typecheck:
-	python3 -m mypy aw_server --ignore-missing-imports
+	python -m mypy aw_server --ignore-missing-imports
 
 package:
-	python3 -m aw_server.__about__
+	python -m aw_server.__about__
 	pyinstaller aw-server.spec --clean --noconfirm
 
 clean:

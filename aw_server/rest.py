@@ -157,7 +157,7 @@ class EventsResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        events = current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)
+        events = [e.to_json_dict() for e in current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)]
         return events, 200
 
     # TODO: How to tell expect that it could be a list of events? Until then we can't use validate.

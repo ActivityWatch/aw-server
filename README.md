@@ -6,12 +6,12 @@ aw-server
 ActivityWatch server, for secure storage and retrieval of all your Quantified Self data.
 
 
-## Install
+## Build and Install
 
-Install program and dependencies:
+To install program and dependencies, Poetry is required.
 
 ```bash
-sudo python3 setup.py install 
+make build
 ```
 
 The `aw-server` binary should now be available to you in your PATH (if it is set correctly).

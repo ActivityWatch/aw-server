@@ -7,3 +7,4 @@ dist
 static
 .*cache
 profiling
+.coverage

@@ -11,4 +11,3 @@ import json
 while True:
     msg = json.loads(input())
     print("{asctime} [{levelname}] {message}".format(**msg))
-

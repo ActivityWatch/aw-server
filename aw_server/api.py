@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 def get_device_id() -> str:
     path = Path(get_data_dir("aw-server")) / "device_id"
     if path.exists():
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             return f.read()
     else:
         uuid = str(uuid4())
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.write(uuid)
         return uuid
 
@@ -39,8 +39,11 @@ def check_bucket_exists(f):
     @functools.wraps(f)
     def g(self, bucket_id, *args, **kwargs):
         if bucket_id not in self.db.buckets():
-            raise NotFound("NoSuchBucket", "There's no bucket named {}".format(bucket_id))
+            raise NotFound(
+                "NoSuchBucket", "There's no bucket named {}".format(bucket_id)
+            )
         return f(self, bucket_id, *args, **kwargs)
+
     return g
 
 
@@ -53,10 +56,10 @@ class ServerAPI:
     def get_info(self) -> Dict[str, Dict]:
         """Get server info"""
         payload = {
-            'hostname': gethostname(),
-            'version': __version__,
-            'testing': self.testing,
-            'device_id': get_device_id(),
+            "hostname": gethostname(),
+            "version": __version__,
+            "testing": self.testing,
+            "device_id": get_device_id(),
         }
         return payload
 
@@ -106,18 +109,29 @@ class ServerAPI:
             type=bucket_data["type"],
             client=bucket_data["client"],
             hostname=bucket_data["hostname"],
-            created=(bucket_data["created"]
-                     if isinstance(bucket_data["created"], datetime)
-                     else iso8601.parse_date(bucket_data["created"])),
+            created=(
+                bucket_data["created"]
+                if isinstance(bucket_data["created"], datetime)
+                else iso8601.parse_date(bucket_data["created"])
+            ),
         )
-        self.create_events(bucket_id, [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]])
+        self.create_events(
+            bucket_id,
+            [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]],
+        )
 
     def import_all(self, buckets: Dict[str, Any]):
         for bid, bucket in buckets.items():
             self.import_bucket(bucket)
 
-    def create_bucket(self, bucket_id: str, event_type: str, client: str,
-                      hostname: str, created: Optional[datetime] = None)-> bool:
+    def create_bucket(
+        self,
+        bucket_id: str,
+        event_type: str,
+        client: str,
+        hostname: str,
+        created: Optional[datetime] = None,
+    ) -> bool:
         """
         Create bucket.
         Returns True if successful, otherwise false if a bucket with the given ID already existed.
@@ -131,7 +145,7 @@ class ServerAPI:
             type=event_type,
             client=client,
             hostname=hostname,
-            created=created
+            created=created,
         )
         return True
 
@@ -143,14 +157,20 @@ class ServerAPI:
         return None
 
     @check_bucket_exists
-    def get_events(self, bucket_id: str, limit: int = -1,
-                   start: datetime = None, end: datetime = None) -> List[Event]:
+    def get_events(
+        self,
+        bucket_id: str,
+        limit: int = -1,
+        start: datetime = None,
+        end: datetime = None,
+    ) -> List[Event]:
         """Get events from a bucket"""
         logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
         if limit is None:  # Let limit = None also mean "no limit"
             limit = -1
-        events = [event.to_json_dict() for event in
-                  self.db[bucket_id].get(limit, start, end)]
+        events = [
+            event.to_json_dict() for event in self.db[bucket_id].get(limit, start, end)
+        ]
         return events
 
     @check_bucket_exists
@@ -161,10 +181,13 @@ class ServerAPI:
         return self.db[bucket_id].insert(events[0] if len(events) == 1 else events)
 
     @check_bucket_exists
-    def get_eventcount(self, bucket_id: str,
-                       start: datetime = None, end: datetime = None) -> int:
+    def get_eventcount(
+        self, bucket_id: str, start: datetime = None, end: datetime = None
+    ) -> int:
         """Get eventcount from a bucket"""
-        logger.debug("Received get request for eventcount in bucket '{}'".format(bucket_id))
+        logger.debug(
+            "Received get request for eventcount in bucket '{}'".format(bucket_id)
+        )
         return self.db[bucket_id].get_eventcount(start, end)
 
     @check_bucket_exists
@@ -195,8 +218,15 @@ class ServerAPI:
 
         Inspired by: https://wakatime.com/developers#heartbeats
         """
-        logger.debug("Received heartbeat in bucket '{}'\n\ttimestamp: {}, duration: {}, pulsetime: {}\n\tdata: {}".format(
-                     bucket_id, heartbeat.timestamp, heartbeat.duration, pulsetime, heartbeat.data))
+        logger.debug(
+            "Received heartbeat in bucket '{}'\n\ttimestamp: {}, duration: {}, pulsetime: {}\n\tdata: {}".format(
+                bucket_id,
+                heartbeat.timestamp,
+                heartbeat.duration,
+                pulsetime,
+                heartbeat.data,
+            )
+        )
 
         # The endtime here is set such that in the event that the heartbeat is older than an
         # existing event we should try to merge it with the last event before the heartbeat instead.
@@ -220,16 +250,32 @@ class ServerAPI:
                 merged = heartbeat_merge(last_event, heartbeat, pulsetime)
                 if merged is not None:
                     # Heartbeat was merged into last_event
-                    logger.debug("Received valid heartbeat, merging. (bucket: {})".format(bucket_id))
+                    logger.debug(
+                        "Received valid heartbeat, merging. (bucket: {})".format(
+                            bucket_id
+                        )
+                    )
                     self.last_event[bucket_id] = merged
                     self.db[bucket_id].replace_last(merged)
                     return merged
                 else:
-                    logger.info("Received heartbeat after pulse window, inserting as new event. (bucket: {})".format(bucket_id))
+                    logger.info(
+                        "Received heartbeat after pulse window, inserting as new event. (bucket: {})".format(
+                            bucket_id
+                        )
+                    )
             else:
-                logger.debug("Received heartbeat with differing data, inserting as new event. (bucket: {})".format(bucket_id))
+                logger.debug(
+                    "Received heartbeat with differing data, inserting as new event. (bucket: {})".format(
+                        bucket_id
+                    )
+                )
         else:
-            logger.info("Received heartbeat, but bucket was previously empty, inserting as new event. (bucket: {})".format(bucket_id))
+            logger.info(
+                "Received heartbeat, but bucket was previously empty, inserting as new event. (bucket: {})".format(
+                    bucket_id
+                )
+            )
 
         self.db[bucket_id].insert(heartbeat)
         self.last_event[bucket_id] = heartbeat
@@ -238,7 +284,9 @@ class ServerAPI:
     def query2(self, name, query, timeperiods, cache):
         result = []
         for timeperiod in timeperiods:
-            period = timeperiod.split("/")[:2]  # iso8601 timeperiods are separated by a slash
+            period = timeperiod.split("/")[
+                :2
+            ]  # iso8601 timeperiods are separated by a slash
             starttime = iso8601.parse_date(period[0])
             endtime = iso8601.parse_date(period[1])
             query = str().join(query)
@@ -249,7 +297,7 @@ class ServerAPI:
     def get_log(self):
         """Get the server log in json format"""
         payload = []
-        with open(get_log_file_path(), 'r') as log_file:
+        with open(get_log_file_path(), "r") as log_file:
             for line in log_file.readlines()[::-1]:
                 payload.append(json.loads(line))
         return payload, 200

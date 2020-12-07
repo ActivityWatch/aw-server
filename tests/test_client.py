@@ -33,7 +33,7 @@ def aw_client():
 
 @pytest.fixture(scope="function")
 def bucket(aw_client):
-    bucket_id = "test-" + str(random.randint(0, 10**5))
+    bucket_id = "test-" + str(random.randint(0, 10 ** 5))
     event_type = "testevents"
     aw_client.create_bucket(bucket_id, event_type, queued=False)
     print(f"Created bucket {bucket_id}")
@@ -53,7 +53,7 @@ def queued_bucket(aw_client, bucket):
 
 def test_get_info(aw_client):
     info = aw_client.get_info()
-    assert info['testing']
+    assert info["testing"]
 
 
 def test_export(aw_client):
@@ -64,8 +64,9 @@ def test_export(aw_client):
     # print(export)
 
 
-def _create_heartbeat_events(start=datetime.now(tz=timezone.utc),
-                             delta=timedelta(seconds=1)):
+def _create_heartbeat_events(
+    start=datetime.now(tz=timezone.utc), delta=timedelta(seconds=1)
+):
     e1_ts = start
     e2_ts = e1_ts + delta
 
@@ -84,8 +85,9 @@ def _create_heartbeat_events(start=datetime.now(tz=timezone.utc),
     return e1, e2
 
 
-def _create_periodic_events(num_events, start=datetime.now(tz=timezone.utc),
-                            delta=timedelta(hours=1)):
+def _create_periodic_events(
+    num_events, start=datetime.now(tz=timezone.utc), delta=timedelta(hours=1)
+):
     events = num_events * [None]
 
     for i, dt in ((i, start + i * delta) for i in range(len(events))):
@@ -134,7 +136,12 @@ def test_queued_heartbeat(aw_client, queued_bucket):
     aw_client.heartbeat(bucket_id, e2, pulsetime=10, queued=True)
 
     # Needed because of aw_client-side heartbeat merging and delayed dispatch
-    aw_client.heartbeat(bucket_id, Event(timestamp=e2.timestamp, data={"label": "something different"}), pulsetime=0, queued=True)
+    aw_client.heartbeat(
+        bucket_id,
+        Event(timestamp=e2.timestamp, data={"label": "something different"}),
+        pulsetime=0,
+        queued=True,
+    )
 
     # Needed since the dispatcher thread might introduce some delay
     max_tries = 20
@@ -167,7 +174,9 @@ def test_send_event(aw_client, bucket):
 
 
 def test_send_events(aw_client, bucket):
-    events = _create_periodic_events(2, start=datetime.now(tz=timezone.utc) - timedelta(days=1))
+    events = _create_periodic_events(
+        2, start=datetime.now(tz=timezone.utc) - timedelta(days=1)
+    )
 
     aw_client.send_events(bucket, events)
     recv_events = aw_client.get_events(bucket)
@@ -184,14 +193,18 @@ def test_get_events_interval(aw_client, bucket):
     aw_client.send_events(bucket, events)
 
     # start kwarg isn't currently range-inclusive
-    recv_events = aw_client.get_events(bucket, limit=50, start=start_dt, end=start_dt + timedelta(days=1))
+    recv_events = aw_client.get_events(
+        bucket, limit=50, start=start_dt, end=start_dt + timedelta(days=1)
+    )
 
     assert len(recv_events) == 25
     assert recv_events == sorted(events[:25], reverse=True, key=lambda e: e.timestamp)
 
 
 def test_store_many_events(aw_client, bucket):
-    events = _create_periodic_events(1000, start=datetime.now(tz=timezone.utc) - timedelta(days=50))
+    events = _create_periodic_events(
+        1000, start=datetime.now(tz=timezone.utc) - timedelta(days=50)
+    )
 
     aw_client.send_events(bucket, events)
     recv_events = aw_client.get_events(bucket, limit=-1)
@@ -223,6 +236,8 @@ def test_midnight_heartbeats(aw_client, bucket):
     recv_events_merged = aw_client.get_events(bucket, limit=-1)
     assert len(recv_events_merged) == 4 / 5 * len(events)
 
-    recv_events_after_midnight = aw_client.get_events(bucket, start=midnight + timedelta(minutes=10))
+    recv_events_after_midnight = aw_client.get_events(
+        bucket, start=midnight + timedelta(minutes=10)
+    )
     pprint(recv_events_after_midnight)
     assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)

@@ -21,7 +21,16 @@ def detect_version_ci() -> Optional[str]:
 
 def detect_version_git() -> Optional[str]:
     try:
-        return basever + ".dev+" + str(subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip(), "utf8")
+        return (
+            basever
+            + ".dev+"
+            + str(
+                subprocess.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"]
+                ).strip(),
+                "utf8",
+            )
+        )
     except Exception as e:
         # Unable to get current commit with git
         return None
@@ -43,7 +52,7 @@ def detect_version():
     return basever + ".dev+unknown"
 
 
-__version__ = 'v0.8.dev+c6433ea'
+__version__ = "v0.8.dev+c6433ea"
 
 
 def assign_static_version():

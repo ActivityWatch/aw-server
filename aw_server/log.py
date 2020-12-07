@@ -22,4 +22,4 @@ class FlaskLogHandler(serving.WSGIRequestHandler):
             levelno = logging.DEBUG
         else:
             raise Exception("Unknown level " + type)
-        self.logger.log(levelno, '{} ({}): {}'.format(code, self.address_string(), msg))
+        self.logger.log(levelno, "{} ({}): {}".format(code, self.address_string(), msg))

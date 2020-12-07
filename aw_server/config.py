@@ -7,13 +7,13 @@ default_config["server"] = {
     "host": "localhost",
     "port": "5600",
     "storage": "peewee",
-    "cors_origins": ""
+    "cors_origins": "",
 }
 default_config["server-testing"] = {
     "host": "localhost",
     "port": "5666",
     "storage": "peewee",
-    "cors_origins": ""
+    "cors_origins": "",
 }
 
 config = load_config("aw-server", default_config)

@@ -23,8 +23,8 @@ SECURITY_ENABLED = False
 # For the planned zeroknowledge storage feature
 ZEROKNOWLEDGE_ENABLED = False
 
-blueprint = Blueprint('api', __name__, url_prefix='/api')
-api = Api(blueprint, doc='/')
+blueprint = Blueprint("api", __name__, url_prefix="/api")
+api = Api(blueprint, doc="/")
 
 
 # TODO: Clean up JSONEncoder code?
@@ -53,43 +53,59 @@ class AnyJson(fields.Raw):
 
 
 # Loads event and bucket schema from JSONSchema in aw_core
-event = api.schema_model('Event', schema.get_json_schema("event"))
-bucket = api.schema_model('Bucket', schema.get_json_schema("bucket"))
-buckets_export = api.schema_model('Export', schema.get_json_schema("export"))
+event = api.schema_model("Event", schema.get_json_schema("event"))
+bucket = api.schema_model("Bucket", schema.get_json_schema("bucket"))
+buckets_export = api.schema_model("Export", schema.get_json_schema("export"))
 
 # TODO: Construct all the models from JSONSchema?
 #       A downside to contructing from JSONSchema: flask-restplus does not have marshalling support
 
-info = api.model('Info', {
-    'hostname': fields.String(),
-    'version': fields.String(),
-    'testing': fields.Boolean(),
-    'device_id': fields.String(),
-})
+info = api.model(
+    "Info",
+    {
+        "hostname": fields.String(),
+        "version": fields.String(),
+        "testing": fields.Boolean(),
+        "device_id": fields.String(),
+    },
+)
 
-create_bucket = api.model('CreateBucket', {
-    'client': fields.String(required=True),
-    'type': fields.String(required=True),
-    'hostname': fields.String(required=True),
-})
+create_bucket = api.model(
+    "CreateBucket",
+    {
+        "client": fields.String(required=True),
+        "type": fields.String(required=True),
+        "hostname": fields.String(required=True),
+    },
+)
 
-query = api.model('Query', {
-    'timeperiods': fields.List(fields.String, required=True, description='List of periods to query'),
-    'query': fields.List(fields.String, required=True, description='String list of query statements'),
-})
+query = api.model(
+    "Query",
+    {
+        "timeperiods": fields.List(
+            fields.String, required=True, description="List of periods to query"
+        ),
+        "query": fields.List(
+            fields.String, required=True, description="String list of query statements"
+        ),
+    },
+)
 
 
 def copy_doc(api_method):
     """Decorator that copies another functions docstring to the decorated function.
-       Used to copy the docstrings in ServerAPI over to the flask-restplus Resources.
-       (The copied docstrings are then used by flask-restplus/swagger)"""
+    Used to copy the docstrings in ServerAPI over to the flask-restplus Resources.
+    (The copied docstrings are then used by flask-restplus/swagger)"""
+
     def decorator(f):
         f.__doc__ = api_method.__doc__
         return f
+
     return decorator
 
 
 # SERVER INFO
+
 
 @api.route("/0/info")
 class InfoResource(Resource):
@@ -100,6 +116,7 @@ class InfoResource(Resource):
 
 
 # BUCKETS
+
 
 @api.route("/0/buckets/")
 class BucketsResource(Resource):
@@ -120,7 +137,12 @@ class BucketResource(Resource):
     @copy_doc(ServerAPI.create_bucket)
     def post(self, bucket_id):
         data = request.get_json()
-        bucket_created = current_app.api.create_bucket(bucket_id, event_type=data["type"], client=data["client"], hostname=data["hostname"])
+        bucket_created = current_app.api.create_bucket(
+            bucket_id,
+            event_type=data["type"],
+            client=data["client"],
+            hostname=data["hostname"],
+        )
         if bucket_created:
             return {}, 200
         else:
@@ -141,6 +163,7 @@ class BucketResource(Resource):
 
 # EVENTS
 
+
 @api.route("/0/buckets/<string:bucket_id>/events")
 class EventsResource(Resource):
     # For some reason this doesn't work with the JSONSchema variant
@@ -157,7 +180,9 @@ class EventsResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        events = current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)
+        events = current_app.api.get_events(
+            bucket_id, limit=limit, start=start, end=end
+        )
         return events, 200
 
     # TODO: How to tell expect that it could be a list of events? Until then we can't use validate.
@@ -165,7 +190,11 @@ class EventsResource(Resource):
     @copy_doc(ServerAPI.create_events)
     def post(self, bucket_id):
         data = request.get_json()
-        logger.debug("Received post request for event in bucket '{}' and data: {}".format(bucket_id, data))
+        logger.debug(
+            "Received post request for event in bucket '{}' and data: {}".format(
+                bucket_id, data
+            )
+        )
 
         if isinstance(data, dict):
             events = [Event(**data)]
@@ -206,7 +235,11 @@ class EventResource(Resource):
 
     @copy_doc(ServerAPI.delete_event)
     def delete(self, bucket_id, event_id):
-        logger.debug("Received delete request for event with id '{}' in bucket '{}'".format(event_id, bucket_id))
+        logger.debug(
+            "Received delete request for event with id '{}' in bucket '{}'".format(
+                event_id, bucket_id
+            )
+        )
         success = current_app.api.delete_event(bucket_id, event_id)
         return {"success": success}, 200
 
@@ -214,7 +247,9 @@ class EventResource(Resource):
 @api.route("/0/buckets/<string:bucket_id>/heartbeat")
 class HeartbeatResource(Resource):
     @api.expect(event, validate=True)
-    @api.param("pulsetime", "Largest timewindow allowed between heartbeats for them to merge")
+    @api.param(
+        "pulsetime", "Largest timewindow allowed between heartbeats for them to merge"
+    )
     @copy_doc(ServerAPI.heartbeat)
     def post(self, bucket_id):
         heartbeat = Event(**request.get_json())
@@ -230,6 +265,7 @@ class HeartbeatResource(Resource):
 
 # QUERY
 
+
 @api.route("/0/query/")
 class QueryResource(Resource):
     # TODO Docs
@@ -241,7 +277,9 @@ class QueryResource(Resource):
             name = request.args["name"]
         query = request.get_json()
         try:
-            result = current_app.api.query2(name, query["query"], query["timeperiods"], False)
+            result = current_app.api.query2(
+                name, query["query"], query["timeperiods"], False
+            )
             return jsonify(result)
         except QueryException as qe:
             traceback.print_exc()
@@ -260,7 +298,9 @@ class ExportAllResource(Resource):
         payload = {"buckets": buckets_export}
         response = make_response(json.dumps(payload))
         filename = "aw-buckets-export.json"
-        response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
+        response.headers["Content-Disposition"] = "attachment; filename={}".format(
+            filename
+        )
         return response
 
 
@@ -274,7 +314,9 @@ class BucketExportResource(Resource):
         payload = {"buckets": {bucket_export["id"]: bucket_export}}
         response = make_response(json.dumps(payload))
         filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
-        response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
+        response.headers["Content-Disposition"] = "attachment; filename={}".format(
+            filename
+        )
         return response
 
 
@@ -298,6 +340,7 @@ class ImportAllResource(Resource):
 
 
 # LOGGING
+
 
 @api.route("/0/log")
 class LogResource(Resource):

@@ -16,9 +16,9 @@ from . import rest
 logger = logging.getLogger(__name__)
 
 app_folder = os.path.dirname(os.path.abspath(__file__))
-static_folder = os.path.join(app_folder, 'static')
+static_folder = os.path.join(app_folder, "static")
 
-root = Blueprint('root', __name__, url_prefix='/')
+root = Blueprint("root", __name__, url_prefix="/")
 
 
 class AWFlask(Flask):
@@ -30,10 +30,10 @@ class AWFlask(Flask):
 
 
 def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
-    app = AWFlask("aw-server", static_folder=static_folder, static_url_path='')
+    app = AWFlask("aw-server", static_folder=static_folder, static_url_path="")
 
     if storage_method is None:
-        storage_method = aw_datastore.get_storage_methods()['memory']
+        storage_method = aw_datastore.get_storage_methods()["memory"]
 
     # Only pretty-print JSON if in testing mode (because of performance)
     app.config["JSONIFY_PRETTYPRINT_REGULAR"] = testing
@@ -54,23 +54,27 @@ def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
 
 @root.route("/")
 def static_root():
-    return current_app.send_static_file('index.html')
-    return send_from_directory('/', 'index.html')
+    return current_app.send_static_file("index.html")
+    return send_from_directory("/", "index.html")
 
 
 @root.route("/css/<path:path>")
 def static_css(path):
-    return send_from_directory(static_folder + '/css', path)
+    return send_from_directory(static_folder + "/css", path)
 
 
 @root.route("/js/<path:path>")
 def static_js(path):
-    return send_from_directory(static_folder + '/js', path)
+    return send_from_directory(static_folder + "/js", path)
 
 
 def _config_cors(cors_origins: List[str], testing: bool):
     if cors_origins:
-        logger.warning('Running with additional allowed CORS origins specified through config or CLI argument (could be a security risk): {}'.format(cors_origins))
+        logger.warning(
+            "Running with additional allowed CORS origins specified through config or CLI argument (could be a security risk): {}".format(
+                cors_origins
+            )
+        )
 
     if testing:
         # Used for development of aw-webui
@@ -85,10 +89,25 @@ def _config_cors(cors_origins: List[str], testing: bool):
 
 
 # Only to be called from aw_server.main function!
-def _start(storage_method, host: str, port: int, testing: bool=False, cors_origins: List[str] = []):
-    app = create_app(storage_method=storage_method, testing=testing, cors_origins=cors_origins)
+def _start(
+    storage_method,
+    host: str,
+    port: int,
+    testing: bool = False,
+    cors_origins: List[str] = [],
+):
+    app = create_app(
+        storage_method=storage_method, testing=testing, cors_origins=cors_origins
+    )
     try:
-        app.run(debug=testing, host=host, port=port, request_handler=FlaskLogHandler, use_reloader=False, threaded=False)
+        app.run(
+            debug=testing,
+            host=host,
+            port=port,
+            request_handler=FlaskLogHandler,
+            use_reloader=False,
+            threaded=False,
+        )
     except OSError as e:
         logger.error(str(e))
         raise e

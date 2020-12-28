@@ -19,7 +19,7 @@ install:
 
 test:
 	python -c 'import aw_server'
-	python -m pytest --cov aw_server tests/test_server.py
+	python -m pytest tests/test_server.py
 
 typecheck:
 	python -m mypy aw_server --ignore-missing-imports

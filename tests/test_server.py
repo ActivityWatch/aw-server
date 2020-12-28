@@ -20,6 +20,12 @@ def bucket(flask_client):
         assert r.status_code == 200
 
 
+def test_info(flask_client):
+    r = flask_client.get("/api/0/info")
+    assert r.status_code == 200
+    assert r.json["testing"]
+
+
 def test_buckets(flask_client, bucket, benchmark):
     @benchmark
     def list_buckets():

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aw-server"
-version = "0.9"
+version = "0.10"
 description = ""
 authors = ["Erik Bjäreholt <erik@bjareho.lt>"]
 license = "MPL-2.0"

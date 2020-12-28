@@ -5,7 +5,7 @@ import pkg_resources
 import re
 
 
-basever = "v0.9"
+basever = "v0.10"
 
 
 def detect_version_ci() -> Optional[str]:
@@ -31,7 +31,7 @@ def detect_version_git() -> Optional[str]:
                 "utf8",
             )
         )
-    except Exception as e:
+    except Exception:
         # Unable to get current commit with git
         return None
 
@@ -52,7 +52,7 @@ def detect_version():
     return basever + ".dev+unknown"
 
 
-__version__ = "v0.8.dev+c6433ea"
+__version__ = 'v0.10.dev+32e3624'
 
 
 def assign_static_version():

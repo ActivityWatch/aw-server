@@ -178,7 +178,7 @@ class ServerAPI:
         """Create events for a bucket. Can handle both single events and multiple ones.
 
         Returns the inserted event when a single event was inserted, otherwise None."""
-        return self.db[bucket_id].insert(events[0] if len(events) == 1 else events)
+        return self.db[bucket_id].insert(events)
 
     @check_bucket_exists
     def get_eventcount(

@@ -52,7 +52,7 @@ def detect_version():
     return basever + ".dev+unknown"
 
 
-__version__ = 'v0.10.dev+32e3624'
+__version__ = "v0.10.dev+32e3624"
 
 
 def assign_static_version():

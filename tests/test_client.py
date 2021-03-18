@@ -168,9 +168,9 @@ def test_list_buckets(aw_client, bucket):
 
 def test_send_event(aw_client, bucket):
     event = Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"})
-    recv_event = aw_client.send_event(bucket, event)
-    assert recv_event.id is not None
-    assert recv_event == event
+    aw_client.send_event(bucket, event)
+    recv_events = aw_client.get_events(bucket, limit=1)
+    assert recv_events == [event]
 
 
 def test_send_events(aw_client, bucket):

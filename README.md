@@ -5,18 +5,16 @@ aw-server
 [![Coverage Status](https://codecov.io/gh/ActivityWatch/aw-server/branch/master/graph/badge.svg)](https://codecov.io/gh/ActivityWatch/aw-server)
 
 
-ActivityWatch server, for secure storage and retrieval of all your Quantified Self data.
+ActivityWatch server, for secure storage and retrieval of all your Quantified Self data. This is being replaced by a rust-based implementation and will be deprecated.
 
 
 ## Build and Install
 
-To install program and dependencies, Poetry is required.
+To install program and dependencies, Poetry is required. You'll want to activate a `venv` before building.
 
 ```bash
 make build
 ```
-
-The `aw-server` binary should now be available to you in your PATH (if it is set correctly).
 
 
 ## Usage
@@ -29,9 +27,9 @@ aw-server
 
 ## Development
 
-If you want to run aw-server in development, you probably want to run a 
-development instance beside your personal (stable) instance. You can do 
-this by giving aw-server the `--testing` flag. This will start the server 
+If you want to run aw-server in development, you probably want to run a
+development instance beside your personal (stable) instance. You can do
+this by giving aw-server the `--testing` flag. This will start the server
 on another port and use a seperate datastore.
 
 ```bash

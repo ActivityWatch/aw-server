@@ -18,6 +18,7 @@ To install program and dependencies, Poetry is required. You'll want to activate
 make build
 ```
 
+The `aw-server` binary should now be available to you in your PATH (if it is set correctly).
 
 ## Usage
 

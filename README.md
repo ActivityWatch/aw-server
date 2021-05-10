@@ -5,7 +5,9 @@ aw-server
 [![Coverage Status](https://codecov.io/gh/ActivityWatch/aw-server/branch/master/graph/badge.svg)](https://codecov.io/gh/ActivityWatch/aw-server)
 
 
-ActivityWatch server, for secure storage and retrieval of all your Quantified Self data. This is being replaced by a rust-based implementation and will be deprecated.
+ActivityWatch server, for secure storage and retrieval of all your Quantified Self data.
+
+**Note:** In the future this will no longer be the default server used by ActivityWatch, instead we will be using [aw-server-rust](https://github.com/ActivityWatch/aw-server-rust/). The fate of this repo is uncertain, but it will likely be around and maintained for a while (as a reference implementation, for prototyping, etc).
 
 
 ## Build and Install
@@ -42,5 +44,4 @@ aw-server --testing
 You can also get a very decent API browser by browsing to `localhost:5600` after starting the server.
 
 There are also some API examples in the [documentation](https://activitywatch.readthedocs.io/en/latest/api-reference.html).
-
 

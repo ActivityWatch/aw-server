@@ -80,7 +80,7 @@ def parse_settings():
     configsection = "server" if not args.testing else "server-testing"
     settings = argparse.Namespace()
     settings.host = config[configsection]["host"]
-    settings.port = config[configsection].getint("port")
+    settings.port = int(config[configsection]["port"])
     settings.storage = config[configsection]["storage"]
     settings.cors_origins = config[configsection]["cors_origins"]
 

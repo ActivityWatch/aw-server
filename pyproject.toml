@@ -9,9 +9,9 @@ license = "MPL-2.0"
 aw-server = "aw_server:main"
 
 [tool.poetry.dependencies]
-python = "^3.6"
-aw-core = {git = "https://github.com/ActivityWatch/aw-core.git"}
-aw-client = {git = "https://github.com/ActivityWatch/aw-client.git"}
+python = "^3.7"
+aw-core = "^0.5"
+aw-client = "^0.5"
 appdirs = "^1.4.3"
 flask = "^1.1.1"
 flask-restx = "^0.2.0"

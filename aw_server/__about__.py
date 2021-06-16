@@ -42,7 +42,10 @@ def detect_version_ci() -> Optional[str]:
             cwd=workdir,
         )
         if p.stderr:
-            if "no tag exactly matches" in p.stderr:
+            if (
+                "no tag exactly matches" in p.stderr
+                or "No names found, cannot describe anything" in p.stderr
+            ):
                 pass
             else:
                 raise Exception(p.stderr)

@@ -16,12 +16,12 @@ projectpath = srcpath.parent
 bundlepath = projectpath.parent  # the ActivityWatch bundle repo, in some circumstances
 
 # This line set by script when run (metaprogramming)
-__version__ = "v0.11.0b1.dev+98fd120"
+__version__ = "v0.11.0b1.dev+65b8c8f"
 
 
 def get_rev():
     p = subprocess.run(
-        "git rev-parse HEAD",
+        "git rev-parse --short HEAD",
         shell=True,
         capture_output=True,
         encoding="utf8",
@@ -30,70 +30,65 @@ def get_rev():
     return p.stdout.strip()
 
 
-def detect_version_ci() -> Optional[str]:
-    # always set to true in GitHub actions
-    if os.environ.get("CI", False) == "true":
-        # GitHub Actions build
-        rev = get_rev()
-        p = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0", "--exact-match", rev],
-            capture_output=True,
-            encoding="utf8",
-            cwd=workdir,
-        )
-        if p.stderr:
-            if (
-                "no tag exactly matches" in p.stderr
-                or "No names found, cannot describe anything" in p.stderr
-            ):
-                pass
-            else:
-                raise Exception(p.stderr)
+def get_tag_exact():
+    rev = get_rev()
+    p = subprocess.run(
+        ["git", "describe", "--tags", "--abbrev=0", "--exact-match", rev],
+        capture_output=True,
+        encoding="utf8",
+        cwd=workdir,
+    )
+    if p.stderr:
+        if (
+            "no tag exactly matches" in p.stderr
+            or "No names found, cannot describe anything" in p.stderr
+        ):
+            pass
         else:
-            return p.stdout.strip()
-
-    for env_var in ["TRAVIS_TAG", "APPVEYOR_REPO_TAG_NAME"]:
-        if env_var in os.environ:
-            return os.environ[env_var]
-    for env_var in ["TRAVIS_COMMIT", "APPVEYOR_REPO_COMMIT"]:
-        # TODO: Add build number/id
-        if env_var in os.environ:
-            return basever + "+commit." + os.environ[env_var]
-    return None
+            raise Exception(p.stderr)
+    else:
+        return p.stdout.strip()
 
 
-def detect_version_git() -> Optional[str]:
+def get_tag_latest():
     try:
         tag = subprocess.check_output(
             ["git", "describe", "--abbrev=0", "--tags"], encoding="utf8", cwd=workdir
         ).strip()
         if tag:
             basever = tag
-        return (
-            basever
-            + ".dev+"
-            + str(
-                subprocess.check_output(
-                    ["git", "rev-parse", "--short", "HEAD"], cwd=workdir
-                ).strip(),
-                "utf8",
-            )
-        )
+    except subprocess.CalledProcessError as e:
+        print(e)
+        return
+
+    try:
+        return f"{basever}.dev+{get_rev()}"
     except Exception as e:
         # Unable to get current commit with git
         logger.exception(e)
         return None
 
 
+def detect_version_git() -> Optional[str]:
+    # Returns an exact tag if there is one, or an approximate one + commit identifier
+    version = get_tag_exact()
+    if version:
+        return version
+
+    version = get_tag_latest()
+    if version:
+        return version
+
+
 def detect_version_pkg() -> Optional[str]:
     try:
-        return pkg_resources.get_distribution("aw-server").version
+        return f"v{pkg_resources.get_distribution('aw-server').version}.dev+{get_rev()}"
     except pkg_resources.DistributionNotFound:
         return None
 
 
 def detect_version():
-    for detectfunc in (detect_version_ci, detect_version_git, detect_version_pkg):
+    for detectfunc in (detect_version_git, detect_version_pkg):
         version = detectfunc()
         if version:
             return version
@@ -126,5 +121,4 @@ if __name__ == "__main__":
 
     print("By method:")
     print(f"  git: {detect_version_git()}")
-    print(f"  ci:  {detect_version_ci()}")
     print(f"  pkg: {detect_version_pkg()}")

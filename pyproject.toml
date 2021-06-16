@@ -23,6 +23,9 @@ pytest = "^6.0"
 pytest-flask = "^0.15.0"
 pytest-benchmark = "^3.2.2"
 pytest-cov = "^2.10.1"
+types-Werkzeug = "^1.0.1"
+types-pkg-resources = "^0.1.2"
+types-Flask = "^1.1.0"
 
 [tool.pytest.ini_options]
 minversion = "6.0"

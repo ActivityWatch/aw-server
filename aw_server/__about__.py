@@ -24,6 +24,7 @@ def get_rev():
         "git rev-parse HEAD",
         shell=True,
         capture_output=True,
+        encoding="utf8",
         cwd=workdir,
     )
     return p.stdout.strip()

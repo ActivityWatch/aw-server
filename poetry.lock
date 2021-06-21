@@ -59,11 +59,11 @@ description = "Core library for ActivityWatch"
 name = "aw-core"
 optional = false
 python-versions = ">=3.7,<4.0"
-version = "0.5.3"
+version = "0.5.4"
 
 [package.dependencies]
 appdirs = ">=1.4.3,<2.0.0"
-deprecation = ">=2.0.7,<3.0.0"
+deprecation = "*"
 iso8601 = ">=0.1.12,<0.2.0"
 jsonschema = ">=3.1,<4.0"
 peewee = ">=3.0.0,<4.0.0"
@@ -71,7 +71,7 @@ python-json-logger = ">=0.1.11,<0.2.0"
 strict-rfc3339 = ">=0.7,<0.8"
 TakeTheTime = ">=0.3.1,<0.4.0"
 timeslot = "*"
-tomlkit = ">=0.6.0,<0.7.0"
+tomlkit = "*"
 
 [package.extras]
 mongo = ["pymongo (>=3.10.0,<4.0.0)"]
@@ -525,8 +525,8 @@ category = "main"
 description = "Style preserving TOML library"
 name = "tomlkit"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
-version = "0.6.0"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+version = "0.7.2"
 
 [[package]]
 category = "dev"
@@ -542,7 +542,7 @@ description = "Typing stubs for click"
 name = "types-click"
 optional = false
 python-versions = "*"
-version = "7.1.1"
+version = "7.1.2"
 
 [[package]]
 category = "dev"
@@ -550,7 +550,7 @@ description = "Typing stubs for Flask"
 name = "types-flask"
 optional = false
 python-versions = "*"
-version = "1.1.0"
+version = "1.1.1"
 
 [package.dependencies]
 types-click = "*"
@@ -563,7 +563,7 @@ description = "Typing stubs for Jinja2"
 name = "types-jinja2"
 optional = false
 python-versions = "*"
-version = "2.11.1"
+version = "2.11.2"
 
 [package.dependencies]
 types-MarkupSafe = "*"
@@ -574,7 +574,7 @@ description = "Typing stubs for MarkupSafe"
 name = "types-markupsafe"
 optional = false
 python-versions = "*"
-version = "1.1.2"
+version = "1.1.3"
 
 [[package]]
 category = "dev"
@@ -582,7 +582,7 @@ description = "Typing stubs for pkg_resources"
 name = "types-pkg-resources"
 optional = false
 python-versions = "*"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 category = "dev"
@@ -590,7 +590,7 @@ description = "Typing stubs for Werkzeug"
 name = "types-werkzeug"
 optional = false
 python-versions = "*"
-version = "1.0.1"
+version = "1.0.2"
 
 [[package]]
 category = "main"
@@ -664,8 +664,8 @@ aw-client = [
     {file = "aw_client-0.5.4-py3-none-any.whl", hash = "sha256:5a3a12ab6771cbc95c08fa631e069f058781aa8b66e5c1985ca51a87f8f38efe"},
 ]
 aw-core = [
-    {file = "aw-core-0.5.3.tar.gz", hash = "sha256:6f7867103ebb8b07bf788ed02fd55dee51d1038f2a3a0e9fd82d1a7897bf6acb"},
-    {file = "aw_core-0.5.3-py3-none-any.whl", hash = "sha256:0d7f361d234476ee4198c19819c2cd84551c69d99169b08491d8d926fd5a78fc"},
+    {file = "aw-core-0.5.4.tar.gz", hash = "sha256:0450eb4958330021d6e65a11da41e41e534d504fcde188114eb06fca6fb4ea20"},
+    {file = "aw_core-0.5.4-py3-none-any.whl", hash = "sha256:0b3324b4f8913506c467e6519ceccacf05a39bc095217ce86a0a4e40460c1acc"},
 ]
 certifi = [
     {file = "certifi-2021.5.30-py2.py3-none-any.whl", hash = "sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8"},
@@ -921,8 +921,8 @@ toml = [
     {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
 ]
 tomlkit = [
-    {file = "tomlkit-0.6.0-py2.py3-none-any.whl", hash = "sha256:e5d5f20809c2b09276a6c5d98fb0202325aee441a651db84ac12e0812ab7e569"},
-    {file = "tomlkit-0.6.0.tar.gz", hash = "sha256:74f976908030ff164c0aa1edabe3bf83ea004b3daa5b0940b9c86a060c004e9a"},
+    {file = "tomlkit-0.7.2-py2.py3-none-any.whl", hash = "sha256:173ad840fa5d2aac140528ca1933c29791b79a374a0861a80347f42ec9328117"},
+    {file = "tomlkit-0.7.2.tar.gz", hash = "sha256:d7a454f319a7e9bd2e249f239168729327e4dd2d27b17dc68be264ad1ce36754"},
 ]
 typed-ast = [
     {file = "typed_ast-1.4.3-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:2068531575a125b87a41802130fa7e29f26c09a2833fea68d9a40cf33902eba6"},
@@ -957,22 +957,28 @@ typed-ast = [
     {file = "typed_ast-1.4.3.tar.gz", hash = "sha256:fb1bbeac803adea29cedd70781399c99138358c26d05fcbd23c13016b7f5ec65"},
 ]
 types-click = [
-    {file = "types_click-7.1.1-py2.py3-none-any.whl", hash = "sha256:b1db0fb31a6d4a31c4282c231827cbdab628b0d504b016937822d943cd5e40a5"},
+    {file = "types-click-7.1.2.tar.gz", hash = "sha256:040897284e4f9466825c3865f708a985a8e7ba4d8e22cb9198ffb7b522160850"},
+    {file = "types_click-7.1.2-py2.py3-none-any.whl", hash = "sha256:4722746f1ec9fd3fc8b1d7fb8c840604dc22f9e32bcc7a31a36d6d85cc2bce24"},
 ]
 types-flask = [
-    {file = "types_Flask-1.1.0-py2.py3-none-any.whl", hash = "sha256:0d16fbd554b274d003761b10bb06e86aa535b122cd98b0a8e45082750c54e35b"},
+    {file = "types-Flask-1.1.1.tar.gz", hash = "sha256:90afe8bd050cf8830cdc620bb9aa4471836b86af88e4d33fccc8789242a661e2"},
+    {file = "types_Flask-1.1.1-py2.py3-none-any.whl", hash = "sha256:4885fd9c64756b0901d3de0a197d0ede60df114d0fbab500aa1bd73bb2c1651c"},
 ]
 types-jinja2 = [
-    {file = "types_Jinja2-2.11.1-py2.py3-none-any.whl", hash = "sha256:84f66a2612376ff3c1656198b10a04c7711b6d917d4f5f7f2c2f7ecec0afa040"},
+    {file = "types-Jinja2-2.11.2.tar.gz", hash = "sha256:5b53d2b8bc6dd6dfbc0ae3e33e346fbe343cbeba1ed528858749e2a2ffe0e143"},
+    {file = "types_Jinja2-2.11.2-py2.py3-none-any.whl", hash = "sha256:d27e112a8add449407de235f4533239149056327c8bddc6b0d6bf80cd7280c16"},
 ]
 types-markupsafe = [
-    {file = "types_MarkupSafe-1.1.2-py2.py3-none-any.whl", hash = "sha256:b5e311cb6aad7f6da0bb1455494305e2bb7941b04c3c8cf9ed7bbd33cf8ba374"},
+    {file = "types-MarkupSafe-1.1.3.tar.gz", hash = "sha256:be8975ba91bd7e672f6f57753ca7ba2979ad9b6687a0e93dd2055926f8c71b0b"},
+    {file = "types_MarkupSafe-1.1.3-py2.py3-none-any.whl", hash = "sha256:b1893d090c72204110c232d9b964d2612e15deff738bb75360030473a45cbc0e"},
 ]
 types-pkg-resources = [
-    {file = "types_pkg_resources-0.1.2-py2.py3-none-any.whl", hash = "sha256:42d640500de564f1ccc21f918117afadf78039e4fa7f513c647ccf742d609aeb"},
+    {file = "types-pkg_resources-0.1.3.tar.gz", hash = "sha256:834a9b8d3dbea343562fd99d5d3359a726f6bf9d3733bccd2b4f3096fbab9dae"},
+    {file = "types_pkg_resources-0.1.3-py2.py3-none-any.whl", hash = "sha256:0cb9972cee992249f93fff1a491bf2dc3ce674e5a1926e27d4f0866f7d9b6d9c"},
 ]
 types-werkzeug = [
-    {file = "types_Werkzeug-1.0.1-py2.py3-none-any.whl", hash = "sha256:51dca6aa5be250e5b2e3150c8ab40e531408e4684db7054d02b5b8dcd2a193cd"},
+    {file = "types-Werkzeug-1.0.2.tar.gz", hash = "sha256:7f6d4c8771a67d44e83134d56e59b482bf81ebd28e6557015fdfcc81e3d11b53"},
+    {file = "types_Werkzeug-1.0.2-py2.py3-none-any.whl", hash = "sha256:1a4e551955e6fc608cf6b93a2749963b9cce5ff56cddfc90404af1c919afa937"},
 ]
 typing-extensions = [
     {file = "typing_extensions-3.10.0.0-py2-none-any.whl", hash = "sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497"},

@@ -9,7 +9,7 @@ license = "MPL-2.0"
 aw-server = "aw_server:main"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 aw-core = "^0.5"
 aw-client = "^0.5"
 appdirs = "^1.4.3"

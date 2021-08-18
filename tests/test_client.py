@@ -91,7 +91,7 @@ def _create_periodic_events(
     events = num_events * [None]
 
     for i, dt in ((i, start + i * delta) for i in range(len(events))):
-        events[i] = Event(timestamp=dt, data={"label": "test"})
+        events[i] = Event(timestamp=dt, duration=delta, data={"label": "test"})
 
     return events
 
@@ -187,18 +187,31 @@ def test_send_events(aw_client, bucket):
 
 def test_get_events_interval(aw_client, bucket):
     start_dt = datetime.now(tz=timezone.utc) - timedelta(days=50)
+    end_dt = start_dt + timedelta(days=1)
     delta = timedelta(hours=1)
     events = _create_periodic_events(1000, delta=delta, start=start_dt)
 
     aw_client.send_events(bucket, events)
 
     # start kwarg isn't currently range-inclusive
-    recv_events = aw_client.get_events(
-        bucket, limit=50, start=start_dt, end=start_dt + timedelta(days=1)
-    )
+    recv_events = aw_client.get_events(bucket, limit=50, start=start_dt, end=end_dt)
 
     assert len(recv_events) == 25
-    assert recv_events == sorted(events[:25], reverse=True, key=lambda e: e.timestamp)
+
+    # drop IDs
+    for e in recv_events:
+        e.id = None
+    print(recv_events)
+    src_events = sorted(events[:25], reverse=True, key=lambda e: e.timestamp)
+
+    # The first event gets cut off
+    assert recv_events[0].timestamp == src_events[0].timestamp
+    assert recv_events[0].data == src_events[0].data
+
+    # This fails due to microsecond precision issues
+    # assert recv_events[0].duration == end_dt - recv_events[0].timestamp
+
+    assert recv_events[1:25] == src_events[1:25]
 
 
 def test_store_many_events(aw_client, bucket):

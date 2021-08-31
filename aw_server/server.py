@@ -7,11 +7,11 @@ from flask_cors import CORS
 
 import aw_datastore
 from aw_datastore import Datastore
+from .custom_watcher_pages import get_custom_watcher_blueprint
 
 from .log import FlaskLogHandler
 from .api import ServerAPI
 from . import rest
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
 
     app.register_blueprint(root)
     app.register_blueprint(rest.blueprint)
+    app.register_blueprint(get_custom_watcher_blueprint(testing))
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)
@@ -55,7 +56,6 @@ def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
 @root.route("/")
 def static_root():
     return current_app.send_static_file("index.html")
-    return send_from_directory("/", "index.html")
 
 
 @root.route("/css/<path:path>")
@@ -90,11 +90,11 @@ def _config_cors(cors_origins: List[str], testing: bool):
 
 # Only to be called from aw_server.main function!
 def _start(
-    storage_method,
-    host: str,
-    port: int,
-    testing: bool = False,
-    cors_origins: List[str] = [],
+        storage_method,
+        host: str,
+        port: int,
+        testing: bool = False,
+        cors_origins: List[str] = [],
 ):
     app = create_app(
         storage_method=storage_method, testing=testing, cors_origins=cors_origins

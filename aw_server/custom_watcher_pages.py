@@ -1,6 +1,6 @@
 import logging
 
-from flask import Blueprint, send_from_directory, jsonify, request, current_app
+from flask import Blueprint, send_from_directory, jsonify, request, current_app, escape
 from iso8601 import iso8601
 
 from aw_core.manager import Manager
@@ -60,6 +60,6 @@ def get_custom_watcher_blueprint(testing):
         if name in custom_watcher_static_directories:
             return send_from_directory(custom_watcher_static_directories[name], path)
         else:
-            return f"Static content: {path} of watcher: {name} not found!", 404
+            return f"Static content: {escape(path)} of watcher: {escape(name)} not found!", 404
 
     return custom_watcher_blueprint

@@ -45,16 +45,19 @@ def get_custom_watcher_blueprint(testing):
 
         buckets = current_app.api.get_buckets().keys()
         custom_page_data = {
-            watcher_name: current_app.api.get_events(get_bucket_name_from_watcher_name(buckets, watcher_name), start=start, end=end)
+            watcher_name: current_app.api.get_events(get_bucket_name_from_watcher_name(buckets, watcher_name),
+                                                     start=start, end=end)
             for watcher_name in custom_watcher_static_directories.keys()
         }
         return jsonify(custom_page_data)
 
-    @custom_watcher_blueprint.route("pages/<string:name>")
-    def custom_watcher_pages(name: str):
+    @custom_watcher_blueprint.route("pages/<string:name>/", defaults={'path': 'index.html'})
+    @custom_watcher_blueprint.route("pages/<string:name>/<path:path>")
+    def custom_watcher_pages(name: str, path: str):
+        print(name, path)
         if name in custom_watcher_static_directories:
-            return send_from_directory(custom_watcher_static_directories[name], "index.html")
+            return send_from_directory(custom_watcher_static_directories[name], path)
         else:
-            return "Watcher not found!", 404
+            return f"Static content: {path} of watcher: {name} not found!", 404
 
     return custom_watcher_blueprint

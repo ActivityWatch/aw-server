@@ -20,17 +20,19 @@ def get_custom_watcher_blueprint(testing):
 
     custom_watcher_static_directories = dict()
 
-    _manager = Manager(testing=testing)
-    for module in _manager.modules_bundled:
+    _manager = Manager(testing=testing, use_parent_parent=True)
+
+    logger.info(f"Searching for watchers with page support...")
+
+    for module in _manager.modules:
         static_dir, name = module.static_directory, module.name
 
-        logger.info(f"Searching for watchers with page support...")
-
-        if static_dir is not None:
-            logger.info(f" - Found page support for watcher {name}")
-            custom_watcher_static_directories[name] = module.static_directory
-        else:
-            logger.info(f" - No static folder found in {name}")
+        if name.startswith("aw-watcher"):
+            if static_dir is not None:
+                logger.info(f" - Found page support for watcher {name}")
+                custom_watcher_static_directories[name] = module.static_directory
+            else:
+                logger.info(f" - No static folder found in {name}")
 
     custom_watcher_blueprint = Blueprint("custom_watcher", __name__, url_prefix="/watcher")
 

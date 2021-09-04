@@ -3,8 +3,6 @@ import logging
 from flask import Blueprint, send_from_directory, jsonify, request, current_app, escape
 from iso8601 import iso8601
 
-from aw_core.manager import Manager
-
 
 def get_bucket_name_from_watcher_name(buckets, watcher_name: str):
     for bucket in buckets:
@@ -15,25 +13,7 @@ def get_bucket_name_from_watcher_name(buckets, watcher_name: str):
     return None
 
 
-def get_custom_watcher_blueprint(testing):
-    logger = logging.getLogger(__name__)
-
-    custom_watcher_static_directories = dict()
-
-    _manager = Manager(testing=testing, use_parent_parent=True)
-
-    logger.info(f"Searching for watchers with page support...")
-
-    for module in _manager.modules:
-        static_dir, name = module.static_directory, module.name
-
-        if name.startswith("aw-watcher"):
-            if static_dir is not None:
-                logger.info(f" - Found page support for watcher {name}")
-                custom_watcher_static_directories[name] = module.static_directory
-            else:
-                logger.info(f" - No static folder found in {name}")
-
+def get_custom_watcher_blueprint(custom_watcher_static_directories):
     custom_watcher_blueprint = Blueprint("custom_watcher", __name__, url_prefix="/watcher")
 
     @custom_watcher_blueprint.route("api/supported_watchers")
@@ -56,7 +36,6 @@ def get_custom_watcher_blueprint(testing):
     @custom_watcher_blueprint.route("pages/<string:name>/", defaults={'path': 'index.html'})
     @custom_watcher_blueprint.route("pages/<string:name>/<path:path>")
     def custom_watcher_pages(name: str, path: str):
-        print(name, path)
         if name in custom_watcher_static_directories:
             return send_from_directory(custom_watcher_static_directories[name], path)
         else:

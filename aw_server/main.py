@@ -1,3 +1,4 @@
+import json
 import logging
 
 from aw_datastore import get_storage_methods
@@ -41,6 +42,7 @@ def main():
         testing=settings.testing,
         storage_method=storage_method,
         cors_origins=settings.cors_origins,
+        custom_watcher_visualizations=json.loads(settings.custom_watcher_visualizations)
     )
 
 
@@ -74,6 +76,11 @@ def parse_settings():
         dest="cors_origins",
         help="CORS origins to allow (as a comma separated list)",
     )
+    parser.add_argument(
+        "--custom-watcher-visualizations",
+        dest="custom_watcher_visualizations",
+        help="The custom watcher visualizations as a JSON string. The JSON contains a dict with key: watcher name and value: static folder path.",
+    )
     args = parser.parse_args()
 
     """ Parse config file """
@@ -83,6 +90,7 @@ def parse_settings():
     settings.port = int(config[configsection]["port"])
     settings.storage = config[configsection]["storage"]
     settings.cors_origins = config[configsection]["cors_origins"]
+    settings.custom_watcher_visualizations = config[configsection]["custom_watcher_visualizations"]
 
     """ If a argument is not none, override the config value """
     for key, value in vars(args).items():

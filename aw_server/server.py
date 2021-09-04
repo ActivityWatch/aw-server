@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List
+from typing import List, Dict
 
 from flask import Flask, Blueprint, current_app, send_from_directory
 from flask_cors import CORS
@@ -29,7 +29,7 @@ class AWFlask(Flask):
         self.api = None  # type: ServerAPI
 
 
-def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
+def create_app(testing=True, storage_method=None, cors_origins=[], custom_watcher_visualizations=dict()) -> AWFlask:
     app = AWFlask("aw-server", static_folder=static_folder, static_url_path="")
 
     if storage_method is None:
@@ -45,7 +45,7 @@ def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
 
     app.register_blueprint(root)
     app.register_blueprint(rest.blueprint)
-    app.register_blueprint(get_custom_watcher_blueprint(testing))
+    app.register_blueprint(get_custom_watcher_blueprint(custom_watcher_visualizations))
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)
@@ -95,9 +95,13 @@ def _start(
         port: int,
         testing: bool = False,
         cors_origins: List[str] = [],
+        custom_watcher_visualizations: Dict[str, str] = dict()
 ):
     app = create_app(
-        storage_method=storage_method, testing=testing, cors_origins=cors_origins
+        storage_method=storage_method,
+        testing=testing,
+        cors_origins=cors_origins,
+        custom_watcher_visualizations=custom_watcher_visualizations
     )
     try:
         app.run(

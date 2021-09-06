@@ -16,10 +16,6 @@ def get_bucket_name_from_watcher_name(buckets, watcher_name: str):
 def get_custom_static_blueprint(custom_static_directories):
     custom_static_blueprint = Blueprint("custom_static", __name__, url_prefix="/watcher")
 
-    @custom_static_blueprint.route("api/supported_watchers")
-    def custom_static_api_supported_pages():
-        return jsonify(list(custom_static_directories.keys()))
-
     @custom_static_blueprint.route("api/get_data", methods=["POST"])
     def custom_static_api_get_data():
         start = iso8601.parse_date(request.json["start"])
@@ -32,6 +28,10 @@ def get_custom_static_blueprint(custom_static_directories):
             for watcher_name in custom_static_directories.keys()
         }
         return jsonify(custom_page_data)
+
+    @custom_static_blueprint.route("pages/")
+    def custom_static_supported_pages():
+        return jsonify(list(custom_static_directories.keys()))
 
     @custom_static_blueprint.route("pages/<string:name>/", defaults={'path': 'index.html'})
     @custom_static_blueprint.route("pages/<string:name>/<path:path>")

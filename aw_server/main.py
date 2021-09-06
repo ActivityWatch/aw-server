@@ -106,6 +106,7 @@ def parse_settings():
 
 
 def parse_str_to_dict(str_value):
+    """Parses a dict from a string in format: key=value,key2=value2,..."""
     output = dict()
     key_value_pairs = str_value.split(",")
 

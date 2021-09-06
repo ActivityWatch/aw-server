@@ -7,7 +7,7 @@ from flask_cors import CORS
 
 import aw_datastore
 from aw_datastore import Datastore
-from .custom_watcher_pages import get_custom_static_blueprint
+from .custom_static import get_custom_static_blueprint
 
 from .log import FlaskLogHandler
 from .api import ServerAPI

@@ -1,4 +1,3 @@
-import json
 import logging
 
 from aw_datastore import get_storage_methods
@@ -42,7 +41,7 @@ def main():
         testing=settings.testing,
         storage_method=storage_method,
         cors_origins=settings.cors_origins,
-        custom_watcher_visualizations=json.loads(settings.custom_watcher_visualizations)
+        custom_static=settings.custom_static
     )
 
 
@@ -77,9 +76,9 @@ def parse_settings():
         help="CORS origins to allow (as a comma separated list)",
     )
     parser.add_argument(
-        "--custom-watcher-visualizations",
-        dest="custom_watcher_visualizations",
-        help="The custom watcher visualizations as a JSON string. The JSON contains a dict with key: watcher name and value: static folder path.",
+        "--custom-static",
+        dest="custom_static",
+        help="The custom static directories. Format: watcher_name=path,wacher_name2=path2,...",
     )
     args = parser.parse_args()
 
@@ -90,7 +89,7 @@ def parse_settings():
     settings.port = int(config[configsection]["port"])
     settings.storage = config[configsection]["storage"]
     settings.cors_origins = config[configsection]["cors_origins"]
-    settings.custom_watcher_visualizations = config[configsection]["custom_watcher_visualizations"]
+    settings.custom_static = config[configsection]["custom_static"]
 
     """ If a argument is not none, override the config value """
     for key, value in vars(args).items():
@@ -98,8 +97,25 @@ def parse_settings():
             vars(settings)[key] = value
 
     settings.cors_origins = [o for o in settings.cors_origins.split(",") if o]
+    settings.custom_static = parse_str_to_dict(settings.custom_static)
 
     storage_methods = get_storage_methods()
     storage_method = storage_methods[settings.storage]
 
     return settings, storage_method
+
+
+def parse_str_to_dict(str_value):
+    output = dict()
+    key_value_pairs = str_value.split(",")
+
+    for pair in key_value_pairs:
+        pair_split = pair.split("=")
+
+        if len(pair_split) != 2:
+            raise ValueError(f"Cannot parse key value pair: {pair}")
+
+        key, value = pair_split
+        output[key] = value
+
+    return output

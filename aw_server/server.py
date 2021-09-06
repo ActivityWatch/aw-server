@@ -7,7 +7,7 @@ from flask_cors import CORS
 
 import aw_datastore
 from aw_datastore import Datastore
-from .custom_watcher_pages import get_custom_watcher_blueprint
+from .custom_watcher_pages import get_custom_static_blueprint
 
 from .log import FlaskLogHandler
 from .api import ServerAPI
@@ -45,7 +45,7 @@ def create_app(testing=True, storage_method=None, cors_origins=[], custom_static
 
     app.register_blueprint(root)
     app.register_blueprint(rest.blueprint)
-    app.register_blueprint(get_custom_watcher_blueprint(custom_static))
+    app.register_blueprint(get_custom_static_blueprint(custom_static))
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)

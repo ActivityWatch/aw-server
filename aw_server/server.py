@@ -109,5 +109,5 @@ def _start(
             threaded=False,
         )
     except OSError as e:
-        logger.error(str(e))
+        logger.exception(e)
         raise e

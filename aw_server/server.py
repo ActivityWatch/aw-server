@@ -99,6 +99,9 @@ def _start(
     app = create_app(
         storage_method=storage_method, testing=testing, cors_origins=cors_origins
     )
+    # needed for host-header check
+    app.config["HOST"] = host
+    # app.config["PORT"] = port
     try:
         app.run(
             debug=testing,

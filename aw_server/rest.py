@@ -1,3 +1,4 @@
+from functools import wraps
 from typing import Dict
 import traceback
 import json
@@ -16,15 +17,31 @@ from .api import ServerAPI
 from .exceptions import BadRequest, Unauthorized
 
 
-# SECURITY
-# As we work our way through features, disable (while this is False, we should only accept connections from localhost)
-SECURITY_ENABLED = False
+def host_header_check(f):
+    """
+    Protects against DNS rebinding attacks (see https://github.com/ActivityWatch/activitywatch/security/advisories/GHSA-v9fg-6g9j-h4x4)
 
-# For the planned zeroknowledge storage feature
-ZEROKNOWLEDGE_ENABLED = False
+    Some discussion in Syncthing how they do it: https://github.com/syncthing/syncthing/issues/4819
+    """
+
+    @wraps(f)
+    def decorator(*args, **kwargs):
+        # TODO: What if server is bound to 0.0.0.0?
+        server_host = current_app.config["HOST"]
+
+        req_host = request.headers.get("host", None)
+        if req_host is None:
+            return {"message": "host header is missing"}, 400
+        else:
+            if req_host.split(":")[0] not in ["localhost", "127.0.0.1", server_host]:
+                return {"message": f"host header is invalid (was {req_host})"}, 400
+        return f(*args, **kwargs)
+
+    return decorator
+
 
 blueprint = Blueprint("api", __name__, url_prefix="/api")
-api = Api(blueprint, doc="/")
+api = Api(blueprint, doc="/", decorators=[host_header_check])
 
 
 # TODO: Clean up JSONEncoder code?

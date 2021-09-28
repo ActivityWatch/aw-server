@@ -209,9 +209,24 @@ def test_get_events_interval(aw_client, bucket):
     assert recv_events[0].data == src_events[0].data
 
     # This fails due to microsecond precision issues
-    # assert recv_events[0].duration == end_dt - recv_events[0].timestamp
+    assert _round_td(recv_events[0].duration) == _round_td(
+        end_dt - recv_events[0].timestamp
+    )
+
+    # NOTE: Duration can differ by a few microseconds, so we round durations off to 10ms
+    recv_events = [_round_durations(e) for e in recv_events]
+    src_events = [_round_durations(e) for e in src_events]
 
     assert recv_events[1:25] == src_events[1:25]
+
+
+def _round_td(td: timedelta) -> timedelta:
+    return timedelta(seconds=round(td.total_seconds(), 2))
+
+
+def _round_durations(e: Event):
+    e.duration = _round_td(e.duration)
+    return e
 
 
 def test_store_many_events(aw_client, bucket):

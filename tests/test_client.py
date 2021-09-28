@@ -166,19 +166,19 @@ def test_list_buckets(aw_client, bucket):
     assert bucket in buckets.keys()
 
 
-def test_send_event(aw_client, bucket):
+def test_insert_event(aw_client, bucket):
     event = Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"})
-    aw_client.send_event(bucket, event)
+    aw_client.insert_event(bucket, event)
     recv_events = aw_client.get_events(bucket, limit=1)
     assert recv_events == [event]
 
 
-def test_send_events(aw_client, bucket):
+def test_insert_events(aw_client, bucket):
     events = _create_periodic_events(
         2, start=datetime.now(tz=timezone.utc) - timedelta(days=1)
     )
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
     recv_events = aw_client.get_events(bucket)
 
     # Why isn't reverse=True needed here?
@@ -191,7 +191,7 @@ def test_get_events_interval(aw_client, bucket):
     delta = timedelta(hours=1)
     events = _create_periodic_events(1000, delta=delta, start=start_dt)
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
 
     # start kwarg isn't currently range-inclusive
     recv_events = aw_client.get_events(bucket, limit=50, start=start_dt, end=end_dt)
@@ -219,7 +219,7 @@ def test_store_many_events(aw_client, bucket):
         1000, start=datetime.now(tz=timezone.utc) - timedelta(days=50)
     )
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
     recv_events = aw_client.get_events(bucket, limit=-1)
 
     assert len(events) == len(recv_events)
@@ -231,7 +231,7 @@ def test_midnight(aw_client, bucket):
     midnight = start_dt.replace(hour=23, minute=50)
     events = _create_periodic_events(100, start=midnight, delta=timedelta(minutes=1))
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
     recv_events = aw_client.get_events(bucket, limit=-1)
     assert len(recv_events) == len(events)
 

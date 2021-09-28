@@ -102,10 +102,9 @@ def test_heartbeat(aw_client, bucket):
     e1, e2 = _create_heartbeat_events()
 
     aw_client.heartbeat(bucket_id, e1, pulsetime=0)
-    returned_event = aw_client.heartbeat(bucket_id, e2, pulsetime=10)
+    aw_client.heartbeat(bucket_id, e2, pulsetime=10)
 
     event = aw_client.get_events(bucket_id, limit=1)[0]
-    assert event == returned_event
 
     assert event.timestamp == e1.timestamp
     assert event.duration == e2.timestamp - e1.timestamp

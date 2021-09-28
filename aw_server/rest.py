@@ -27,7 +27,7 @@ def host_header_check(f):
     @wraps(f)
     def decorator(*args, **kwargs):
         # TODO: What if server is bound to 0.0.0.0?
-        server_host = current_app.config["HOST"]
+        server_host = current_app.config.get("HOST", None)
 
         req_host = request.headers.get("host", None)
         if req_host is None:

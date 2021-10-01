@@ -8,7 +8,7 @@ import json
 import logging
 import iso8601
 
-from aw_core.models import Event
+from aw_core.models import Event, Setting
 from aw_core.log import get_log_file_path
 from aw_core.dirs import get_data_dir
 
@@ -117,7 +117,8 @@ class ServerAPI:
         )
         self.create_events(
             bucket_id,
-            [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]],
+            [Event(**e) if isinstance(e, dict)
+             else e for e in bucket_data["events"]],
         )
 
     def import_all(self, buckets: Dict[str, Any]):
@@ -165,7 +166,8 @@ class ServerAPI:
         end: datetime = None,
     ) -> List[Event]:
         """Get events from a bucket"""
-        logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
+        logger.debug(
+            "Received get request for events in bucket '{}'".format(bucket_id))
         if limit is None:  # Let limit = None also mean "no limit"
             limit = -1
         events = [
@@ -186,7 +188,8 @@ class ServerAPI:
     ) -> int:
         """Get eventcount from a bucket"""
         logger.debug(
-            "Received get request for eventcount in bucket '{}'".format(bucket_id)
+            "Received get request for eventcount in bucket '{}'".format(
+                bucket_id)
         )
         return self.db[bucket_id].get_eventcount(start, end)
 
@@ -290,10 +293,35 @@ class ServerAPI:
             starttime = iso8601.parse_date(period[0])
             endtime = iso8601.parse_date(period[1])
             query = str().join(query)
-            result.append(query2.query(name, query, starttime, endtime, self.db))
+            result.append(query2.query(
+                name, query, starttime, endtime, self.db))
         return result
 
+    # SETTINGS
+
+    def get_settings(self) -> List[Setting]:
+        """Get all the settings"""
+        # TODO: auto populate data if this array is empty
+        # data = {
+        #     'durationDefault': '86400',
+        #     'initialTimestamp': 'Thu Sep 23 2021 15:22:08 GMT+0530',
+        #     'newReleaseCheckData': '{"isEnabled":true,"nextCheckTime":"2021-09-29T09:51:36.782Z","howOftenToCheck":86400,"timesChecked":0}',
+        #     'startOfDay': '04:00',
+        #     'syncSettingsToServer': 'true',
+        #     'userSatisfactionPollData': '{"isEnabled":true,"nextPollTime":"2021-09-30T09:52:08.703Z","timesPollIsShown":0}'
+        # }
+        data = self.db.get_settings()
+        return data
+
+    def update_setting(self, data) -> bool:
+        """Update a single setting"""
+        data = self.db.update_setting(data["key"], data["value"])
+
+        logger.info("setting updated {0}".format(data))
+        return data
+
     # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...
+
     def get_log(self):
         """Get the server log in json format"""
         payload = []

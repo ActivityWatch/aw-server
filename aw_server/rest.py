@@ -218,7 +218,8 @@ class EventCountResource(Resource):
         start = iso8601.parse_date(args["start"]) if "start" in args else None
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
-        events = current_app.api.get_eventcount(bucket_id, start=start, end=end)
+        events = current_app.api.get_eventcount(
+            bucket_id, start=start, end=end)
         return events, 200
 
 
@@ -257,7 +258,8 @@ class HeartbeatResource(Resource):
         if "pulsetime" in request.args:
             pulsetime = float(request.args["pulsetime"])
         else:
-            raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
+            raise BadRequest("MissingParameter",
+                             "Missing required parameter pulsetime")
 
         event = current_app.api.heartbeat(bucket_id, heartbeat, pulsetime)
         return event.to_json_dict(), 200
@@ -337,6 +339,20 @@ class ImportAllResource(Resource):
             buckets = request.get_json()["buckets"]
             current_app.api.import_all(buckets)
         return None, 200
+
+
+# SETTINGS
+
+
+@api.route("/0/settings")
+class SettingsResource(Resource):
+    def get(self):
+        data = current_app.api.get_settings()
+        return jsonify(data)
+
+    def post(self):
+        data = current_app.api.update_setting(request.json)
+        return data
 
 
 # LOGGING

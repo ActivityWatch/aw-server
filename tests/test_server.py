@@ -43,7 +43,7 @@ def test_heartbeats(flask_client, bucket, benchmark):
     def heartbeat():
         now = datetime.now()
         r = flask_client.post(
-            "/api/0/buckets/test/heartbeat?pulsetime=1".format(bucket),
+            f"/api/0/buckets/{bucket}/heartbeat?pulsetime=1",
             json={"timestamp": now, "duration": 0, "data": {"random": random.random()}},
         )
         assert r.status_code == 200
@@ -51,38 +51,38 @@ def test_heartbeats(flask_client, bucket, benchmark):
 
 def test_get_events(flask_client, bucket, benchmark):
     n_events = 100
-    start_time = datetime.now() - timedelta(1)
+    start_time = datetime.now() - timedelta(days=100)
     for i in range(n_events):
-        now = datetime.now() - timedelta(1)
+        now = start_time + timedelta(hours=i)
         r = flask_client.post(
-            "/api/0/buckets/test/heartbeat?pulsetime=0".format(bucket),
+            f"/api/0/buckets/{bucket}/heartbeat?pulsetime=0",
             json={"timestamp": now, "duration": 0, "data": {"random": random.random()}},
         )
         assert r.status_code == 200
 
     @benchmark
     def get_events():
-        r = flask_client.get("/api/0/buckets/test/events".format(bucket))
+        r = flask_client.get(f"/api/0/buckets/{bucket}/events")
         assert r.status_code == 200
         assert r.json
         assert len(r.json) == n_events
 
-        r = flask_client.get("/api/0/buckets/test/events?limit=-1".format(bucket))
+        r = flask_client.get(f"/api/0/buckets/{bucket}/events?limit=-1")
         assert r.status_code == 200
         assert r.json
         assert len(r.json) == n_events
 
-        r = flask_client.get("/api/0/buckets/test/events?limit=10".format(bucket))
+        r = flask_client.get(f"/api/0/buckets/{bucket}/events?limit=10")
         assert r.status_code == 200
         assert r.json
         assert len(r.json) == 10
 
-        r = flask_client.get("/api/0/buckets/test/events?limit=100".format(bucket))
+        r = flask_client.get(f"/api/0/buckets/{bucket}/events?limit=100")
         assert r.status_code == 200
         assert r.json
         assert len(r.json) == n_events
 
-        r = flask_client.get("/api/0/buckets/test/events?limit=1000".format(bucket))
+        r = flask_client.get(f"/api/0/buckets/{bucket}/events?limit=1000")
         assert r.status_code == 200
         assert r.json
         assert len(r.json) == n_events

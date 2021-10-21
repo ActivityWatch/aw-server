@@ -29,7 +29,9 @@ class AWFlask(Flask):
         self.api = None  # type: ServerAPI
 
 
-def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
+def create_app(
+    host: str, testing=True, storage_method=None, cors_origins=[]
+) -> AWFlask:
     app = AWFlask("aw-server", static_folder=static_folder, static_url_path="")
 
     if storage_method is None:
@@ -48,6 +50,9 @@ def create_app(testing=True, storage_method=None, cors_origins=[]) -> AWFlask:
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)
+
+    # needed for host-header check
+    app.config["HOST"] = host
 
     return app
 
@@ -97,11 +102,8 @@ def _start(
     cors_origins: List[str] = [],
 ):
     app = create_app(
-        storage_method=storage_method, testing=testing, cors_origins=cors_origins
+        host, storage_method=storage_method, testing=testing, cors_origins=cors_origins
     )
-    # needed for host-header check
-    app.config["HOST"] = host
-    # app.config["PORT"] = port
     try:
         app.run(
             debug=testing,

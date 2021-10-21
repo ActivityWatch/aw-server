@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.WARN)
 
 @pytest.fixture(scope="session")
 def app():
-    return aw_server.create_app(testing=True)
+    return aw_server.create_app("127.0.0.1", testing=True)
 
 
 @pytest.fixture(scope="session")

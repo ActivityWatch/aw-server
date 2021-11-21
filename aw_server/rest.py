@@ -15,7 +15,11 @@ from aw_query.exceptions import QueryException
 from . import logger
 from .api import ServerAPI
 from .exceptions import BadRequest, Unauthorized
+from .config import config
 
+import requests
+from requests.auth import HTTPBasicAuth
+from datetime import datetime
 
 def host_header_check(f):
     """
@@ -200,7 +204,7 @@ class EventsResource(Resource):
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
         events = current_app.api.get_events(
-            bucket_id, limit=limit, start=start, end=end
+            bucket_id, limit=limit, end=end
         )
         return events, 200
 
@@ -369,3 +373,96 @@ class LogResource(Resource):
     @copy_doc(ServerAPI.get_log)
     def get(self):
         return current_app.api.get_log(), 200
+
+
+@api.route("/0/tempoio/<string:start>/<string:end>")
+class GetTempoIOData(Resource):
+    def get(self, start, end):
+        try:
+            hed = {'Authorization': 'Bearer {}'.format(config['tempoio']['api_key'])}
+            response = requests.get('https://api.tempo.io/core/3/worklogs?from={}&to={}'.format(start, end), headers=hed)
+            
+            if response.status_code == 200:
+                return response.json(), 200
+
+            print('Tempo IO get request failed')
+            return None, 400
+        except KeyError:
+            return None, 412
+
+
+@api.route("/0/tempoio/<string:id>")
+class EditTempoIOData(Resource):
+    def delete(self, id):
+        try:
+            hed = {
+                'Authorization': 'Bearer {}'.format(config['tempoio']['api_key']),
+                'Content-type':'application/json'
+            }
+
+            response = requests.delete('https://api.tempo.io/core/3/worklogs/{}'.format(id), headers=hed)
+
+            if response.ok:
+                return None, 200
+
+            print('Tempo IO delete request failed')
+            return None, 400
+        except KeyError:
+            return None, 412
+            
+
+    def put(self):
+        try:
+            body = request.get_json()
+            body["authorAccountId"] = config['tempoio']['user']
+            hed = {
+                'Authorization': 'Bearer {}'.format(config['tempoio']['api_key']),
+                'Content-type':'application/json'
+            }
+
+            response = requests.put('https://api.tempo.io/core/3/worklogs/{}'.format(id), headers=hed, json=body)
+
+            if response.status_code == 200:
+                return response.json(), 200
+
+            print('Tempo IO post request failed')
+            return None, 400
+        except KeyError:
+            return None, 412
+
+@api.route("/0/tempoio")
+class AddTempoIOData(Resource):
+    def post(self):
+        try:
+            body = request.get_json()
+            body["authorAccountId"] = config['tempoio']['user']
+            hed = {
+                'Authorization': 'Bearer {}'.format(config['tempoio']['api_key']),
+                'Content-type':'application/json'
+            }
+
+            response = requests.post('https://api.tempo.io/core/3/worklogs', headers=hed, json=body)
+
+            if response.status_code == 200:
+                return response.json(), 200
+
+            print('Tempo IO post request failed')
+            return None, 400
+        except KeyError:
+            return None, 412
+
+@api.route("/0/jira")
+class GetJiraData(Resource):
+    def get(self):
+        try:
+            url = '{}/rest/api/3/search?jql={}'.format(config['jira']['base_url'], config['jira']['jql'])
+            response = requests.get(url, verify=False, auth=HTTPBasicAuth(config['jira']['email'], config['jira']['api_key']))
+            
+            if response.status_code == 200:
+                return response.json(), 200
+
+            print('Jira request failed')
+            return None, 400
+        except KeyError:
+            return None, 412
+

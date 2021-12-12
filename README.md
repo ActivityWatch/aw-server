@@ -44,5 +44,5 @@ aw-server --testing
 
 You can also get a very decent API browser by browsing to `localhost:5600` after starting the server.
 
-There are also some API examples in the [documentation](https://activitywatch.readthedocs.io/en/latest/api-reference.html).
+There are also some API examples in the [documentation](https://docs.activitywatch.net/en/latest/api.html).
 

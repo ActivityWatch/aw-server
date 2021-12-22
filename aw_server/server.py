@@ -61,6 +61,7 @@ def create_app(
 def static_root():
     return current_app.send_static_file("index.html")
 
+
 @root.route("/css/<path:path>")
 def static_css(path):
     return send_from_directory(static_folder + "/css", path)

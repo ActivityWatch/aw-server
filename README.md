@@ -7,17 +7,18 @@ aw-server
 
 ActivityWatch server, for secure storage and retrieval of all your Quantified Self data.
 
+**Note:** In the future this will no longer be the default server used by ActivityWatch, instead we will be using [aw-server-rust](https://github.com/ActivityWatch/aw-server-rust/). The fate of this repo is uncertain, but it will likely be around and maintained for a while (as a reference implementation, for prototyping, etc).
+
 
 ## Build and Install
 
-To install program and dependencies, Poetry is required.
+To install program and dependencies, Poetry is required. You'll want to activate a `venv` before building.
 
 ```bash
 make build
 ```
 
 The `aw-server` binary should now be available to you in your PATH (if it is set correctly).
-
 
 ## Usage
 
@@ -29,9 +30,9 @@ aw-server
 
 ## Development
 
-If you want to run aw-server in development, you probably want to run a 
-development instance beside your personal (stable) instance. You can do 
-this by giving aw-server the `--testing` flag. This will start the server 
+If you want to run aw-server in development, you probably want to run a
+development instance beside your personal (stable) instance. You can do
+this by giving aw-server the `--testing` flag. This will start the server
 on another port and use a seperate datastore.
 
 ```bash
@@ -44,5 +45,4 @@ aw-server --testing
 You can also get a very decent API browser by browsing to `localhost:5600` after starting the server.
 
 There are also some API examples in the [documentation](https://activitywatch.readthedocs.io/en/latest/api-reference.html).
-
 

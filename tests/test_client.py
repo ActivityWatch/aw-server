@@ -102,10 +102,9 @@ def test_heartbeat(aw_client, bucket):
     e1, e2 = _create_heartbeat_events()
 
     aw_client.heartbeat(bucket_id, e1, pulsetime=0)
-    returned_event = aw_client.heartbeat(bucket_id, e2, pulsetime=10)
+    aw_client.heartbeat(bucket_id, e2, pulsetime=10)
 
     event = aw_client.get_events(bucket_id, limit=1)[0]
-    assert event == returned_event
 
     assert event.timestamp == e1.timestamp
     assert event.duration == e2.timestamp - e1.timestamp
@@ -166,19 +165,19 @@ def test_list_buckets(aw_client, bucket):
     assert bucket in buckets.keys()
 
 
-def test_send_event(aw_client, bucket):
+def test_insert_event(aw_client, bucket):
     event = Event(timestamp=datetime.now(tz=timezone.utc), data={"label": "test"})
-    aw_client.send_event(bucket, event)
+    aw_client.insert_event(bucket, event)
     recv_events = aw_client.get_events(bucket, limit=1)
     assert recv_events == [event]
 
 
-def test_send_events(aw_client, bucket):
+def test_insert_events(aw_client, bucket):
     events = _create_periodic_events(
         2, start=datetime.now(tz=timezone.utc) - timedelta(days=1)
     )
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
     recv_events = aw_client.get_events(bucket)
 
     # Why isn't reverse=True needed here?
@@ -191,7 +190,7 @@ def test_get_events_interval(aw_client, bucket):
     delta = timedelta(hours=1)
     events = _create_periodic_events(1000, delta=delta, start=start_dt)
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
 
     # start kwarg isn't currently range-inclusive
     recv_events = aw_client.get_events(bucket, limit=50, start=start_dt, end=end_dt)
@@ -209,9 +208,24 @@ def test_get_events_interval(aw_client, bucket):
     assert recv_events[0].data == src_events[0].data
 
     # This fails due to microsecond precision issues
-    # assert recv_events[0].duration == end_dt - recv_events[0].timestamp
+    assert _round_td(recv_events[0].duration) == _round_td(
+        end_dt - recv_events[0].timestamp
+    )
+
+    # NOTE: Duration can differ by a few microseconds, so we round durations off to 10ms
+    recv_events = [_round_durations(e) for e in recv_events]
+    src_events = [_round_durations(e) for e in src_events]
 
     assert recv_events[1:25] == src_events[1:25]
+
+
+def _round_td(td: timedelta) -> timedelta:
+    return timedelta(seconds=round(td.total_seconds(), 2))
+
+
+def _round_durations(e: Event):
+    e.duration = _round_td(e.duration)
+    return e
 
 
 def test_store_many_events(aw_client, bucket):
@@ -219,7 +233,7 @@ def test_store_many_events(aw_client, bucket):
         1000, start=datetime.now(tz=timezone.utc) - timedelta(days=50)
     )
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
     recv_events = aw_client.get_events(bucket, limit=-1)
 
     assert len(events) == len(recv_events)
@@ -231,7 +245,7 @@ def test_midnight(aw_client, bucket):
     midnight = start_dt.replace(hour=23, minute=50)
     events = _create_periodic_events(100, start=midnight, delta=timedelta(minutes=1))
 
-    aw_client.send_events(bucket, events)
+    aw_client.insert_events(bucket, events)
     recv_events = aw_client.get_events(bucket, limit=-1)
     assert len(recv_events) == len(events)
 

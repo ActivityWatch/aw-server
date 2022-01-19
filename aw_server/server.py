@@ -29,7 +29,9 @@ class AWFlask(Flask):
         self.api = None  # type: ServerAPI
 
 
-def create_app(testing=True, storage_method=None, cors_origins=[], custom_static=dict()) -> AWFlask:
+def create_app(
+    host: str, testing=True, storage_method=None, cors_origins=[], custom_static=dict()
+) -> AWFlask:
     app = AWFlask("aw-server", static_folder=static_folder, static_url_path="")
 
     if storage_method is None:
@@ -49,6 +51,9 @@ def create_app(testing=True, storage_method=None, cors_origins=[], custom_static
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)
+
+    # needed for host-header check
+    app.config["HOST"] = host
 
     return app
 
@@ -98,10 +103,7 @@ def _start(
     custom_static: Dict[str, str] = dict()
 ):
     app = create_app(
-        storage_method=storage_method,
-        testing=testing,
-        cors_origins=cors_origins,
-        custom_static=custom_static
+        host, storage_method=storage_method, testing=testing, cors_origins=cors_origins, custom_static=custom_static
     )
     try:
         app.run(
@@ -113,5 +115,5 @@ def _start(
             threaded=False,
         )
     except OSError as e:
-        logger.error(str(e))
+        logger.exception(e)
         raise e

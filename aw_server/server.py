@@ -90,12 +90,12 @@ def _config_cors(cors_origins: List[str], testing: bool):
 
 # Only to be called from aw_server.main function!
 def _start(
-        storage_method,
-        host: str,
-        port: int,
-        testing: bool = False,
-        cors_origins: List[str] = [],
-        custom_static: Dict[str, str] = dict()
+    storage_method,
+    host: str,
+    port: int,
+    testing: bool = False,
+    cors_origins: List[str] = [],
+    custom_static: Dict[str, str] = dict()
 ):
     app = create_app(
         storage_method=storage_method,

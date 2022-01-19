@@ -78,7 +78,7 @@ def parse_settings():
     parser.add_argument(
         "--custom-static",
         dest="custom_static",
-        help="The custom static directories. Format: watcher_name=path,wacher_name2=path2,...",
+        help="The custom static directories. Format: watcher_name=path,watcher_name2=path2,...",
     )
     args = parser.parse_args()
 

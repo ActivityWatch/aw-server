@@ -25,16 +25,6 @@ import logging
 from flask import Blueprint, send_from_directory, jsonify, escape
 
 
-def get_bucket_name_from_watcher_name(buckets, watcher_name: str):
-    """Searches for a bucket based on the watcher's name. Returns bucket name or None"""
-    for bucket in buckets:
-        if bucket.startswith(watcher_name):
-            return bucket
-
-    logging.warning(f"Cannot find bucket for watcher {watcher_name}")
-    return None
-
-
 def get_custom_static_blueprint(custom_static_directories):
     custom_static_blueprint = Blueprint("custom_static", __name__, url_prefix="/watcher")
 

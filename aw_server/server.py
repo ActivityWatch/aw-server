@@ -100,10 +100,14 @@ def _start(
     port: int,
     testing: bool = False,
     cors_origins: List[str] = [],
-    custom_static: Dict[str, str] = dict()
+    custom_static: Dict[str, str] = dict(),
 ):
     app = create_app(
-        host, storage_method=storage_method, testing=testing, cors_origins=cors_origins, custom_static=custom_static
+        host,
+        storage_method=storage_method,
+        testing=testing,
+        cors_origins=cors_origins,
+        custom_static=custom_static,
     )
     try:
         app.run(

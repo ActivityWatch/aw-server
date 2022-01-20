@@ -26,14 +26,18 @@ from flask import Blueprint, send_from_directory, jsonify, escape
 
 
 def get_custom_static_blueprint(custom_static_directories):
-    custom_static_blueprint = Blueprint("custom_static", __name__, url_prefix="/watcher")
+    custom_static_blueprint = Blueprint(
+        "custom_static", __name__, url_prefix="/watcher"
+    )
 
     @custom_static_blueprint.route("pages/")
     def custom_static_supported_pages():
         """Serves a list of all watchers that are supported / were registered successfully"""
         return jsonify(list(custom_static_directories.keys()))
 
-    @custom_static_blueprint.route("pages/<string:name>/", defaults={'path': 'index.html'})
+    @custom_static_blueprint.route(
+        "pages/<string:name>/", defaults={"path": "index.html"}
+    )
     @custom_static_blueprint.route("pages/<string:name>/<path:path>")
     def custom_static_pages(name: str, path: str):
         """Serves the custom static content"""
@@ -41,6 +45,9 @@ def get_custom_static_blueprint(custom_static_directories):
         if name in custom_static_directories:
             return send_from_directory(custom_static_directories[name], path)
         else:
-            return f"Static content: {escape(path)} of watcher: {escape(name)} not found!", 404
+            return (
+                f"Static content: {escape(path)} of watcher: {escape(name)} not found!",
+                404,
+            )
 
     return custom_static_blueprint

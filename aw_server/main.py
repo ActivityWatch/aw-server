@@ -41,6 +41,7 @@ def main():
         testing=settings.testing,
         storage_method=storage_method,
         cors_origins=settings.cors_origins,
+        custom_static=settings.custom_static
     )
 
 
@@ -74,6 +75,11 @@ def parse_settings():
         dest="cors_origins",
         help="CORS origins to allow (as a comma separated list)",
     )
+    parser.add_argument(
+        "--custom-static",
+        dest="custom_static",
+        help="The custom static directories. Format: watcher_name=path,watcher_name2=path2,...",
+    )
     args = parser.parse_args()
 
     """ Parse config file """
@@ -83,6 +89,7 @@ def parse_settings():
     settings.port = int(config[configsection]["port"])
     settings.storage = config[configsection]["storage"]
     settings.cors_origins = config[configsection]["cors_origins"]
+    settings.custom_static = config[configsection]["custom_static"]
 
     """ If a argument is not none, override the config value """
     for key, value in vars(args).items():
@@ -90,8 +97,26 @@ def parse_settings():
             vars(settings)[key] = value
 
     settings.cors_origins = [o for o in settings.cors_origins.split(",") if o]
+    settings.custom_static = parse_str_to_dict(settings.custom_static)
 
     storage_methods = get_storage_methods()
     storage_method = storage_methods[settings.storage]
 
     return settings, storage_method
+
+
+def parse_str_to_dict(str_value):
+    """Parses a dict from a string in format: key=value,key2=value2,..."""
+    output = dict()
+    key_value_pairs = str_value.split(",")
+
+    for pair in key_value_pairs:
+        pair_split = pair.split("=")
+
+        if len(pair_split) != 2:
+            raise ValueError(f"Cannot parse key value pair: {pair}")
+
+        key, value = pair_split
+        output[key] = value
+
+    return output

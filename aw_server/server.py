@@ -1,17 +1,17 @@
 import os
 import logging
-from typing import List
+from typing import List, Dict
 
 from flask import Flask, Blueprint, current_app, send_from_directory
 from flask_cors import CORS
 
 import aw_datastore
 from aw_datastore import Datastore
+from .custom_static import get_custom_static_blueprint
 
 from .log import FlaskLogHandler
 from .api import ServerAPI
 from . import rest
-
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class AWFlask(Flask):
 
 
 def create_app(
-    host: str, testing=True, storage_method=None, cors_origins=[]
+    host: str, testing=True, storage_method=None, cors_origins=[], custom_static=dict()
 ) -> AWFlask:
     app = AWFlask("aw-server", static_folder=static_folder, static_url_path="")
 
@@ -47,6 +47,7 @@ def create_app(
 
     app.register_blueprint(root)
     app.register_blueprint(rest.blueprint)
+    app.register_blueprint(get_custom_static_blueprint(custom_static))
 
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)
@@ -60,7 +61,6 @@ def create_app(
 @root.route("/")
 def static_root():
     return current_app.send_static_file("index.html")
-    return send_from_directory("/", "index.html")
 
 
 @root.route("/css/<path:path>")
@@ -100,9 +100,10 @@ def _start(
     port: int,
     testing: bool = False,
     cors_origins: List[str] = [],
+    custom_static: Dict[str, str] = dict()
 ):
     app = create_app(
-        host, storage_method=storage_method, testing=testing, cors_origins=cors_origins
+        host, storage_method=storage_method, testing=testing, cors_origins=cors_origins, custom_static=custom_static
     )
     try:
         app.run(

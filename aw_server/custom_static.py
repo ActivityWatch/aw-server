@@ -26,9 +26,7 @@ from flask import Blueprint, send_from_directory, jsonify, escape
 
 
 def get_custom_static_blueprint(custom_static_directories):
-    custom_static_blueprint = Blueprint(
-        "custom_static", __name__, url_prefix="/watcher"
-    )
+    custom_static_blueprint = Blueprint("custom_static", __name__, url_prefix="/")
 
     @custom_static_blueprint.route("pages/")
     def custom_static_supported_pages():

@@ -34,6 +34,9 @@ def main():
     if settings.testing:
         logger.info("Will run in testing mode")
 
+    if settings.custom_static:
+        logger.info(f"Using custom_static: {settings.custom_static}")
+
     logger.info("Starting up...")
     _start(
         host=settings.host,
@@ -89,15 +92,17 @@ def parse_settings():
     settings.port = int(config[configsection]["port"])
     settings.storage = config[configsection]["storage"]
     settings.cors_origins = config[configsection]["cors_origins"]
-    settings.custom_static = config[configsection]["custom_static"]
+    settings.custom_static = dict(config[configsection]["custom_static"])
 
     """ If a argument is not none, override the config value """
     for key, value in vars(args).items():
         if value is not None:
-            vars(settings)[key] = value
+            if key == "custom_static":
+                settings.custom_static = parse_str_to_dict(value)
+            else:
+                vars(settings)[key] = value
 
     settings.cors_origins = [o for o in settings.cors_origins.split(",") if o]
-    settings.custom_static = parse_str_to_dict(settings.custom_static)
 
     storage_methods = get_storage_methods()
     storage_method = storage_methods[settings.storage]

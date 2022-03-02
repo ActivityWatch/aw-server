@@ -157,6 +157,16 @@ class ServerAPI:
         return None
 
     @check_bucket_exists
+    def get_event(
+        self,
+        bucket_id: str,
+        event_id: str,
+    ) -> Event:
+        """Get a single event from a bucket"""
+        logger.debug("Received get request for event in bucket '{}'".format(bucket_id))
+        return self.db[bucket_id].get(bucket_id)
+
+    @check_bucket_exists
     def get_events(
         self,
         bucket_id: str,

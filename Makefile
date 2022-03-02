@@ -28,6 +28,9 @@ package:
 	python -m aw_server.__about__
 	pyinstaller aw-server.spec --clean --noconfirm
 
+lint-fix:
+	black .
+
 clean:
 	rm -rf build dist
 	rm -rf aw_server/__pycache__

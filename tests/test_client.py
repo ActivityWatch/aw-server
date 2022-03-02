@@ -33,7 +33,7 @@ def aw_client():
 
 @pytest.fixture(scope="function")
 def bucket(aw_client):
-    bucket_id = "test-" + str(random.randint(0, 10 ** 5))
+    bucket_id = "test-" + str(random.randint(0, 10**5))
     event_type = "testevents"
     aw_client.create_bucket(bucket_id, event_type, queued=False)
     print(f"Created bucket {bucket_id}")

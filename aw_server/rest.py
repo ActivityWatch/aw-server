@@ -243,11 +243,11 @@ class EventResource(Resource):
     # For some reason this doesn't work with the JSONSchema variant
     # Marshalling doesn't work with JSONSchema events
     # @api.marshal_list_with(event)
-    # @api.doc(model=event)
-    # @copy_doc(ServerAPI.get_event)
-    # def get(self, bucket_id, event_id):
-    #     events = current_app.api.get_events(bucket_id, limit=limit, start=start, end=end)
-    #     return events, 200
+    @api.doc(model=event)
+    @copy_doc(ServerAPI.get_event)
+    def get(self, bucket_id, event_id):
+        events = current_app.api.get_event(bucket_id)
+        return events, 200
 
     @copy_doc(ServerAPI.delete_event)
     def delete(self, bucket_id, event_id):

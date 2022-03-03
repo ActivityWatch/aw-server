@@ -246,8 +246,11 @@ class EventResource(Resource):
         logger.debug(
             f"Received get request for event with id '{event_id}' in bucket '{bucket_id}'"
         )
-        events = current_app.api.get_event(bucket_id, event_id)
-        return events, 200
+        event = current_app.api.get_event(bucket_id, event_id)
+        if event:
+            return event, 200
+        else:
+            return None, 404
 
     @copy_doc(ServerAPI.delete_event)
     def delete(self, bucket_id: str, event_id: int):

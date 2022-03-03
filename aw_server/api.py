@@ -161,14 +161,13 @@ class ServerAPI:
         self,
         bucket_id: str,
         event_id: int,
-    ) -> Event:
+    ) -> Optional[Event]:
         """Get a single event from a bucket"""
         logger.debug(
             f"Received get request for event {event_id} in bucket '{bucket_id}'"
         )
         event = self.db[bucket_id].get_by_id(event_id)
-        if event:
-            return event.to_json_dict()
+        return event.to_json_dict() if event else None
 
     @check_bucket_exists
     def get_events(

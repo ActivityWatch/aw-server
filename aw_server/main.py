@@ -5,6 +5,7 @@ from aw_core.log import setup_logging
 
 from .server import _start
 from .config import config
+from . import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,11 @@ def parse_settings():
     )
     parser.add_argument("--verbose", action="store_true", help="Be chatty.")
     parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Print version and quit",
+    )
+    parser.add_argument(
         "--log-json", action="store_true", help="Output the logs in JSON format"
     )
     parser.add_argument(
@@ -84,6 +90,9 @@ def parse_settings():
         help="The custom static directories. Format: watcher_name=path,watcher_name2=path2,...",
     )
     args = parser.parse_args()
+    if args.version:
+        print(__version__)
+        exit(0)
 
     """ Parse config file """
     configsection = "server" if not args.testing else "server-testing"

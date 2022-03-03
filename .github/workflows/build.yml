@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-18.04, windows-latest, macOS-latest]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
         python_version: [3.9]
     steps:
     - uses: actions/checkout@v2
@@ -42,7 +42,6 @@ jobs:
       run: |
         source venv/bin/activate || source venv/Scripts/activate
         make test
-        make typecheck
         bash <(curl -s https://codecov.io/bash)
     - name: Package
       shell: bash
@@ -50,3 +49,38 @@ jobs:
         source venv/bin/activate || source venv/Scripts/activate
         pip install pyinstaller
         make package
+
+  typecheck:
+    name: Typecheck
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE: false
+      SKIP_WEBUI: true
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python_version: [3.9]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Create virtualenv
+      shell: bash
+      run: |
+        pip install virtualenv
+        python -m virtualenv venv
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install poetry
+        source venv/bin/activate || source venv/Scripts/activate
+        make build
+    - name: Typecheck
+      shell: bash
+      run: |
+        source venv/bin/activate || source venv/Scripts/activate
+        make typecheck

@@ -41,7 +41,7 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "aw-client"
-version = "0.5.7"
+version = "0.5.8"
 description = "Client library for ActivityWatch"
 category = "main"
 optional = false
@@ -50,8 +50,10 @@ python-versions = ">=3.7,<4.0"
 [package.dependencies]
 aw-core = ">=0.5.7,<0.6.0"
 click = ">=8.0,<9.0"
-persist-queue = ">=0.6.0,<0.7.0"
-requests = ">=2.22,<3.0"
+persist-queue = "*"
+requests = "*"
+tabulate = "*"
+typing-extensions = "*"
 
 [[package]]
 name = "aw-core"
@@ -144,6 +146,9 @@ description = "Code coverage measurement for Python"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
+
+[package.dependencies]
+tomli = {version = "*", optional = true, markers = "extra == \"toml\""}
 
 [package.extras]
 toml = ["tomli"]
@@ -350,7 +355,7 @@ python-versions = "*"
 
 [[package]]
 name = "persist-queue"
-version = "0.6.0"
+version = "0.7.0"
 description = "A thread-safe disk based persistent queue in Python."
 category = "main"
 optional = false
@@ -458,16 +463,15 @@ histogram = ["pygal", "pygaljs"]
 
 [[package]]
 name = "pytest-cov"
-version = "2.12.1"
+version = "3.0.0"
 description = "Pytest plugin for measuring coverage."
 category = "dev"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+python-versions = ">=3.6"
 
 [package.dependencies]
-coverage = ">=5.2.1"
+coverage = {version = ">=5.2.1", extras = ["toml"]}
 pytest = ">=4.6"
-toml = "*"
 
 [package.extras]
 testing = ["fields", "hunter", "process-tests", "six", "pytest-xdist", "virtualenv"]
@@ -548,6 +552,17 @@ description = "Strict, simple, lightweight RFC3339 functions"
 category = "main"
 optional = false
 python-versions = "*"
+
+[[package]]
+name = "tabulate"
+version = "0.8.9"
+description = "Pretty-print tabular data"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.extras]
+widechars = ["wcwidth"]
 
 [[package]]
 name = "takethetime"
@@ -649,7 +664,7 @@ python-versions = "*"
 name = "typing-extensions"
 version = "4.1.1"
 description = "Backported and Experimental Type Hints for Python 3.6+"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -692,7 +707,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "9a6fe3a48060091569ebf2e357938ab2a4eb5f63ac23cb08196ebcf975c7723b"
+content-hash = "4e945903079142bb8e286cb7b3b6a96e944c42f2abac2acbfd8d7f5b7ea50878"
 
 [metadata.files]
 aniso8601 = [
@@ -712,8 +727,8 @@ attrs = [
     {file = "attrs-21.4.0.tar.gz", hash = "sha256:626ba8234211db98e869df76230a137c4c40a12d72445c45d5f5b716f076e2fd"},
 ]
 aw-client = [
-    {file = "aw-client-0.5.7.tar.gz", hash = "sha256:fe61d5f2f10be9bf38ff0db509a6bda139a05126b5b30258e94ca25ce5cc6003"},
-    {file = "aw_client-0.5.7-py3-none-any.whl", hash = "sha256:5807dfe33d8e74856ec65c8ee2910f062d5654f4cd5f2366d43409c1c4be357e"},
+    {file = "aw-client-0.5.8.tar.gz", hash = "sha256:8c1d7b5735ece75e5146f106fc2e8623341549059d45c8fdd990fc85507f28c7"},
+    {file = "aw_client-0.5.8-py3-none-any.whl", hash = "sha256:782c84993a283b66ab8a16ff776a314d9baf2ebf5e27ef873b22e1ef78e83f4a"},
 ]
 aw-core = [
     {file = "aw-core-0.5.8.tar.gz", hash = "sha256:47927c8d1bab7d7837589226af89f2871b60b7e69ccdc90f480b20d362450d41"},
@@ -927,8 +942,8 @@ peewee = [
     {file = "peewee-3.14.9.tar.gz", hash = "sha256:69c1b88dc89b184231cc1ce6df241075aca5cec43e89749cc4a63108f9ceea47"},
 ]
 persist-queue = [
-    {file = "persist-queue-0.6.0.tar.gz", hash = "sha256:e73dd62545d37e519247d96368bfa5c510fde66999a338d6d2d44790dc10f89b"},
-    {file = "persist_queue-0.6.0-py2.py3-none-any.whl", hash = "sha256:b7a6a6e642bed23076f03d15d08d87aebad32029f3e702cc10f5b86d6fbd0cb7"},
+    {file = "persist-queue-0.7.0.tar.gz", hash = "sha256:e85452d204536fdfc707a72290008dca376b636088a9d5de5eab52cdfde06142"},
+    {file = "persist_queue-0.7.0-py2.py3-none-any.whl", hash = "sha256:2571f1c235daf5ebda7bd826de010cc1a867fc14ae6c223f86199f3a0c96c09c"},
 ]
 platformdirs = [
     {file = "platformdirs-2.5.1-py3-none-any.whl", hash = "sha256:bcae7cab893c2d310a711b70b24efb93334febe65f8de776ee320b517471e227"},
@@ -981,8 +996,8 @@ pytest-benchmark = [
     {file = "pytest_benchmark-3.4.1-py2.py3-none-any.whl", hash = "sha256:36d2b08c4882f6f997fd3126a3d6dfd70f3249cde178ed8bbc0b73db7c20f809"},
 ]
 pytest-cov = [
-    {file = "pytest-cov-2.12.1.tar.gz", hash = "sha256:261ceeb8c227b726249b376b8526b600f38667ee314f910353fa318caa01f4d7"},
-    {file = "pytest_cov-2.12.1-py2.py3-none-any.whl", hash = "sha256:261bb9e47e65bd099c89c3edf92972865210c36813f80ede5277dceb77a4a62a"},
+    {file = "pytest-cov-3.0.0.tar.gz", hash = "sha256:e7f0f5b1617d2210a2cabc266dfe2f4c75a8d32fb89eafb7ad9d06f6d076d470"},
+    {file = "pytest_cov-3.0.0-py3-none-any.whl", hash = "sha256:578d5d15ac4a25e5f961c938b85a05b09fdaae9deef3bb6de9a6e766622ca7a6"},
 ]
 pytest-flask = [
     {file = "pytest-flask-1.2.0.tar.gz", hash = "sha256:46fde652f77777bf02dc91205aec4ce20cdf2acbbbd66a918ab91f5c14693d3d"},
@@ -1010,6 +1025,10 @@ six = [
 ]
 strict-rfc3339 = [
     {file = "strict-rfc3339-0.7.tar.gz", hash = "sha256:5cad17bedfc3af57b399db0fed32771f18fc54bbd917e85546088607ac5e1277"},
+]
+tabulate = [
+    {file = "tabulate-0.8.9-py3-none-any.whl", hash = "sha256:d7c013fe7abbc5e491394e10fa845f8f32fe54f8dc60c6622c6cf482d25d47e4"},
+    {file = "tabulate-0.8.9.tar.gz", hash = "sha256:eb1d13f25760052e8931f2ef80aaf6045a6cceb47514db8beab24cded16f13a7"},
 ]
 takethetime = [
     {file = "TakeTheTime-0.3.1.tar.gz", hash = "sha256:dbe30453a1b596a38f9e2e3fa8e1adc5af2dbf646ca0837ad5c2059a16fe2ff9"},

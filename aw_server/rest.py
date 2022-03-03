@@ -238,19 +238,19 @@ class EventCountResource(Resource):
         return events, 200
 
 
-@api.route("/0/buckets/<string:bucket_id>/events/<string:event_id>")
+@api.route("/0/buckets/<string:bucket_id>/events/<int:event_id>")
 class EventResource(Resource):
-    # For some reason this doesn't work with the JSONSchema variant
-    # Marshalling doesn't work with JSONSchema events
-    # @api.marshal_list_with(event)
     @api.doc(model=event)
     @copy_doc(ServerAPI.get_event)
-    def get(self, bucket_id, event_id):
-        events = current_app.api.get_event(bucket_id)
+    def get(self, bucket_id: str, event_id: int):
+        logger.debug(
+            f"Received get request for event with id '{event_id}' in bucket '{bucket_id}'"
+        )
+        events = current_app.api.get_event(bucket_id, event_id)
         return events, 200
 
     @copy_doc(ServerAPI.delete_event)
-    def delete(self, bucket_id, event_id):
+    def delete(self, bucket_id: str, event_id: int):
         logger.debug(
             "Received delete request for event with id '{}' in bucket '{}'".format(
                 event_id, bucket_id

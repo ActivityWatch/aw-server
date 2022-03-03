@@ -10,22 +10,22 @@ aw-server = "aw_server:main"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-aw-core = "^0.5.5"
-aw-client = "^0.5.5"
-appdirs = "^1.4.3"
+aw-core = "^0.5.8"
+aw-client = "^0.5.8"
+appdirs = "*"
 flask = "^2.0"
 flask-restx = "^0.5.1"
-flask-cors = "^3.0.8"
+flask-cors = "*"
 
 [tool.poetry.dev-dependencies]
 mypy = "*"
 pytest = "^6.0"
-pytest-flask = "^1.2.0"
-pytest-benchmark = "^3.2.2"
-pytest-cov = "^2.10.1"
-types-Werkzeug = "^1.0.1"
-types-pkg-resources = "^0.1.2"
-types-Flask = "^1.1.0"
+pytest-flask = "*"
+pytest-benchmark = "*"
+pytest-cov = "*"
+types-Werkzeug = "*"
+types-pkg-resources = "*"
+types-Flask = "*"
 black = "^22.1.0"
 
 [tool.pytest.ini_options]

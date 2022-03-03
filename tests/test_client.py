@@ -184,6 +184,23 @@ def test_insert_events(aw_client, bucket):
     assert events == sorted(recv_events, key=lambda e: e.timestamp)
 
 
+def test_get_event_single(aw_client, bucket):
+    start_dt = datetime.now(tz=timezone.utc) - timedelta(days=50)
+    delta = timedelta(hours=1)
+    events = _create_periodic_events(10, delta=delta, start=start_dt)
+
+    aw_client.insert_events(bucket, events)
+
+    events = aw_client.get_events(bucket)
+
+    for e in events:
+        e2 = aw_client.get_event(bucket, e.id)
+        assert e.id == e2.id
+        assert e.timestamp == e2.timestamp
+        assert e.duration == e2.duration
+        assert e.data == e2.data
+
+
 def test_get_events_interval(aw_client, bucket):
     start_dt = datetime.now(tz=timezone.utc) - timedelta(days=50)
     end_dt = start_dt + timedelta(days=1)

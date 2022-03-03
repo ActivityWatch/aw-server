@@ -41,7 +41,7 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "aw-client"
-version = "0.5.8"
+version = "0.5.9"
 description = "Client library for ActivityWatch"
 category = "main"
 optional = false
@@ -57,7 +57,7 @@ typing-extensions = "*"
 
 [[package]]
 name = "aw-core"
-version = "0.5.8"
+version = "0.5.9"
 description = "Core library for ActivityWatch"
 category = "main"
 optional = false
@@ -727,12 +727,12 @@ attrs = [
     {file = "attrs-21.4.0.tar.gz", hash = "sha256:626ba8234211db98e869df76230a137c4c40a12d72445c45d5f5b716f076e2fd"},
 ]
 aw-client = [
-    {file = "aw-client-0.5.8.tar.gz", hash = "sha256:8c1d7b5735ece75e5146f106fc2e8623341549059d45c8fdd990fc85507f28c7"},
-    {file = "aw_client-0.5.8-py3-none-any.whl", hash = "sha256:782c84993a283b66ab8a16ff776a314d9baf2ebf5e27ef873b22e1ef78e83f4a"},
+    {file = "aw-client-0.5.9.tar.gz", hash = "sha256:fd93dc58582492fca316c59aeaa4d24651284ef94c9aed92d94b4afd812a6cfa"},
+    {file = "aw_client-0.5.9-py3-none-any.whl", hash = "sha256:1c2449bbaecfb42e029268c67d9eea8cbc4b807e80e59a0389c1b771b43d62de"},
 ]
 aw-core = [
-    {file = "aw-core-0.5.8.tar.gz", hash = "sha256:47927c8d1bab7d7837589226af89f2871b60b7e69ccdc90f480b20d362450d41"},
-    {file = "aw_core-0.5.8-py3-none-any.whl", hash = "sha256:18262729514c5196b915ffc142d98b07e2d743d92d00e2c76e49b601edc4a280"},
+    {file = "aw-core-0.5.9.tar.gz", hash = "sha256:81149f6a971f192aa91183066f78f2bdb4c14de826f79b6607b3b52984f2ddb8"},
+    {file = "aw_core-0.5.9-py3-none-any.whl", hash = "sha256:4f725d42ce11f5f7f1f6883811a925214bdaf114a4e68cfa58ce8a66cc23cfc6"},
 ]
 black = [
     {file = "black-22.1.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:1297c63b9e1b96a3d0da2d85d11cd9bf8664251fd69ddac068b98dc4f34f73b6"},

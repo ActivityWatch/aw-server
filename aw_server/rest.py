@@ -26,10 +26,13 @@ def host_header_check(f):
 
     @wraps(f)
     def decorator(*args, **kwargs):
-        # TODO: What if server is bound to 0.0.0.0?
         server_host = current_app.config["HOST"]
         req_host = request.headers.get("host", None)
-        if req_host is None:
+        if server_host == "0.0.0.0":
+            logger.warning(
+                "Server is listening on 0.0.0.0, host header check is disabled (potential security issue)."
+            )
+        elif req_host is None:
             return {"message": "host header is missing"}, 400
         else:
             if req_host.split(":")[0] not in ["localhost", "127.0.0.1", server_host]:

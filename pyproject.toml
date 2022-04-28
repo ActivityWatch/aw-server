@@ -17,6 +17,11 @@ flask = "^2.0"
 flask-restx = "^0.5.1"
 flask-cors = "*"
 
+# No longer needed once:
+#   https://github.com/pallets/flask/commit/d023d943715f193e78413280e10d101f39501748
+# has been release (or minimum Python bumped to v3.10)
+importlib-metadata = {version = "*", python = "<3.10"}
+
 [tool.poetry.dev-dependencies]
 mypy = "*"
 pytest = "^6.0"

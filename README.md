@@ -33,7 +33,7 @@ aw-server
 If you want to run aw-server in development, you probably want to run a
 development instance beside your personal (stable) instance. You can do
 this by giving aw-server the `--testing` flag. This will start the server
-on another port and use a seperate datastore.
+on another port and use a separate datastore.
 
 ```bash
 aw-server --testing

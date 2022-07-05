@@ -103,6 +103,7 @@ class ServerAPI:
     def import_bucket(self, bucket_data: Any):
         bucket_id = bucket_data["id"]
         logger.info("Importing bucket {}".format(bucket_id))
+
         # TODO: Check that bucket doesn't already exist
         self.db.create_bucket(
             bucket_id,
@@ -115,6 +116,13 @@ class ServerAPI:
                 else iso8601.parse_date(bucket_data["created"])
             ),
         )
+
+        # scrub IDs from events
+        # (otherwise causes weird bugs with no events seemingly imported when importing events exported from aw-server-rust, which contains IDs)
+        for event in bucket_data["events"]:
+            if "id" in event:
+                del event["id"]
+
         self.create_events(
             bucket_id,
             [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]],

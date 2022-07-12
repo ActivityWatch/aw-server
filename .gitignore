@@ -12,3 +12,4 @@ profiling
 .coverage
 htmlcov
 coverage.xml
+coverage_html

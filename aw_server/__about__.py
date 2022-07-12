@@ -4,9 +4,7 @@ import logging
 from typing import Optional
 from pathlib import Path
 
-import pkg_resources
-
-from importlib.metadata import version as get_version
+from importlib.metadata import PackageNotFoundError, version as get_version
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +16,7 @@ projectpath = srcpath.parent
 bundlepath = projectpath.parent  # the ActivityWatch bundle repo, in some circumstances
 
 # This line set by script when run (metaprogramming)
-__version__ = "v0.12.0b2.dev+1c03eb2"
+__version__ = "v0.12.0b2.dev+f66fd9d"
 
 
 def get_rev():
@@ -57,8 +55,9 @@ def get_tag_latest():
         tag = subprocess.check_output(
             ["git", "describe", "--abbrev=0", "--tags"], encoding="utf8", cwd=workdir
         ).strip()
-        if tag:
-            basever = tag
+        if not tag:
+            return
+        basever = tag
     except subprocess.CalledProcessError as e:
         print(e)
         return
@@ -87,7 +86,7 @@ def detect_version_git() -> Optional[str]:
 def detect_version_pkg() -> Optional[str]:
     try:
         return f"v{get_version('aw-server')}.dev+{get_rev()}"
-    except pkg_resources.DistributionNotFound:
+    except PackageNotFoundError:
         return None
 
 

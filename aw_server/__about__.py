@@ -1,22 +1,24 @@
-from typing import Optional
-import os
 import subprocess
-import pkg_resources
 import re
 import logging
+from typing import Optional
 from pathlib import Path
+
+import pkg_resources
+
+from importlib.metadata import version as get_version
 
 logger = logging.getLogger(__name__)
 
 # TODO: Remove reliance on
-basever = "v0.11"
+basever = "v0.12"
 
 srcpath = Path(__file__).absolute().parent
 projectpath = srcpath.parent
 bundlepath = projectpath.parent  # the ActivityWatch bundle repo, in some circumstances
 
 # This line set by script when run (metaprogramming)
-__version__ = "v0.12.0b1.dev+5096717"
+__version__ = "v0.12.0b2.dev+1c03eb2"
 
 
 def get_rev():
@@ -84,7 +86,7 @@ def detect_version_git() -> Optional[str]:
 
 def detect_version_pkg() -> Optional[str]:
     try:
-        return f"v{pkg_resources.get_distribution('aw-server').version}.dev+{get_rev()}"
+        return f"v{get_version('aw-server')}.dev+{get_rev()}"
     except pkg_resources.DistributionNotFound:
         return None
 

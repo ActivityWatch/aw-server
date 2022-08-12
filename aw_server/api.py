@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def get_device_id() -> str:
     path = Path(get_data_dir("aw-server")) / "device_id"
     if path.exists():
-        with open(path, "r") as f:
+        with open(path) as f:
             return f.read()
     else:
         uuid = str(uuid4())
@@ -40,7 +40,7 @@ def check_bucket_exists(f):
     def g(self, bucket_id, *args, **kwargs):
         if bucket_id not in self.db.buckets():
             raise NotFound(
-                "NoSuchBucket", "There's no bucket named {}".format(bucket_id)
+                "NoSuchBucket", f"There's no bucket named {bucket_id}"
             )
         return f(self, bucket_id, *args, **kwargs)
 
@@ -102,7 +102,7 @@ class ServerAPI:
 
     def import_bucket(self, bucket_data: Any):
         bucket_id = bucket_data["id"]
-        logger.info("Importing bucket {}".format(bucket_id))
+        logger.info(f"Importing bucket {bucket_id}")
 
         # TODO: Check that bucket doesn't already exist
         self.db.create_bucket(
@@ -161,7 +161,7 @@ class ServerAPI:
     def delete_bucket(self, bucket_id: str) -> None:
         """Delete a bucket"""
         self.db.delete_bucket(bucket_id)
-        logger.debug("Deleted bucket '{}'".format(bucket_id))
+        logger.debug(f"Deleted bucket '{bucket_id}'")
         return None
 
     @check_bucket_exists
@@ -186,7 +186,7 @@ class ServerAPI:
         end: datetime = None,
     ) -> List[Event]:
         """Get events from a bucket"""
-        logger.debug("Received get request for events in bucket '{}'".format(bucket_id))
+        logger.debug(f"Received get request for events in bucket '{bucket_id}'")
         if limit is None:  # Let limit = None also mean "no limit"
             limit = -1
         events = [
@@ -207,7 +207,7 @@ class ServerAPI:
     ) -> int:
         """Get eventcount from a bucket"""
         logger.debug(
-            "Received get request for eventcount in bucket '{}'".format(bucket_id)
+            f"Received get request for eventcount in bucket '{bucket_id}'"
         )
         return self.db[bucket_id].get_eventcount(start, end)
 
@@ -310,7 +310,7 @@ class ServerAPI:
             ]  # iso8601 timeperiods are separated by a slash
             starttime = iso8601.parse_date(period[0])
             endtime = iso8601.parse_date(period[1])
-            query = str().join(query)
+            query = ''.join(query)
             result.append(query2.query(name, query, starttime, endtime, self.db))
         return result
 
@@ -318,7 +318,7 @@ class ServerAPI:
     def get_log(self):
         """Get the server log in json format"""
         payload = []
-        with open(get_log_file_path(), "r") as log_file:
+        with open(get_log_file_path()) as log_file:
             for line in log_file.readlines()[::-1]:
                 payload.append(json.loads(line))
         return payload, 200

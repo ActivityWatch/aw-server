@@ -30,7 +30,7 @@ def main():
         log_file_json=False,
     )
 
-    logger.info("Using storage method: {}".format(settings.storage))
+    logger.info(f"Using storage method: {settings.storage}")
 
     if settings.testing:
         logger.info("Will run in testing mode")

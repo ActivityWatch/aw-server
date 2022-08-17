@@ -456,7 +456,7 @@ class GetJiraData(Resource):
     def get(self):
         try:
             url = '{}/rest/api/3/search?jql={}'.format(config['jira']['base_url'], config['jira']['jql'])
-            response = requests.get(url, verify=False, auth=HTTPBasicAuth(config['jira']['email'], config['jira']['api_key']))
+            response = requests.get(url, auth=HTTPBasicAuth(config['jira']['email'], config['jira']['api_key']))
             
             if response.status_code == 200:
                 return response.json(), 200

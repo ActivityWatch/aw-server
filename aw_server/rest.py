@@ -204,7 +204,7 @@ class EventsResource(Resource):
         end = iso8601.parse_date(args["end"]) if "end" in args else None
 
         events = current_app.api.get_events(
-            bucket_id, limit=limit, end=end
+            bucket_id, limit=limit, start=start, end=end
         )
         return events, 200
 

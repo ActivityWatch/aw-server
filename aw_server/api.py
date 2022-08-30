@@ -39,9 +39,7 @@ def check_bucket_exists(f):
     @functools.wraps(f)
     def g(self, bucket_id, *args, **kwargs):
         if bucket_id not in self.db.buckets():
-            raise NotFound(
-                "NoSuchBucket", f"There's no bucket named {bucket_id}"
-            )
+            raise NotFound("NoSuchBucket", f"There's no bucket named {bucket_id}")
         return f(self, bucket_id, *args, **kwargs)
 
     return g
@@ -206,9 +204,7 @@ class ServerAPI:
         self, bucket_id: str, start: datetime = None, end: datetime = None
     ) -> int:
         """Get eventcount from a bucket"""
-        logger.debug(
-            f"Received get request for eventcount in bucket '{bucket_id}'"
-        )
+        logger.debug(f"Received get request for eventcount in bucket '{bucket_id}'")
         return self.db[bucket_id].get_eventcount(start, end)
 
     @check_bucket_exists
@@ -310,7 +306,7 @@ class ServerAPI:
             ]  # iso8601 timeperiods are separated by a slash
             starttime = iso8601.parse_date(period[0])
             endtime = iso8601.parse_date(period[1])
-            query = ''.join(query)
+            query = "".join(query)
             result.append(query2.query(name, query, starttime, endtime, self.db))
         return result
 

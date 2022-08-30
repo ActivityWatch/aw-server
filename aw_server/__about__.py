@@ -90,6 +90,18 @@ def detect_version_pkg() -> Optional[str]:
         return None
 
 
+def detect_version_poetry() -> Optional[str]:
+    """Detect version from pyproject.toml file, with `poetry version -s`"""
+    try:
+        basever = subprocess.check_output(
+            ["poetry", "version", "-s"], encoding="utf8", cwd=workdir
+        ).strip()
+    except subprocess.CalledProcessError as e:
+        print(e)
+        return None
+    return f"v{basever}.dev+{get_rev()}"
+
+
 def detect_version():
     for detectfunc in (detect_version_git, detect_version_pkg):
         version = detectfunc()

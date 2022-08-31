@@ -1,11 +1,13 @@
-.PHONY: aw_webui build install test typecheck package clean
+.PHONY: aw-webui build install test typecheck package clean
 
-build: aw_webui
+build: aw-webui
 	poetry install
 
-aw_webui:
+aw-webui:
 	mkdir -p aw_server/static/
-ifndef SKIP_WEBUI  # Skip building webui if SKIP_WEBUI is defined
+ifeq ($(SKIP_WEBUI),true) # Skip building webui if SKIP_WEBUI is true
+	@echo "Skipping building webui"
+else
 	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
 	# Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279

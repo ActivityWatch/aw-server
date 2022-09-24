@@ -42,7 +42,11 @@ jobs:
       run: |
         source venv/bin/activate || source venv/Scripts/activate
         make test
-        bash <(curl -s https://codecov.io/bash)
+    - name: Report coverage
+      shell: bash
+      run: |
+        # allow failures since codecov servers can be grumpy
+        bash <(curl -s https://codecov.io/bash) || true
     - name: Package
       shell: bash
       run: |

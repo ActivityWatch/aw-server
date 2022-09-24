@@ -18,6 +18,10 @@ flask-restx = "^0.5.1"
 flask-cors = "*"
 importlib-metadata = {version = "*", python = "<3.10"}
 
+# locked waiting for: https://stackoverflow.com/a/73109165/965332
+# should be updated asap to avoid security issues
+werkzeug = "2.1.2"
+
 [tool.poetry.dev-dependencies]
 mypy = "*"
 pytest = "^7.0"

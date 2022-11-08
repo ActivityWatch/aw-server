@@ -116,7 +116,7 @@ def _start(
             port=port,
             request_handler=FlaskLogHandler,
             use_reloader=False,
-            threaded=False,
+            threaded=True,
         )
     except OSError as e:
         logger.exception(e)

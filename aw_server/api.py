@@ -180,8 +180,8 @@ class ServerAPI:
         self,
         bucket_id: str,
         limit: int = -1,
-        start: datetime = None,
-        end: datetime = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
     ) -> List[Event]:
         """Get events from a bucket"""
         logger.debug(f"Received get request for events in bucket '{bucket_id}'")
@@ -201,7 +201,7 @@ class ServerAPI:
 
     @check_bucket_exists
     def get_eventcount(
-        self, bucket_id: str, start: datetime = None, end: datetime = None
+        self, bucket_id: str, start: Optional[datetime] = None, end: Optional[datetime] = None
     ) -> int:
         """Get eventcount from a bucket"""
         logger.debug(f"Received get request for eventcount in bucket '{bucket_id}'")

@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "aw-server"
 version = "0.12.0"
-description = ""
+description = "Server for ActivityWatch"
 authors = ["Erik Bjäreholt <erik@bjareho.lt>"]
 license = "MPL-2.0"
 
@@ -14,7 +14,7 @@ aw-core = "^0.5.8"
 aw-client = "^0.5.8"
 appdirs = "*"
 flask = "^2.0"
-flask-restx = "^0.5.1"
+flask-restx = "^1.0.3"
 flask-cors = "*"
 importlib-metadata = {version = "*", python = "<3.10"}
 

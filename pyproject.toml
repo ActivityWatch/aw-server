@@ -38,6 +38,9 @@ minversion = "6.0"
 addopts = "--cov-report=term --cov-report=xml --cov-report=html --cov=aw_server"
 python_files = ["*.py",]
 
+[tool.ruff]
+ignore = ["E402", "E501"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

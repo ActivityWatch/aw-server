@@ -1,15 +1,14 @@
 import logging
 
 import pytest
-
-import aw_server
+from aw_server.server import create_app
 
 logging.basicConfig(level=logging.WARN)
 
 
 @pytest.fixture(scope="session")
 def app():
-    return aw_server.create_app("127.0.0.1", testing=True)
+    return create_app("127.0.0.1", testing=True)
 
 
 @pytest.fixture(scope="session")

@@ -30,7 +30,16 @@ package:
 	python -m aw_server.__about__
 	pyinstaller aw-server.spec --clean --noconfirm
 
+PYFILES=$(shell find . -name '*.py')
+
+lint:
+	ruff check .
+
 lint-fix:
+	poetry run pyupgrade --py38-plus --exit-zero-even-if-changed $(PYFILES)
+	ruff check --fix .
+
+format:
 	black .
 
 clean:

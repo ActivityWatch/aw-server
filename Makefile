@@ -24,7 +24,7 @@ test:
 	python -m pytest tests/test_server.py
 
 typecheck:
-	python -m mypy aw_server --ignore-missing-imports
+	python -m mypy aw_server tests --ignore-missing-imports
 
 package:
 	python -m aw_server.__about__

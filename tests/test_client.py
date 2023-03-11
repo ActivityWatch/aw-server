@@ -151,7 +151,7 @@ def test_queued_heartbeat(aw_client, queued_bucket):
         sleep(0.5)
 
     assert i != max_tries - 1
-    print("Done on the {}th try".format(i + 1))
+    print(f"Done on the {i + 1}th try")
 
     assert len(events) == 1
     event = events[0]

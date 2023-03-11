@@ -1,24 +1,26 @@
-from typing import Dict, List, Any, Optional
-from datetime import datetime
-from socket import gethostname
-from pathlib import Path
-from uuid import uuid4
 import functools
 import json
 import logging
+from datetime import datetime
+from pathlib import Path
+from socket import gethostname
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+)
+from uuid import uuid4
+
 import iso8601
-
-from aw_core.models import Event
-from aw_core.log import get_log_file_path
 from aw_core.dirs import get_data_dir
-
+from aw_core.log import get_log_file_path
+from aw_core.models import Event
 from aw_query import query2
 from aw_transform import heartbeat_merge
 
 from .__about__ import __version__
-
-from .exceptions import BadRequest, NotFound, Unauthorized
-
+from .exceptions import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +203,10 @@ class ServerAPI:
 
     @check_bucket_exists
     def get_eventcount(
-        self, bucket_id: str, start: Optional[datetime] = None, end: Optional[datetime] = None
+        self,
+        bucket_id: str,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
     ) -> int:
         """Get eventcount from a bucket"""
         logger.debug(f"Received get request for eventcount in bucket '{bucket_id}'")

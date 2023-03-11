@@ -20,9 +20,13 @@ Another parameter called "view" can be used if you want to create multiple visua
   See https://github.com/ActivityWatch/activitywatch/issues/453#issuecomment-910567848
 
 """
-import logging
 
-from flask import Blueprint, send_from_directory, jsonify, escape
+from flask import (
+    Blueprint,
+    escape,
+    jsonify,
+    send_from_directory,
+)
 
 
 def get_custom_static_blueprint(custom_static_directories):

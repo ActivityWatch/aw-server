@@ -1,17 +1,21 @@
-import os
 import logging
-from typing import List, Dict
-
-from flask import Flask, Blueprint, current_app, send_from_directory
-from flask_cors import CORS
+import os
+from typing import Dict, List
 
 import aw_datastore
 from aw_datastore import Datastore
-from .custom_static import get_custom_static_blueprint
+from flask import (
+    Blueprint,
+    Flask,
+    current_app,
+    send_from_directory,
+)
+from flask_cors import CORS
 
-from .log import FlaskLogHandler
-from .api import ServerAPI
 from . import rest
+from .api import ServerAPI
+from .custom_static import get_custom_static_blueprint
+from .log import FlaskLogHandler
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +30,7 @@ class AWFlask(Flask):
         Flask.__init__(self, name, *args, **kwargs)
 
         # Is set on later initialization
-        self.api = None  # type: ServerAPI
+        self.api: ServerAPI = None  # type: ignore
 
 
 def create_app(
@@ -76,9 +80,8 @@ def static_js(path):
 def _config_cors(cors_origins: List[str], testing: bool):
     if cors_origins:
         logger.warning(
-            "Running with additional allowed CORS origins specified through config or CLI argument (could be a security risk): {}".format(
-                cors_origins
-            )
+            "Running with additional allowed CORS origins specified through config "
+            "or CLI argument (could be a security risk): {}".format(cors_origins)
         )
 
     if testing:

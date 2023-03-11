@@ -10,13 +10,13 @@ def bucket(flask_client):
     try:
         bucket_id = "test"
         r = flask_client.post(
-            "/api/0/buckets/{}".format(bucket_id),
+            f"/api/0/buckets/{bucket_id}",
             json={"client": "test", "type": "test", "hostname": "test"},
         )
         assert r.status_code == 200
         yield bucket_id
     finally:
-        r = flask_client.delete("/api/0/buckets/{}".format(bucket_id))
+        r = flask_client.delete(f"/api/0/buckets/{bucket_id}")
         assert r.status_code == 200
 
 

@@ -1,11 +1,11 @@
 import logging
 
-from aw_datastore import get_storage_methods
 from aw_core.log import setup_logging
+from aw_datastore import get_storage_methods
 
-from .server import _start
-from .config import config
 from . import __version__
+from .config import config
+from .server import _start
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,6 @@ def main():
         verbose=settings.verbose,
         log_stderr=True,
         log_file=True,
-        log_file_json=False,
     )
 
     logger.info(f"Using storage method: {settings.storage}")

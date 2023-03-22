@@ -19,7 +19,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         python_version: [3.9]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: 'recursive'
     - name: Set up Python
@@ -60,7 +60,7 @@ jobs:
         os: [ubuntu-latest]
         python_version: [3.9]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: 'recursive'
     - name: Set up Python

@@ -23,7 +23,7 @@ jobs:
       with:
         submodules: 'recursive'
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install dependencies
@@ -64,7 +64,7 @@ jobs:
       with:
         submodules: 'recursive'
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install dependencies

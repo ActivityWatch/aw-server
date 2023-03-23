@@ -28,7 +28,7 @@ pytest-cov = "*"
 types-Werkzeug = "*"
 types-pkg-resources = "*"
 types-Flask = "*"
-black = "^22.1.0"
+black = "^23.1.0"
 
 [tool.pytest.ini_options]
 minversion = "6.0"

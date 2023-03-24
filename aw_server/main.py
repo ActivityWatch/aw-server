@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from aw_core.log import setup_logging
 from aw_datastore import get_storage_methods
@@ -91,7 +92,7 @@ def parse_settings():
     args = parser.parse_args()
     if args.version:
         print(__version__)
-        exit(0)
+        sys.exit(0)
 
     """ Parse config file """
     configsection = "server" if not args.testing else "server-testing"

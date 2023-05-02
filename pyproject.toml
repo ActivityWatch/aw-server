@@ -13,7 +13,7 @@ python = "^3.8"
 aw-core = "^0.5.8"
 aw-client = "^0.5.8"
 appdirs = "*"
-flask = "^2.2"
+flask = "^2.3"
 flask-restx = "^1.0.3"
 flask-cors = "*"
 importlib-metadata = {version = "*", python = "<3.10"}

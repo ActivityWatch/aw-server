@@ -48,14 +48,14 @@ tests-no-zope = ["cloudpickle", "cloudpickle", "hypothesis", "hypothesis", "mypy
 
 [[package]]
 name = "aw-client"
-version = "0.5.11"
+version = "0.5.12"
 description = "Client library for ActivityWatch"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "aw_client-0.5.11-py3-none-any.whl", hash = "sha256:3776f309aacf4c2f002b392b889064e304d8d7e68f4003c6dd61f9ed064fd641"},
-    {file = "aw_client-0.5.11.tar.gz", hash = "sha256:e844a34253cd8866dac4e7a51662d1fadfc5376cb23178286d310bae8db0da29"},
+    {file = "aw_client-0.5.12-py3-none-any.whl", hash = "sha256:12bd6cbc02a06e970267f7f192a31a0036b4a9f9ae0852bd0a8bc718b9b8ea5a"},
+    {file = "aw_client-0.5.12.tar.gz", hash = "sha256:824b5e83abe755d5f089bbbf87eaabdc8895220c1642904a5aa6b66fba09b6ba"},
 ]
 
 [package.dependencies]
@@ -1176,4 +1176,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "e4def7d9cb2ae596346ab9e56519c9cd6c9eb0fc66af93fa10d3822cbb7d67be"
+content-hash = "b1e4212a24b682bdeea204cd6acc315c907d5e629ea23b461bd9e8f7407df6c7"

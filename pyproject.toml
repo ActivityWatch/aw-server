@@ -11,7 +11,7 @@ aw-server = "aw_server:main"
 [tool.poetry.dependencies]
 python = "^3.8"
 aw-core = "^0.5.8"
-aw-client = "^0.5.8"
+aw-client = "^0.5.12"
 appdirs = "*"
 flask = "^2.2"
 flask-restx = "^1.0.3"

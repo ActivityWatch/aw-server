@@ -104,6 +104,16 @@ create_bucket = api.model(
     },
 )
 
+update_bucket = api.model(
+    "UpdateBucket",
+    {
+        "client": fields.String(required=False),
+        "type": fields.String(required=False),
+        "hostname": fields.String(required=False),
+        "data": fields.String(required=False),
+    },
+)
+
 query = api.model(
     "Query",
     {
@@ -172,6 +182,19 @@ class BucketResource(Resource):
             return {}, 200
         else:
             return {}, 304
+
+    @api.expect(update_bucket)
+    @copy_doc(ServerAPI.update_bucket)
+    def put(self, bucket_id):
+        data = request.get_json()
+        current_app.api.update_bucket(
+            bucket_id,
+            event_type=data["type"],
+            client=data["client"],
+            hostname=data["hostname"],
+            data=data["data"],
+        )
+        return {}, 200
 
     @copy_doc(ServerAPI.delete_bucket)
     @api.param("force", "Needs to be =1 to delete a bucket it non-testing mode")

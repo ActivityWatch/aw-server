@@ -139,6 +139,7 @@ class ServerAPI:
         client: str,
         hostname: str,
         created: Optional[datetime] = None,
+        data: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Create bucket.
@@ -154,8 +155,28 @@ class ServerAPI:
             client=client,
             hostname=hostname,
             created=created,
+            data=data,
         )
         return True
+
+    @check_bucket_exists
+    def update_bucket(
+        self,
+        bucket_id: str,
+        event_type: Optional[str] = None,
+        client: Optional[str] = None,
+        hostname: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Update bucket metadata"""
+        self.db.update_bucket(
+            bucket_id,
+            type=event_type,
+            client=client,
+            hostname=hostname,
+            data=data,
+        )
+        return None
 
     @check_bucket_exists
     def delete_bucket(self, bucket_id: str) -> None:

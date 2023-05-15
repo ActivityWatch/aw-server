@@ -375,14 +375,14 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "flask"
-version = "2.3.2"
+version = "2.2.4"
 description = "A simple framework for building complex web applications."
 category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "Flask-2.3.2-py3-none-any.whl", hash = "sha256:77fd4e1249d8c9923de34907236b747ced06e5467ecac1a7bb7115ae0e9670b0"},
-    {file = "Flask-2.3.2.tar.gz", hash = "sha256:8c2f9abd47a9e8df7f0c3f091ce9497d011dc3b31effcf4c85a6e2b50f4114ef"},
+    {file = "Flask-2.2.4-py3-none-any.whl", hash = "sha256:13f6329ddbfff11340939cd11919daf150a01358ded4b7e81c03c055dfecb559"},
+    {file = "Flask-2.2.4.tar.gz", hash = "sha256:77504c4c097f56ac5f29b00f9009213010cf9d2923a288c0e0564a5db2bb53d6"},
 ]
 
 [package.dependencies]
@@ -1190,4 +1190,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "691d297474d5c01e1ec12c1d88cd6585625956572c8c9cd0a2ae465c2e326e93"
+content-hash = "e4def7d9cb2ae596346ab9e56519c9cd6c9eb0fc66af93fa10d3822cbb7d67be"

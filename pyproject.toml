@@ -17,18 +17,18 @@ flask = "^2.2"
 flask-restx = "^1.0.3"
 flask-cors = "*"
 importlib-metadata = {version = "*", python = "<3.10"}
-werkzeug = "^2.2.3"
+werkzeug = "^2.3.3"
 
 [tool.poetry.dev-dependencies]
 mypy = "*"
-pytest = "^7.0"
+pytest = "^7.3"
 pytest-flask = "*"
 pytest-benchmark = "*"
 pytest-cov = "*"
 types-Werkzeug = "*"
 types-pkg-resources = "*"
 types-Flask = "*"
-black = "^23.1.0"
+black = "^23.3.0"
 
 [tool.pytest.ini_options]
 minversion = "6.0"

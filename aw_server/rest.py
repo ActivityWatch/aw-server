@@ -1,11 +1,9 @@
 import json
 import traceback
-from datetime import datetime, timedelta
 from functools import wraps
 from threading import Lock
 from typing import Dict
 
-import flask.json.provider
 import iso8601
 from aw_core import schema
 from aw_core.models import Event
@@ -51,20 +49,6 @@ def host_header_check(f):
 
 blueprint = Blueprint("api", __name__, url_prefix="/api")
 api = Api(blueprint, doc="/", decorators=[host_header_check])
-
-
-# TODO: Clean up JSONEncoder code?
-# Move to server.py
-class CustomJSONProvider(flask.json.provider.DefaultJSONProvider):
-    def default(self, obj, *args, **kwargs):
-        try:
-            if isinstance(obj, datetime):
-                return obj.isoformat()
-            if isinstance(obj, timedelta):
-                return obj.total_seconds()
-        except TypeError:
-            pass
-        return super().default(obj)
 
 
 # Loads event and bucket schema from JSONSchema in aw_core

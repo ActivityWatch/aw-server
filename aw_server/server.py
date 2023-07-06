@@ -1,8 +1,10 @@
 import logging
 import os
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 import aw_datastore
+import flask.json.provider
 from aw_datastore import Datastore
 from flask import (
     Blueprint,
@@ -26,40 +28,50 @@ root = Blueprint("root", __name__, url_prefix="/")
 
 
 class AWFlask(Flask):
-    def __init__(self, name, testing: bool, *args, **kwargs):
-        self.json_provider_class = rest.CustomJSONProvider
-
-        # Only pretty-print JSON if in testing mode (because of performance)
+    def __init__(
+        self,
+        host: str,
+        testing: bool,
+        storage_method=None,
+        cors_origins=[],
+        custom_static=dict(),
+        *args,
+        **kwargs
+    ):
+        name = "aw-server"
+        self.json_provider_class = CustomJSONProvider
+        # only prettyprint JSON if testing (due to perf)
         self.json_provider_class.compact = not testing
 
         # Initialize Flask
         Flask.__init__(self, name, *args, **kwargs)
+        self.config["HOST"] = host  # needed for host-header check
+        with self.app_context():
+            _config_cors(cors_origins, testing)
 
-        # Is set on later initialization
-        self.api: ServerAPI = None  # type: ignore
+        # Initialize datastore and API
+        if storage_method is None:
+            storage_method = aw_datastore.get_storage_methods()["memory"]
+        db = Datastore(storage_method, testing=testing)
+        self.api = ServerAPI(db=db, testing=testing)
+
+        self.register_blueprint(root)
+        self.register_blueprint(rest.blueprint)
+        self.register_blueprint(get_custom_static_blueprint(custom_static))
 
 
-def create_app(
-    host: str, testing=True, storage_method=None, cors_origins=[], custom_static=dict()
-) -> AWFlask:
-    app = AWFlask("aw-server", testing, static_folder=static_folder, static_url_path="")
-
-    with app.app_context():
-        _config_cors(cors_origins, testing)
-
-    app.register_blueprint(root)
-    app.register_blueprint(rest.blueprint)
-    app.register_blueprint(get_custom_static_blueprint(custom_static))
-
-    if storage_method is None:
-        storage_method = aw_datastore.get_storage_methods()["memory"]
-    db = Datastore(storage_method, testing=testing)
-    app.api = ServerAPI(db=db, testing=testing)
-
-    # needed for host-header check
-    app.config["HOST"] = host
-
-    return app
+class CustomJSONProvider(flask.json.provider.DefaultJSONProvider):
+    # encoding/decoding of datetime as iso8601 strings
+    # encoding of timedelta as second floats
+    def default(self, obj, *args, **kwargs):
+        try:
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if isinstance(obj, timedelta):
+                return obj.total_seconds()
+        except TypeError:
+            pass
+        return super().default(obj)
 
 
 @root.route("/")
@@ -105,10 +117,10 @@ def _start(
     cors_origins: List[str] = [],
     custom_static: Dict[str, str] = dict(),
 ):
-    app = create_app(
+    app = AWFlask(
         host,
-        storage_method=storage_method,
         testing=testing,
+        storage_method=storage_method,
         cors_origins=cors_origins,
         custom_static=custom_static,
     )

@@ -1,14 +1,14 @@
 import logging
 
 import pytest
-from aw_server.server import create_app
+from aw_server.server import AWFlask
 
 logging.basicConfig(level=logging.WARN)
 
 
 @pytest.fixture(scope="session")
 def app():
-    return create_app("127.0.0.1", testing=True)
+    return AWFlask("127.0.0.1", testing=True)
 
 
 @pytest.fixture(scope="session")

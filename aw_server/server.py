@@ -26,7 +26,13 @@ root = Blueprint("root", __name__, url_prefix="/")
 
 
 class AWFlask(Flask):
-    def __init__(self, name, *args, **kwargs):
+    def __init__(self, name, testing: bool, *args, **kwargs):
+        self.json_provider_class = rest.CustomJSONProvider
+
+        # Only pretty-print JSON if in testing mode (because of performance)
+        self.json_provider_class.compact = not testing
+
+        # Initialize Flask
         Flask.__init__(self, name, *args, **kwargs)
 
         # Is set on later initialization
@@ -36,23 +42,17 @@ class AWFlask(Flask):
 def create_app(
     host: str, testing=True, storage_method=None, cors_origins=[], custom_static=dict()
 ) -> AWFlask:
-    app = AWFlask("aw-server", static_folder=static_folder, static_url_path="")
-
-    if storage_method is None:
-        storage_method = aw_datastore.get_storage_methods()["memory"]
-
-    # Only pretty-print JSON if in testing mode (because of performance)
-    app.config["JSONIFY_PRETTYPRINT_REGULAR"] = testing
+    app = AWFlask("aw-server", testing, static_folder=static_folder, static_url_path="")
 
     with app.app_context():
         _config_cors(cors_origins, testing)
-
-    app.json_encoder = rest.CustomJSONEncoder
 
     app.register_blueprint(root)
     app.register_blueprint(rest.blueprint)
     app.register_blueprint(get_custom_static_blueprint(custom_static))
 
+    if storage_method is None:
+        storage_method = aw_datastore.get_storage_methods()["memory"]
     db = Datastore(storage_method, testing=testing)
     app.api = ServerAPI(db=db, testing=testing)
 

@@ -5,6 +5,7 @@ from functools import wraps
 from threading import Lock
 from typing import Dict
 
+import flask.json.provider
 import iso8601
 from aw_core import schema
 from aw_core.models import Event
@@ -54,10 +55,7 @@ api = Api(blueprint, doc="/", decorators=[host_header_check])
 
 # TODO: Clean up JSONEncoder code?
 # Move to server.py
-class CustomJSONEncoder(json.JSONEncoder):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-
+class CustomJSONProvider(flask.json.provider.DefaultJSONProvider):
     def default(self, obj, *args, **kwargs):
         try:
             if isinstance(obj, datetime):
@@ -66,15 +64,7 @@ class CustomJSONEncoder(json.JSONEncoder):
                 return obj.total_seconds()
         except TypeError:
             pass
-        return json.JSONEncoder.default(self, obj)
-
-
-class AnyJson(fields.Raw):
-    def format(self, value):
-        if type(value) == dict:
-            return value
-        else:
-            return json.loads(value)
+        return super().default(obj)
 
 
 # Loads event and bucket schema from JSONSchema in aw_core

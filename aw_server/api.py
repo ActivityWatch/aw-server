@@ -53,7 +53,7 @@ class ServerAPI:
         self.testing = testing
         self.last_event = {}  # type: dict
 
-    def get_info(self) -> Dict[str, Dict]:
+    def get_info(self) -> Dict[str, Any]:
         """Get server info"""
         payload = {
             "hostname": gethostname(),
@@ -142,13 +142,23 @@ class ServerAPI:
         data: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
-        Create bucket.
+        Create a bucket.
+
+        If hostname is "!local", the hostname and device_id will be set from the server info.
+        This is useful for watchers which are known/assumed to run locally but might not know their hostname (like aw-watcher-web).
+
         Returns True if successful, otherwise false if a bucket with the given ID already existed.
         """
         if created is None:
             created = datetime.now()
         if bucket_id in self.db.buckets():
             return False
+        if hostname == "!local":
+            info = self.get_info()
+            if data is None:
+                data = {}
+            hostname = info["hostname"]
+            data["device_id"] = info["device_id"]
         self.db.create_bucket(
             bucket_id,
             type=event_type,

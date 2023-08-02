@@ -35,8 +35,8 @@ class AWFlask(Flask):
         storage_method=None,
         cors_origins=[],
         custom_static=dict(),
-        *args,
-        **kwargs
+        static_folder=static_folder,
+        static_url_path="",
     ):
         name = "aw-server"
         self.json_provider_class = CustomJSONProvider
@@ -44,7 +44,12 @@ class AWFlask(Flask):
         self.json_provider_class.compact = not testing
 
         # Initialize Flask
-        Flask.__init__(self, name, *args, **kwargs)
+        Flask.__init__(
+            self,
+            name,
+            static_folder=static_folder,
+            static_url_path=static_url_path,
+        )
         self.config["HOST"] = host  # needed for host-header check
         with self.app_context():
             _config_cors(cors_origins, testing)

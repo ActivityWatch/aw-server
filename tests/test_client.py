@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 from datetime import datetime, timedelta, timezone
@@ -272,6 +273,19 @@ def test_midnight_heartbeats(aw_client, bucket):
 
 def test_settings(aw_client):
     aw_client.set_setting("test", "test")
+    aw_client.set_setting("list", json.dumps([1, 2, 3]))
+    aw_client.set_setting("dict", json.dumps({"a": 1, "b": 2}))
+
+    # check set
     assert aw_client.get_setting("test") == "test"
+    assert json.loads(aw_client.get_setting("list")) == [1, 2, 3]
+    assert json.loads(aw_client.get_setting("dict")) == {"a": 1, "b": 2}
+
+    # check unset
     assert aw_client.get_setting("test2") is None
-    assert aw_client.get_setting() == {"test": "test"}
+
+    # check get all
+    settings = aw_client.get_setting()
+    assert settings["test"] == "test"
+    assert json.loads(settings["list"]) == [1, 2, 3]
+    assert json.loads(settings["dict"]) == {"a": 1, "b": 2}

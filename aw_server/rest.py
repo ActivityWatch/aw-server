@@ -387,3 +387,20 @@ class LogResource(Resource):
     @copy_doc(ServerAPI.get_log)
     def get(self):
         return current_app.api.get_log(), 200
+
+
+# SETTINGS
+
+
+@api.route("/0/settings", defaults={"key": ""})
+@api.route("/0/settings/<string:key>")
+class SettingsResource(Resource):
+    def get(self, key: str):
+        data = current_app.api.get_setting(key)
+        return jsonify(data)
+
+    def post(self, key: str):
+        if not key:
+            raise BadRequest("MissingParameter", "Missing required parameter key")
+        data = current_app.api.set_setting(key, request.get_json())
+        return data

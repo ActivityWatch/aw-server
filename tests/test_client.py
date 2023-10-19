@@ -1,34 +1,17 @@
 import logging
-from datetime import datetime, timezone, timedelta
 import random
-from time import sleep
+from datetime import datetime, timedelta, timezone
 from pprint import pprint
+from time import sleep
 
 import pytest
-
 from aw_core.models import Event
-from aw_client import ActivityWatchClient
 
 logging.basicConfig(level=logging.WARN)
 
 # TODO: Could it be possible to write a sisterclass of ActivityWatchClient
 # which calls aw_server.api directly? Would it be of use? Would add another
 # layer of integration tests that are actually more like unit tests.
-
-
-@pytest.fixture(scope="session")
-def aw_client():
-    # TODO: Could it be possible to write a sisterclass of ActivityWatchClient
-    # which calls aw_server.api directly? Would it be of use? Would add another
-    # layer of integration tests that are actually more like unit tests.
-    c = ActivityWatchClient("client-test", testing=True)
-    yield c
-
-    # Delete test buckets after all tests needing the fixture have been run
-    buckets = c.get_buckets()
-    for bucket_id in buckets:
-        if bucket_id.startswith("test-"):
-            c.delete_bucket(bucket_id)
 
 
 @pytest.fixture(scope="function")
@@ -285,3 +268,10 @@ def test_midnight_heartbeats(aw_client, bucket):
     )
     pprint(recv_events_after_midnight)
     assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)
+
+
+def test_settings(aw_client):
+    aw_client.set_setting("test", "test")
+    assert aw_client.get_setting("test") == "test"
+    assert aw_client.get_setting("test2") is None
+    assert aw_client.get_setting() == {"test": "test"}

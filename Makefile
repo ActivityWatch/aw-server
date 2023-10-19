@@ -20,6 +20,8 @@ install:
 	cp misc/aw-server.service /usr/lib/systemd/user/aw-server.service
 
 test:
+	@# Note that extensive integration tests are also run in the bundle repo,
+	@# for both aw-server and aw-server-rust, but without code coverage.
 	python -c 'import aw_server'
 	python -m pytest tests/test_server.py
 

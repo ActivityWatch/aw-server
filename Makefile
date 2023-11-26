@@ -8,6 +8,7 @@ aw-webui:
 ifeq ($(SKIP_WEBUI),true) # Skip building webui if SKIP_WEBUI is true
 	@echo "Skipping building webui"
 else
+	rm -rf aw_server/static/*
 	make --directory=aw-webui build DEV=$(DEV)
 	cp -r aw-webui/dist/* aw_server/static/
 	# Needed for https://github.com/ActivityWatch/activitywatch/pull/274, works around https://github.com/pypa/pip/issues/6279
@@ -30,6 +31,7 @@ typecheck:
 
 package:
 	python -m aw_server.__about__
+	rm -rf dist
 	pyinstaller aw-server.spec --clean --noconfirm
 
 PYFILES=$(shell find . -name '*.py')

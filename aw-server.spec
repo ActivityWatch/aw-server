@@ -1,5 +1,6 @@
 # -*- mode: python -*-
 # vi: set ft=python :
+
 import os
 
 import aw_core
@@ -36,6 +37,7 @@ exe = EXE(
     a.scripts,
     exclude_binaries=True,
     name=name,
+    contents_directory=".",
     debug=False,
     strip=False,
     upx=True,

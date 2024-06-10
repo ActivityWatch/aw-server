@@ -29,8 +29,7 @@ test:
 typecheck:
 	python -m mypy aw_server tests --ignore-missing-imports
 
-package:
-	python -m aw_server.__about__
+package: bump-version
 	rm -rf dist
 	pyinstaller aw-server.spec --clean --noconfirm
 
@@ -45,6 +44,11 @@ lint-fix:
 
 format:
 	black .
+
+bump-version:
+	@# make sure to pull tags in parent repo before running this
+	poetry run python -m aw_server.__about__
+	VERSION=$$(grep -oP '__version__ = "v\K[^"]+' aw_server/__about__.py | head -n1); echo $$VERSION; poetry version $$VERSION
 
 clean:
 	rm -rf build dist

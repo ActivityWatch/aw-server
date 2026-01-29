@@ -89,9 +89,19 @@ def parse_settings():
         dest="custom_static",
         help="The custom static directories. Format: watcher_name=path,watcher_name2=path2,...",
     )
+    # Postgres specific arguments
+    parser.add_argument("--pg-host", dest="pg_host", help="Postgres host")
+    parser.add_argument("--pg-port", dest="pg_port", type=int, help="Postgres port")
+    parser.add_argument("--pg-user", dest="pg_user", help="Postgres user")
+    parser.add_argument("--pg-password", dest="pg_password", help="Postgres password")
+    parser.add_argument(
+        "--pg-database", dest="pg_database", help="Postgres database name"
+    )
+
     args = parser.parse_args()
     if args.version:
         print(__version__)
+
         sys.exit(0)
 
     """ Parse config file """
@@ -114,7 +124,27 @@ def parse_settings():
     settings.cors_origins = [o for o in settings.cors_origins.split(",") if o]
 
     storage_methods = get_storage_methods()
-    storage_method = storage_methods[settings.storage]
+    storage_method_cls = storage_methods[settings.storage]
+
+    # Curry the storage method with the settings
+    # This is a bit of a hack, but it works because the storage methods accept kwargs
+    # and ignore the ones they don't need (or rather, we only pass relevant ones if we were cleaner)
+    # But since we want to pass these dynamically...
+
+    def storage_method(testing, **kwargs):
+        # Merge CLI args into kwargs
+        kwargs.update(
+            {
+                "host": getattr(settings, "pg_host", None),
+                "port": getattr(settings, "pg_port", None),
+                "user": getattr(settings, "pg_user", None),
+                "password": getattr(settings, "pg_password", None),
+                "database": getattr(settings, "pg_database", None),
+            }
+        )
+        # Filter out None values
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        return storage_method_cls(testing=testing, **kwargs)
 
     return settings, storage_method
 

@@ -21,9 +21,9 @@ Another parameter called "view" can be used if you want to create multiple visua
 
 """
 
+from markupsafe import escape
 from flask import (
     Blueprint,
-    escape,
     jsonify,
     send_from_directory,
 )

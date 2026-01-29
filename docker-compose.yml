@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  aw-server:
+    build:
+      context: ..
+      dockerfile: aw-server/Dockerfile
+    ports:
+      - "5600:5600"
+    depends_on:
+      - aw-postgres
+    command: >
+      --host 0.0.0.0
+      --storage postgres
+      --pg-host aw-postgres
+      --pg-port 5432
+      --pg-user aw
+      --pg-password aw-secure
+      --pg-database aw
+    restart: unless-stopped
+
+  aw-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: aw
+      POSTGRES_PASSWORD: aw-secure
+      POSTGRES_DB: aw
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    ports:
+      # Optional: Expose Postgres to host for debugging
+      - "5433:5432"
+
+volumes:
+  postgres-data:

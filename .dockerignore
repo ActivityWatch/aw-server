@@ -1,0 +1,26 @@
+# Ignore patterns for the build context (monorepo root)
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+env/
+venv/
+.venv/
+.git/
+.gitignore
+.dockerignore
+
+# Node
+**/node_modules
+**/npm-debug.log
+**/yarn-error.log
+
+# WebUI builds
+**/dist
+**/aw_server/static
+
+# IDEs
+.idea/
+.vscode/
+*.swp

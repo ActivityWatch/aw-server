@@ -272,9 +272,7 @@ def test_midnight_heartbeats(aw_client, bucket):
     # the 23:50 start. Use a small offset to avoid boundary ambiguity where
     # events ending exactly at midnight could be included by the >= condition.
     query_start = midnight + timedelta(minutes=10, milliseconds=1)
-    recv_events_after_midnight = aw_client.get_events(
-        bucket, start=query_start
-    )
+    recv_events_after_midnight = aw_client.get_events(bucket, start=query_start)
     pprint(recv_events_after_midnight)
     assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)
 

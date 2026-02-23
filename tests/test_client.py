@@ -253,7 +253,11 @@ def test_midnight(aw_client, bucket):
 
 def test_midnight_heartbeats(aw_client, bucket):
     now = datetime.now(tz=timezone.utc) - timedelta(days=1)
-    midnight = now.replace(hour=23, minute=50)
+    # Zero out seconds/microseconds for deterministic midnight boundary.
+    # Without this, residual microseconds cause non-deterministic boundary
+    # matching when querying events around midnight (the endtime >= start_query
+    # condition can include/exclude boundary events depending on microseconds).
+    midnight = now.replace(hour=23, minute=50, second=0, microsecond=0)
     events = _create_periodic_events(20, start=midnight, delta=timedelta(minutes=1))
 
     label_ring = ["1", "1", "2", "3", "4"]
@@ -264,9 +268,11 @@ def test_midnight_heartbeats(aw_client, bucket):
     recv_events_merged = aw_client.get_events(bucket, limit=-1)
     assert len(recv_events_merged) == 4 / 5 * len(events)
 
-    recv_events_after_midnight = aw_client.get_events(
-        bucket, start=midnight + timedelta(minutes=10)
-    )
+    # Query from midnight (00:00), which is exactly midnight + 10 minutes from
+    # the 23:50 start. Use a small offset to avoid boundary ambiguity where
+    # events ending exactly at midnight could be included by the >= condition.
+    query_start = midnight + timedelta(minutes=10, milliseconds=1)
+    recv_events_after_midnight = aw_client.get_events(bucket, start=query_start)
     pprint(recv_events_after_midnight)
     assert len(recv_events_after_midnight) == int(len(recv_events_merged) / 2)
 

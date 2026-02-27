@@ -91,7 +91,11 @@ def test_get_events(flask_client, bucket, benchmark):
 def test_insert_event_returns_list(flask_client, bucket):
     """Test that POST /events returns a list of events with IDs (matching aw-server-rust)."""
     now = datetime.now()
-    event_data = {"timestamp": now.isoformat(), "duration": 0, "data": {"label": "test"}}
+    event_data = {
+        "timestamp": now.isoformat(),
+        "duration": 0,
+        "data": {"label": "test"},
+    }
 
     # Single event as list
     r = flask_client.post(
@@ -119,7 +123,11 @@ def test_insert_events_returns_list(flask_client, bucket):
     """Test that POST /events with multiple events returns a list."""
     now = datetime.now()
     events_data = [
-        {"timestamp": (now - timedelta(hours=i)).isoformat(), "duration": 0, "data": {"label": f"test-{i}"}}
+        {
+            "timestamp": (now - timedelta(hours=i)).isoformat(),
+            "duration": 0,
+            "data": {"label": f"test-{i}"},
+        }
         for i in range(3)
     ]
 

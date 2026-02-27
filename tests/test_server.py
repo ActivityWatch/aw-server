@@ -88,4 +88,48 @@ def test_get_events(flask_client, bucket, benchmark):
         assert len(r.json) == n_events
 
 
+def test_insert_event_returns_list(flask_client, bucket):
+    """Test that POST /events returns a list of events with IDs (matching aw-server-rust)."""
+    now = datetime.now()
+    event_data = {"timestamp": now.isoformat(), "duration": 0, "data": {"label": "test"}}
+
+    # Single event as list
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/events",
+        json=[event_data],
+    )
+    assert r.status_code == 200
+    assert isinstance(r.json, list), f"Expected list, got {type(r.json)}"
+    assert len(r.json) == 1
+    assert r.json[0]["id"] is not None
+    assert r.json[0]["data"] == {"label": "test"}
+
+    # Single event as dict (legacy format)
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/events",
+        json=event_data,
+    )
+    assert r.status_code == 200
+    assert isinstance(r.json, list), f"Expected list, got {type(r.json)}"
+    assert len(r.json) == 1
+    assert r.json[0]["id"] is not None
+
+
+def test_insert_events_returns_list(flask_client, bucket):
+    """Test that POST /events with multiple events returns a list."""
+    now = datetime.now()
+    events_data = [
+        {"timestamp": (now - timedelta(hours=i)).isoformat(), "duration": 0, "data": {"label": f"test-{i}"}}
+        for i in range(3)
+    ]
+
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/events",
+        json=events_data,
+    )
+    assert r.status_code == 200
+    assert isinstance(r.json, list), f"Expected list, got {type(r.json)}"
+    assert len(r.json) == 3
+
+
 # TODO: Add benchmark for basic AFK-filtering query

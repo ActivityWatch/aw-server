@@ -291,11 +291,12 @@ class HeartbeatResource(Resource):
         # This lock is meant to ensure that only one heartbeat is processed at a time,
         # as the heartbeat function is not thread-safe.
         # This should maybe be moved into the api.py file instead (but would be very messy).
-        aquired = self.lock.acquire(timeout=1)
-        if not aquired:
+        acquired = self.lock.acquire(timeout=10)
+        if not acquired:
             logger.warning(
-                "Heartbeat lock could not be aquired within a reasonable time, this likely indicates a bug."
+                "Heartbeat lock could not be acquired within timeout, rejecting request."
             )
+            return {"message": "Server busy, try again later"}, 503
         try:
             event = current_app.api.heartbeat(bucket_id, heartbeat, pulsetime)
         finally:

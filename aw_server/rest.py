@@ -271,8 +271,12 @@ class EventResource(Resource):
 
 @api.route("/0/buckets/<string:bucket_id>/heartbeat")
 class HeartbeatResource(Resource):
+    # Class-level lock shared across all instances.
+    # Flask-RESTX creates a new Resource instance per request, so an
+    # instance-level lock would provide no mutual exclusion.
+    lock = Lock()
+
     def __init__(self, *args, **kwargs):
-        self.lock = Lock()
         super().__init__(*args, **kwargs)
 
     @api.expect(event, validate=True)

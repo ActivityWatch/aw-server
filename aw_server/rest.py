@@ -225,8 +225,8 @@ class EventsResource(Resource):
         else:
             raise BadRequest("Invalid POST data", "")
 
-        event = current_app.api.create_events(bucket_id, events)
-        return event.to_json_dict() if event else None, 200
+        events = current_app.api.create_events(bucket_id, events)
+        return [e.to_json_dict() for e in events], 200
 
 
 @api.route("/0/buckets/<string:bucket_id>/events/count")

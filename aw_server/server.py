@@ -18,6 +18,7 @@ from . import rest
 from .api import ServerAPI
 from .custom_static import get_custom_static_blueprint
 from .log import FlaskLogHandler
+from .task_tracker import register as register_task_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,9 @@ class AWFlask(Flask):
         self.register_blueprint(rest.blueprint)
         self.register_blueprint(get_custom_static_blueprint(custom_static))
 
+        # Register task tracker (creates tables + routes)
+        register_task_tracker(self)
+
 
 class CustomJSONProvider(flask.json.provider.DefaultJSONProvider):
     # encoding/decoding of datetime as iso8601 strings
@@ -101,9 +105,8 @@ def _config_cors(cors_origins: List[str], testing: bool):
             "or CLI argument (could be a security risk): {}".format(cors_origins)
         )
 
-    if testing:
-        # Used for development of aw-webui
-        cors_origins.append("http://127.0.0.1:27180/*")
+    # Allow Vue dev server (both testing and production/dev mode)
+    cors_origins.append("http://127.0.0.1:27180")
 
     # TODO: This could probably be more specific
     #       See https://github.com/ActivityWatch/aw-server/pull/43#issuecomment-386888769

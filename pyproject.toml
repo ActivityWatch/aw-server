@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aw-server"
-version = "0.13.2"
+version = "0.14.0"
 description = "Server for ActivityWatch"
 authors = ["Erik Bjäreholt <erik@bjareho.lt>"]
 license = "MPL-2.0"
@@ -19,14 +19,14 @@ flask-cors = "*"
 importlib-metadata = {version = "*", python = "<3.10"}
 werkzeug = "^2.3.3"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 mypy = "*"
 pytest = "^7.3"
 pytest-flask = "*"
 pytest-benchmark = "*"
 pytest-cov = "*"
 types-Werkzeug = "*"
-types-pkg-resources = "*"
+types-setuptools = "*"
 types-Flask = "*"
 black = "^23.3.0"
 

@@ -228,11 +228,19 @@ class ServerAPI:
         return events
 
     @check_bucket_exists
-    def create_events(self, bucket_id: str, events: List[Event]) -> Optional[Event]:
+    def create_events(self, bucket_id: str, events: List[Event]) -> List[Event]:
         """Create events for a bucket. Can handle both single events and multiple ones.
 
-        Returns the inserted event when a single event was inserted, otherwise None."""
-        return self.db[bucket_id].insert(events)
+        Always returns a list of inserted events (matching aw-server-rust behavior).
+        For single events, the returned event includes the server-assigned ID.
+        For bulk inserts, events may not have IDs due to storage limitations."""
+        if len(events) == 1:
+            # Pass as single Event so Bucket.insert uses insert_one (returns Event with ID)
+            inserted = self.db[bucket_id].insert(events[0])
+            return [inserted]
+        else:
+            self.db[bucket_id].insert(events)
+            return events
 
     @check_bucket_exists
     def get_eventcount(

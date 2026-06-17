@@ -410,18 +410,22 @@ class ImportAllResource(Resource):
     @api.expect(buckets_export)
     @copy_doc(ServerAPI.import_all)
     def post(self):
-        # If import comes from a form in th web-ui
-        if len(request.files) > 0:
-            # web-ui form only allows one file, but technically it's possible to
-            # upload multiple files at the same time
-            for filename, f in request.files.items():
-                buckets = json.loads(f.stream.read())["buckets"]
+        try:
+            # If import comes from a form in the web-ui
+            if len(request.files) > 0:
+                # web-ui form only allows one file, but technically it's possible to
+                # upload multiple files at the same time
+                for filename, f in request.files.items():
+                    buckets = json.loads(f.stream.read())["buckets"]
+                    current_app.api.import_all(buckets)
+            # Normal import from body
+            else:
+                buckets = request.get_json()["buckets"]
                 current_app.api.import_all(buckets)
-        # Normal import from body
-        else:
-            buckets = request.get_json()["buckets"]
-            current_app.api.import_all(buckets)
-        return None, 200
+        except Exception as e:
+            logger.exception("Import failed")
+            return {"message": str(e)}, 400
+        return {"message": "Import successful"}, 200
 
 
 # LOGGING

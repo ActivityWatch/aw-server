@@ -137,7 +137,11 @@ class ServerAPI:
         bucket_id = bucket_data["id"]
         logger.info(f"Importing bucket {bucket_id}")
 
-        # TODO: Check that bucket doesn't already exist
+        if bucket_id in self.db.buckets():
+            raise Exception(
+                f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
+            )
+
         try:
             self.db.create_bucket(
                 bucket_id,

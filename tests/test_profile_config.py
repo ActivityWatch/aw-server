@@ -118,9 +118,6 @@ def test_named_profile_config_is_isolated_from_default(xdg_tmp, monkeypatch):
     share ~/.config/activitywatch/aw-server."""
     import aw_core.dirs as dirs
 
-    if not hasattr(dirs, "_get_appname"):
-        pytest.skip("aw-core < 0.5.17 does not suffix dirs by AW_PROFILE")
-
     export_profile("research")
     research_dir = dirs.get_config_dir("aw-server")
     export_profile(DEFAULT_PROFILE)

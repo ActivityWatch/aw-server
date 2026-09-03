@@ -56,21 +56,22 @@ typing-extensions = "*"
 
 [[package]]
 name = "aw-core"
-version = "0.5.17"
+version = "0.5.18"
 description = "Core library for ActivityWatch"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "aw_core-0.5.17-py3-none-any.whl", hash = "sha256:8c3dae7fddd23984f7711e4ff7933ba45ce25e5e416fdde4a9f1677e95c64feb"},
-    {file = "aw_core-0.5.17.tar.gz", hash = "sha256:f8ac5418d6a1de2b868bc75447d4d495aebc577a77eea56ba11dc2bde3771e27"},
+    {file = "aw_core-0.5.18-py3-none-any.whl", hash = "sha256:6e3df7b46e913d631e0dc8b1b10046c111284a9f4240bec8efd279ce4e438cd5"},
+    {file = "aw_core-0.5.18.tar.gz", hash = "sha256:dc14867ed15b4529d6e69b1d07df3fb29c91ccf7ab174de3f9100b90a95cc826"},
 ]
 
 [package.dependencies]
+click = "*"
 deprecation = "*"
 iso8601 = "*"
 jsonschema = ">=4.3,<5.0"
-peewee = "==3.*"
+peewee = ">=3.0.0,<5.0.0"
 platformdirs = "3.10"
 rfc3339-validator = ">=0.1.4,<0.2.0"
 strict-rfc3339 = ">=0.7,<0.8"
@@ -1191,4 +1192,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "0b78e48db7a29818d47702721422924b6d8e29aa9b14e7be2bda6b91d0a3c178"
+content-hash = "370151e1033b3e3d1c635d9d6ce131af2633bbf6642c9d4e3d11baa38258d60f"

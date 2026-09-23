@@ -110,7 +110,11 @@ class ServerAPI:
         bucket_id = bucket_data["id"]
         logger.info(f"Importing bucket {bucket_id}")
 
-        # TODO: Check that bucket doesn't already exist
+        if bucket_id in self.db.buckets():
+            raise Exception(
+                f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
+            )
+
         self.db.create_bucket(
             bucket_id,
             type=bucket_data["type"],
@@ -135,8 +139,15 @@ class ServerAPI:
         )
 
     def import_all(self, buckets: Dict[str, Any]):
-        for bid, bucket in buckets.items():
-            self.import_bucket(bucket)
+        imported: List[str] = []
+        try:
+            for _bid, bucket in buckets.items():
+                self.import_bucket(bucket)
+                imported.append(bucket["id"])
+        except Exception:
+            for bid in imported:
+                self.db.delete_bucket(bid)
+            raise
 
     def create_bucket(
         self,

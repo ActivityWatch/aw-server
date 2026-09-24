@@ -79,8 +79,8 @@ tomlkit = "*"
 [package.source]
 type = "git"
 url = "https://github.com/0xbrayo/aw-core.git"
-reference = "951a441021278b3ff6000cfa0673798608c57550"
-resolved_reference = "951a441021278b3ff6000cfa0673798608c57550"
+reference = "a794efb9639b03c243c47c85819f701defbd2591"
+resolved_reference = "a794efb9639b03c243c47c85819f701defbd2591"
 
 [[package]]
 name = "black"
@@ -1196,4 +1196,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "222fa6b67a8dc48a53002ff008c5751217de2c1c24fd9eed28c77b50c1b07cf9"
+content-hash = "d9a8d45f09ed67bb9ae094fbd286997820bdfc22c35e66657f7098f59c0f0a9c"

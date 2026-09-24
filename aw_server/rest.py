@@ -3,6 +3,7 @@ import traceback
 from functools import wraps
 from threading import Lock
 from typing import Dict
+from urllib.parse import urlsplit
 
 import iso8601
 from aw_core import schema
@@ -40,7 +41,24 @@ def host_header_check(f):
         elif req_host is None:
             return {"message": "host header is missing"}, 400
         else:
-            if req_host.split(":")[0] not in ["localhost", "127.0.0.1", server_host]:
+            try:
+                # Host is an authority: IPv6 literals use brackets, optionally
+                # followed by a port. Splitting on ':' truncates them to '['.
+                authority = urlsplit("//" + req_host)
+                valid = (
+                    authority.hostname
+                    in ["localhost", "127.0.0.1", "::1", server_host.lower()]
+                    and authority.username is None
+                    and authority.password is None
+                    and not authority.path
+                    and not authority.query
+                    and not authority.fragment
+                )
+                # Validate the optional port too (including unbracketed IPv6).
+                authority.port
+            except ValueError:
+                valid = False
+            if not valid:
                 return {"message": f"host header is invalid (was {req_host})"}, 400
         return f(*args, **kwargs)
 

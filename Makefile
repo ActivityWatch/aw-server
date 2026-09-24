@@ -24,7 +24,7 @@ test:
 	@# Note that extensive integration tests are also run in the bundle repo,
 	@# for both aw-server and aw-server-rust, but without code coverage.
 	python -c 'import aw_server'
-	python -m pytest tests/test_server.py tests/test_profile.py tests/test_profile_config.py tests/test_query_cache.py
+	python -m pytest tests/test_server.py tests/test_profile.py tests/test_profile_config.py tests/test_query_cache.py tests/test_host_header.py
 
 typecheck:
 	python -m mypy aw_server tests --ignore-missing-imports

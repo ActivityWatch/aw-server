@@ -1,4 +1,5 @@
 import json
+import re
 import traceback
 from functools import wraps
 from threading import Lock
@@ -45,8 +46,15 @@ def host_header_check(f):
                 # Host is an authority: IPv6 literals use brackets, optionally
                 # followed by a port. Splitting on ':' truncates them to '['.
                 authority = urlsplit("//" + req_host)
+                # urlsplit accepts empty ports and discards empty query or
+                # fragment delimiters. Require a complete Host authority too.
                 valid = (
-                    authority.hostname
+                    re.fullmatch(
+                        r"(?:\[[^\[\]\s/?#@]+\]|[^\s:/?#@\[\]]+)(?::[0-9]+)?",
+                        req_host,
+                    )
+                    is not None
+                    and authority.hostname
                     in ["localhost", "127.0.0.1", "::1", server_host.lower()]
                     and authority.username is None
                     and authority.password is None

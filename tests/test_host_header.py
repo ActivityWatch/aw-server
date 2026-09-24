@@ -1,4 +1,5 @@
 import http.client
+import json
 import socket
 from threading import Thread
 
@@ -31,6 +32,15 @@ def test_loopback_host_headers(flask_client, host):
         "localhost/evil",
         "localhost?evil",
         "localhost#evil",
+        "[::1]:",
+        "[::1]?",
+        "[::1]#",
+        "localhost:",
+        "localhost?",
+        "localhost#",
+        "[::1]junk",
+        "[::1]junk:5600",
+        "local\thost",
     ],
 )
 def test_untrusted_or_malformed_host_headers(app, host):
@@ -77,7 +87,7 @@ def test_ipv6_loopback_listener():
         connection.request("GET", "/api/0/buckets/")
         response = connection.getresponse()
         assert response.status == 200
-        assert response.read() == b"{}\n"
+        assert json.loads(response.read()) == {}
     finally:
         connection.close()
         server.shutdown()

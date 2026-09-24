@@ -1,7 +1,13 @@
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
 
 import pytest
+from aw_core.models import Event
+from aw_datastore import Datastore, get_storage_methods
+
+from aw_server.api import ServerAPI
+from aw_server.exceptions import NotFound
 
 
 @pytest.fixture()
@@ -182,3 +188,78 @@ def test_query_valid_timeperiod(flask_client):
     )
     assert r.status_code == 200
     assert r.json == [1]
+
+
+@pytest.fixture(params=["memory", "peewee", "sqlite"])
+def isolated_api(request, tmp_path, monkeypatch):
+    """Exercise the storage backends without accessing a user's database/settings."""
+    monkeypatch.setattr("aw_server.settings.get_config_dir", lambda _: str(tmp_path))
+    monkeypatch.setattr(
+        "aw_datastore.storages.peewee.get_data_dir",
+        lambda _: str(tmp_path),
+    )
+    storage = get_storage_methods()[request.param]
+    kwargs = (
+        {} if request.param == "memory" else {"filepath": str(tmp_path / "test.db")}
+    )
+    db = Datastore(storage, testing=True, **kwargs)
+    try:
+        yield ServerAPI(db, testing=True)
+    finally:
+        if request.param == "peewee":
+            db.storage_strategy.db.close()
+        elif request.param == "sqlite":
+            db.storage_strategy.conn.close()
+
+
+def test_bucket_checks_reuse_datastore_lookup(isolated_api, monkeypatch):
+    api = isolated_api
+    api.create_bucket("test", "test", "test", "test")
+    # Simulate the first access to a bucket that existed before server startup.
+    api.db.bucket_instances.clear()
+    listing = Mock(wraps=api.db.buckets)
+    monkeypatch.setattr(api.db, "buckets", listing)
+
+    assert api.get_events("test") == []
+    assert listing.call_count == 1
+    listing.reset_mock()
+
+    timestamp = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    api.heartbeat("test", Event(timestamp=timestamp, data={"app": "test"}), 60)
+    merged = api.heartbeat(
+        "test",
+        Event(timestamp=timestamp + timedelta(seconds=1), data={"app": "test"}),
+        60,
+    )
+    assert merged.duration == timedelta(seconds=1)
+    assert api.get_eventcount("test") == 1
+    assert len(api.get_events("test")) == 1
+    assert len(api.export_bucket("test")["events"]) == 1
+    listing.assert_not_called()
+
+
+def test_bucket_checks_follow_datastore_lifecycle(isolated_api):
+    api = isolated_api
+    with pytest.raises(NotFound, match="There's no bucket named test"):
+        api.get_events("test")
+
+    api.create_bucket("test", "test", "test", "test")
+    assert api.get_events("test") == []
+    api.delete_bucket("test")
+    with pytest.raises(NotFound, match="There's no bucket named test"):
+        api.get_events("test")
+
+    # Changes made through Datastore must also be visible to the API.
+    api.db.create_bucket("test", type="test", client="test", hostname="test")
+    assert api.get_events("test") == []
+    api.db.delete_bucket("test")
+    with pytest.raises(NotFound):
+        api.get_events("test")
+
+
+def test_bucket_check_does_not_mask_operation_errors(isolated_api, monkeypatch):
+    api = isolated_api
+    api.create_bucket("test", "test", "test", "test")
+    monkeypatch.setattr(api.db["test"], "get", Mock(side_effect=KeyError("event data")))
+    with pytest.raises(KeyError, match="event data"):
+        api.get_events("test")

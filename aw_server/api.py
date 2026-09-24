@@ -45,8 +45,14 @@ def get_device_id() -> str:
 def check_bucket_exists(f):
     @functools.wraps(f)
     def g(self, bucket_id, *args, **kwargs):
-        if bucket_id not in self.db.buckets():
-            raise NotFound("NoSuchBucket", f"There's no bucket named {bucket_id}")
+        # Datastore caches bucket handles and invalidates them on deletion.
+        # Reuse that lookup instead of loading every bucket's metadata per call.
+        try:
+            self.db[bucket_id]
+        except KeyError:
+            raise NotFound(
+                "NoSuchBucket", f"There's no bucket named {bucket_id}"
+            ) from None
         return f(self, bucket_id, *args, **kwargs)
 
     return g
@@ -241,7 +247,7 @@ class ServerAPI:
             self.db.delete_bucket(bucket_id)
         finally:
             self._invalidate_all()
-        logger.debug(f"Deleted bucket '{bucket_id}'")
+        logger.debug("Deleted bucket '%s'", bucket_id)
         return None
 
     @check_bucket_exists
@@ -252,7 +258,7 @@ class ServerAPI:
     ) -> Optional[Event]:
         """Get a single event from a bucket"""
         logger.debug(
-            f"Received get request for event {event_id} in bucket '{bucket_id}'"
+            "Received get request for event %s in bucket '%s'", event_id, bucket_id
         )
         event = self.db[bucket_id].get_by_id(event_id)
         return event.to_json_dict() if event else None
@@ -266,7 +272,7 @@ class ServerAPI:
         end: Optional[datetime] = None,
     ) -> List[Event]:
         """Get events from a bucket"""
-        logger.debug(f"Received get request for events in bucket '{bucket_id}'")
+        logger.debug("Received get request for events in bucket '%s'", bucket_id)
         if limit is None:  # Let limit = None also mean "no limit"
             limit = -1
         events = [
@@ -309,7 +315,7 @@ class ServerAPI:
         end: Optional[datetime] = None,
     ) -> int:
         """Get eventcount from a bucket"""
-        logger.debug(f"Received get request for eventcount in bucket '{bucket_id}'")
+        logger.debug("Received get request for eventcount in bucket '%s'", bucket_id)
         return self.db[bucket_id].get_eventcount(start, end)
 
     @check_bucket_exists
@@ -348,13 +354,12 @@ class ServerAPI:
         Inspired by: https://wakatime.com/developers#heartbeats
         """
         logger.debug(
-            "Received heartbeat in bucket '{}'\n\ttimestamp: {}, duration: {}, pulsetime: {}\n\tdata: {}".format(
-                bucket_id,
-                heartbeat.timestamp,
-                heartbeat.duration,
-                pulsetime,
-                heartbeat.data,
-            )
+            "Received heartbeat in bucket '%s'\n\ttimestamp: %s, duration: %s, pulsetime: %s\n\tdata: %s",
+            bucket_id,
+            heartbeat.timestamp,
+            heartbeat.duration,
+            pulsetime,
+            heartbeat.data,
         )
 
         # The endtime here is set such that in the event that the heartbeat is older than an
@@ -380,9 +385,7 @@ class ServerAPI:
                 if merged is not None:
                     # Heartbeat was merged into last_event
                     logger.debug(
-                        "Received valid heartbeat, merging. (bucket: {})".format(
-                            bucket_id
-                        )
+                        "Received valid heartbeat, merging. (bucket: %s)", bucket_id
                     )
                     affected = [event_range(last_event), event_range(merged)]
                     if self.query_cache:
@@ -399,21 +402,18 @@ class ServerAPI:
                     return merged
                 else:
                     logger.info(
-                        "Received heartbeat after pulse window, inserting as new event. (bucket: {})".format(
-                            bucket_id
-                        )
+                        "Received heartbeat after pulse window, inserting as new event. (bucket: %s)",
+                        bucket_id,
                     )
             else:
                 logger.debug(
-                    "Received heartbeat with differing data, inserting as new event. (bucket: {})".format(
-                        bucket_id
-                    )
+                    "Received heartbeat with differing data, inserting as new event. (bucket: %s)",
+                    bucket_id,
                 )
         else:
             logger.info(
-                "Received heartbeat, but bucket was previously empty, inserting as new event. (bucket: {})".format(
-                    bucket_id
-                )
+                "Received heartbeat, but bucket was previously empty, inserting as new event. (bucket: %s)",
+                bucket_id,
             )
 
         try:

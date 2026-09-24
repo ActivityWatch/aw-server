@@ -1,3 +1,4 @@
+import copy
 import functools
 import json
 import logging
@@ -5,6 +6,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from socket import gethostname
+from contextlib import closing
 from typing import (
     Any,
     Dict,
@@ -71,6 +73,19 @@ def _serialized(f):
     return g
 
 
+def _forget_last_event(f):
+    """Drop the cached heartbeat state for the bucket before a non-heartbeat
+    write, so a later heartbeat re-reads the stored last event instead of
+    merging into (and replacing by ID) a stale one. Use under _serialized."""
+
+    @functools.wraps(f)
+    def g(self, bucket_id, *args, **kwargs):
+        self.last_event.pop(bucket_id, None)
+        return f(self, bucket_id, *args, **kwargs)
+
+    return g
+
+
 class ServerAPI:
     def __init__(self, db, testing, query_cache: bool = True) -> None:
         self.db = db
@@ -104,15 +119,7 @@ class ServerAPI:
     def get_buckets(self) -> Dict[str, Dict]:
         """Get dict {bucket_name: Bucket} of all buckets"""
         logger.debug("Received get request for buckets")
-        buckets = self.db.buckets()
-        for b in buckets:
-            # TODO: Move this code to aw-core?
-            last_events = self.db[b].get(limit=1)
-            if len(last_events) > 0:
-                last_event = last_events[0]
-                last_updated = last_event.timestamp + last_event.duration
-                buckets[b]["last_updated"] = last_updated.isoformat()
-        return buckets
+        return self.db.buckets(include_last_updated=True)
 
     @check_bucket_exists
     def get_bucket_metadata(self, bucket_id: str) -> Dict[str, Any]:
@@ -132,15 +139,59 @@ class ServerAPI:
 
     def export_all(self) -> Dict[str, Any]:
         """Exports all buckets and their events to a format consistent across versions"""
-        buckets = self.get_buckets()
+        buckets = self.db.buckets()
         exported_buckets = {}
         for bid in buckets.keys():
             exported_buckets[bid] = self.export_bucket(bid)
         return exported_buckets
 
+    def stream_export(self, bucket_id=None):
+        # Validate before returning the generator so a missing bucket is a 404,
+        # not an exception after the HTTP response has started.
+        if bucket_id is not None:
+            buckets = {bucket_id: self.get_bucket_metadata(bucket_id)}
+        else:
+            buckets = self.db.buckets()
+
+        def generate():
+            yield '{"buckets":{'
+            for index, (bid, metadata) in enumerate(buckets.items()):
+                if index:
+                    yield ","
+                yield json.dumps(bid) + ":"
+                yield json.dumps(metadata)[:-1] + ',"events":['
+                with closing(self.db[bid].iter_events()) as events:
+                    for event_index, event in enumerate(events):
+                        if event_index:
+                            yield ","
+                        payload = event.to_json_dict()
+                        payload.pop("id", None)
+                        yield json.dumps(payload)
+                yield "]}"
+            yield "}}"
+
+        def buffered():
+            # Avoid a socket write for every separator/small event while retaining
+            # only a bounded batch (plus the largest individual event).
+            with closing(generate()) as fragments:
+                batch = []
+                size = 0
+                for fragment in fragments:
+                    batch.append(fragment)
+                    size += len(fragment)
+                    if size >= 64 * 1024:
+                        yield "".join(batch)
+                        batch = []
+                        size = 0
+                if batch:
+                    yield "".join(batch)
+
+        return buffered()
+
     @_serialized
     def import_bucket(self, bucket_data: Any):
         bucket_id = bucket_data["id"]
+        self.last_event.pop(bucket_id, None)
         logger.info(f"Importing bucket {bucket_id}")
 
         # TODO: Check that bucket doesn't already exist
@@ -175,6 +226,7 @@ class ServerAPI:
             self.import_bucket(bucket)
 
     @_serialized
+    @_forget_last_event
     def create_bucket(
         self,
         bucket_id: str,
@@ -194,7 +246,7 @@ class ServerAPI:
         """
         if created is None:
             created = datetime.now()
-        if bucket_id in self.db.buckets():
+        if self.db.has_bucket(bucket_id):
             return False
         if hostname == "!local":
             info = self.get_info()
@@ -217,6 +269,7 @@ class ServerAPI:
 
     @check_bucket_exists
     @_serialized
+    @_forget_last_event
     def update_bucket(
         self,
         bucket_id: str,
@@ -229,7 +282,7 @@ class ServerAPI:
         try:
             self.db.update_bucket(
                 bucket_id,
-                type=event_type,
+                type_id=event_type,
                 client=client,
                 hostname=hostname,
                 data=data,
@@ -241,6 +294,7 @@ class ServerAPI:
 
     @check_bucket_exists
     @_serialized
+    @_forget_last_event
     def delete_bucket(self, bucket_id: str) -> None:
         """Delete a bucket"""
         try:
@@ -282,6 +336,7 @@ class ServerAPI:
 
     @check_bucket_exists
     @_serialized
+    @_forget_last_event
     def create_events(self, bucket_id: str, events: List[Event]) -> List[Event]:
         """Create events for a bucket. Can handle both single events and multiple ones.
 
@@ -320,6 +375,7 @@ class ServerAPI:
 
     @check_bucket_exists
     @_serialized
+    @_forget_last_event
     def delete_event(self, bucket_id: str, event_id) -> bool:
         """Delete a single event from a bucket"""
         old = self.db[bucket_id].get_by_id(event_id)
@@ -362,22 +418,13 @@ class ServerAPI:
             heartbeat.data,
         )
 
-        # The endtime here is set such that in the event that the heartbeat is older than an
-        # existing event we should try to merge it with the last event before the heartbeat instead.
-        # FIXME: This (the endtime=heartbeat.timestamp) gets rid of the "heartbeat was older than last event"
-        #        warning and also causes a already existing "newer" event to be overwritten in the
-        #        replace_last call below. This is problematic.
-        # Solution: This could be solved if we were able to replace arbitrary events.
-        #           That way we could double check that the event has been applied
-        #           and if it hasn't we simply replace it with the updated counterpart.
-
         last_event = None
         if bucket_id not in self.last_event:
             last_events = self.db[bucket_id].get(limit=1)
             if len(last_events) > 0:
                 last_event = last_events[0]
         else:
-            last_event = self.last_event[bucket_id]
+            last_event = copy.copy(self.last_event[bucket_id])
 
         if last_event:
             if last_event.data == heartbeat.data:
@@ -388,18 +435,18 @@ class ServerAPI:
                         "Received valid heartbeat, merging. (bucket: %s)", bucket_id
                     )
                     affected = [event_range(last_event), event_range(merged)]
-                    if self.query_cache:
-                        # replace_last() replaces the *stored* last event, which
-                        # is not always last_event (other writes, or an earlier
-                        # out-of-order heartbeat), so invalidate its range too.
-                        stored = self.db[bucket_id].get(limit=1)
-                        affected += [event_range(e) for e in stored]
-                    self.last_event[bucket_id] = merged
+                    replaced = False
                     try:
-                        self.db[bucket_id].replace_last(merged)
+                        replaced = merged.id is not None and self.db[bucket_id].replace(
+                            merged.id, merged
+                        )
                     finally:
                         self._invalidate(affected)
-                    return merged
+                    if replaced:
+                        self.last_event[bucket_id] = merged
+                        return merged
+                    # The row may have been removed by another datastore user.
+                    self.last_event.pop(bucket_id, None)
                 else:
                     logger.info(
                         "Received heartbeat after pulse window, inserting as new event. (bucket: %s)",
@@ -417,11 +464,11 @@ class ServerAPI:
             )
 
         try:
-            self.db[bucket_id].insert(heartbeat)
+            inserted = self.db[bucket_id].insert(heartbeat)
         finally:
             self._invalidate([event_range(heartbeat)])
-        self.last_event[bucket_id] = heartbeat
-        return heartbeat
+        self.last_event[bucket_id] = inserted
+        return inserted
 
     def query2(self, name, query, timeperiods, cache: bool = True):
         """Run a query for each timeperiod.

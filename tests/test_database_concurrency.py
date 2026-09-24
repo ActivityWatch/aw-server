@@ -1,4 +1,5 @@
 """Exercise real SQLite locks across separate request-thread connections."""
+
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 

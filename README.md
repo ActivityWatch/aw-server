@@ -28,6 +28,10 @@ Run aw-server:
 aw-server
 ```
 
+To bind explicitly to IPv6 loopback, run `aw-server --host ::1` and open
+`http://[::1]:5600`. The default `localhost` binding depends on your system's
+address resolution and may listen only on IPv4.
+
 ## Development
 
 If you want to run aw-server in development, you probably want to run a

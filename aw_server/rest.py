@@ -16,7 +16,6 @@ from flask import (
     Response,
     current_app,
     jsonify,
-    make_response,
     request,
     stream_with_context,
 )
@@ -463,9 +462,10 @@ class ExportAllResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_all)
     def get(self):
-        buckets_export = current_app.api.export_all()
-        payload = {"buckets": buckets_export}
-        response = make_response(json.dumps(payload))
+        response = Response(
+            stream_with_context(current_app.api.stream_export()),
+            mimetype="application/json",
+        )
         filename = "aw-buckets-export.json"
         response.headers["Content-Disposition"] = content_disposition(filename)
         return response
@@ -477,10 +477,11 @@ class BucketExportResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
-        bucket_export = current_app.api.export_bucket(bucket_id)
-        payload = {"buckets": {bucket_export["id"]: bucket_export}}
-        response = make_response(json.dumps(payload))
-        filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
+        response = Response(
+            stream_with_context(current_app.api.stream_export(bucket_id)),
+            mimetype="application/json",
+        )
+        filename = "aw-bucket-export_{}.json".format(bucket_id)
         response.headers["Content-Disposition"] = content_disposition(filename)
         return response
 

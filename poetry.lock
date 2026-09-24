@@ -79,8 +79,8 @@ tomlkit = "*"
 [package.source]
 type = "git"
 url = "https://github.com/0xbrayo/aw-core.git"
-reference = "951a441021278b3ff6000cfa0673798608c57550"
-resolved_reference = "951a441021278b3ff6000cfa0673798608c57550"
+reference = "a794efb9639b03c243c47c85819f701defbd2591"
+resolved_reference = "a794efb9639b03c243c47c85819f701defbd2591"
 
 [[package]]
 name = "black"
@@ -1211,4 +1211,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "7bf53a2e1b6643bf036c6796c4d4965417ef75f9cb48691ea1421952016a28e0"
+content-hash = "5745f3d46d890fdf28c9c66dfec21e863433f77a9c7bfa1b95966cdab3a25b84"

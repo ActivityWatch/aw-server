@@ -11,7 +11,7 @@ aw-server = "aw_server:main"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-aw-core = { git = "https://github.com/0xbrayo/aw-core.git", rev = "951a441021278b3ff6000cfa0673798608c57550" }
+aw-core = { git = "https://github.com/0xbrayo/aw-core.git", rev = "a794efb9639b03c243c47c85819f701defbd2591" }
 aw-client = "^0.5.8"
 flask = "^2.2"
 flask-restx = "^1.0.3"

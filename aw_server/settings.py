@@ -6,12 +6,23 @@ from aw_core.dirs import get_config_dir
 from .profile import profile_from_env, profile_suffix
 
 
+def _settings_suffix(testing: bool) -> str:
+    """Bare ``settings.json`` in isolated roots; ``-testing`` only in legacy."""
+    try:
+        from aw_core.dirs import legacy_testing_suffix
+
+        return legacy_testing_suffix(testing)
+    except ImportError:
+        return profile_suffix(profile_from_env(testing=testing))
+
+
 class Settings:
     def __init__(self, testing: bool):
-        # Dir isolation (AW_PROFILE) already separates profiles; the filename
-        # suffix is the pre-profile workaround and stays so --testing still
-        # finds settings-testing.json. Named profiles get the same shape.
-        filename = f"settings{profile_suffix(profile_from_env(testing=testing))}.json"
+        # Isolated roots (including new-style activitywatch-testing/) use
+        # bare settings.json — the directory already isolates. The
+        # settings-testing.json suffix stays so legacy shared-root testing
+        # still finds its file next to prod.
+        filename = f"settings{_settings_suffix(testing)}.json"
         self.config_file = Path(get_config_dir("aw-server")) / filename
         self.load()
 

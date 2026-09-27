@@ -119,10 +119,10 @@ def parse_settings():
     testing = is_testing(profile)
 
     """ Parse config file """
-    config = load_config()
+    config = load_config(profile)
     section = config_section(profile)
     if section not in config:
-        if profile not in (DEFAULT_PROFILE,):
+        if profile not in (DEFAULT_PROFILE,) and section != "server":
             logger.warning(
                 "Profile %s has no [%s] section, falling back to [server] "
                 "(port %s may collide with the default instance)",

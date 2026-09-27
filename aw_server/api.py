@@ -60,9 +60,6 @@ class ServerAPI:
         self.last_event = {}  # type: dict
         # Every write below must invalidate the cache (see query_cache.py).
         self.query_cache: Optional[QueryCache] = QueryCache() if query_cache else None
-        # Buckets written outside heartbeat(), where self.last_event may not be
-        # the event replace_last() actually replaces.
-        self._last_event_unverified: set = set()
 
     def _invalidate(self, ranges) -> None:
         if self.query_cache:
@@ -225,7 +222,6 @@ class ServerAPI:
             self.db.delete_bucket(bucket_id)
         finally:
             self._invalidate_all()
-            self._last_event_unverified.add(bucket_id)
         logger.debug(f"Deleted bucket '{bucket_id}'")
         return None
 
@@ -284,7 +280,6 @@ class ServerAPI:
                 return []
         finally:
             self._invalidate(affected)
-            self._last_event_unverified.add(bucket_id)
 
     @check_bucket_exists
     def get_eventcount(
@@ -306,7 +301,6 @@ class ServerAPI:
         finally:
             if old:
                 self._invalidate([event_range(old)])
-            self._last_event_unverified.add(bucket_id)
 
     @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
@@ -369,12 +363,12 @@ class ServerAPI:
                         )
                     )
                     affected = [event_range(last_event), event_range(merged)]
-                    if bucket_id in self._last_event_unverified:
-                        # replace_last() replaces the stored last event, which
-                        # may not be last_event after other writes
+                    if self.query_cache:
+                        # replace_last() replaces the *stored* last event, which
+                        # is not always last_event (other writes, or an earlier
+                        # out-of-order heartbeat), so invalidate its range too.
                         stored = self.db[bucket_id].get(limit=1)
                         affected += [event_range(e) for e in stored]
-                        self._last_event_unverified.discard(bucket_id)
                     self.last_event[bucket_id] = merged
                     try:
                         self.db[bucket_id].replace_last(merged)
@@ -405,7 +399,6 @@ class ServerAPI:
         finally:
             self._invalidate([event_range(heartbeat)])
         self.last_event[bucket_id] = heartbeat
-        self._last_event_unverified.discard(bucket_id)
         return heartbeat
 
     def query2(self, name, query, timeperiods, cache: bool = True):

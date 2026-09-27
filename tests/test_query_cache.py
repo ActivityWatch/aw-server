@@ -144,6 +144,36 @@ def test_heartbeat_overlapping_cached_period_invalidates(api):
     assert total(api) == 90
 
 
+def test_merge_after_out_of_order_heartbeat_invalidates_replaced_event(api):
+    b = "ooo-bucket"
+    api.create_bucket(b, "test", "test", "testhost")
+    q = [f'events = query_bucket("{b}");', "RETURN = sum_durations(events);"]
+
+    def day2_total():
+        return api.query2("t", q, [tp(DAY2)], True)[0].total_seconds()
+
+    # newer event on DAY2, then an older heartbeat on DAY1 with other data
+    api.heartbeat(
+        b, Event(timestamp=DAY2[0] + timedelta(hours=5), duration=30, data={"x": 1}), 0
+    )
+    api.heartbeat(
+        b, Event(timestamp=DAY1[0] + timedelta(hours=5), duration=0, data={"y": 1}), 0
+    )
+    assert day2_total() == 30
+    # a matching heartbeat merges and replace_last() overwrites the stored
+    # (DAY2) last event: its cached DAY2 result must be dropped
+    api.heartbeat(
+        b,
+        Event(
+            timestamp=DAY1[0] + timedelta(hours=5, seconds=10),
+            duration=0,
+            data={"y": 1},
+        ),
+        60,
+    )
+    assert day2_total() == api.query2("t", q, [tp(DAY2)], False)[0].total_seconds()
+
+
 def test_insert_and_delete_invalidate_only_overlapping(api):
     assert total(api) == 60
     assert total(api, DAY2) == 0

@@ -31,7 +31,7 @@ import logging
 import threading
 from collections import OrderedDict, deque
 from datetime import datetime, timedelta, timezone
-from typing import Any, Deque, Iterable, Optional, Tuple
+from typing import Any, Deque, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,21 @@ def _overlaps(a: TimeRange, b: TimeRange) -> bool:
     return a[0] <= b[1] and b[0] <= a[1]
 
 
+def coalesce(ranges: Iterable[TimeRange], max_ranges: int = 64) -> List[TimeRange]:
+    """Merge overlapping/touching ranges. Past ``max_ranges``, fall back to one
+    bounding range: over-invalidating after a big import is fine, scanning the
+    cache once per imported event is not."""
+    merged: List[TimeRange] = []
+    for start, end in sorted(ranges):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    if len(merged) > max_ranges:
+        return [(merged[0][0], max(end for _, end in merged))]
+    return merged
+
+
 class QueryCache:
     def __init__(
         self,
@@ -72,8 +87,8 @@ class QueryCache:
         self._entries: "OrderedDict[str, Tuple[TimeRange, Any, int]]" = OrderedDict()
         self._bytes = 0
         self._gen = 0
-        # (generation, affected range) of recent writes, oldest first
-        self._writes: Deque[Tuple[int, TimeRange]] = deque(maxlen=write_log_size)
+        # (generation, affected ranges) of recent writes, oldest first
+        self._writes: Deque[Tuple[int, List[TimeRange]]] = deque(maxlen=write_log_size)
         self.hits = 0
         self.misses = 0
 
@@ -94,6 +109,9 @@ class QueryCache:
             return self._gen
 
     def get(self, key: str) -> Optional[Any]:
+        """Return the cached result. It is shared, not copied: callers must not
+        mutate it (the REST layer only serializes it; a deepcopy per hit would
+        roughly double warm load times)."""
         with self._lock:
             entry = self._entries.get(key)
             if entry is None:
@@ -118,7 +136,9 @@ class QueryCache:
                 if oldest_logged > started_gen + 1:
                     return False  # write log doesn't reach back far enough to tell
                 for gen, affected in self._writes:
-                    if gen > started_gen and _overlaps(affected, period):
+                    if gen > started_gen and any(
+                        _overlaps(r, period) for r in affected
+                    ):
                         return False
             old = self._entries.pop(key, None)
             if old:
@@ -134,13 +154,13 @@ class QueryCache:
 
     def invalidate(self, ranges: Iterable[TimeRange]) -> None:
         """Record writes affecting ``ranges`` and drop overlapping entries. Call after the write."""
-        ranges = [(_utc(a), _utc(b)) for a, b in ranges]
+        ranges = coalesce((_utc(a), _utc(b)) for a, b in ranges)
         if not ranges:
             return
         with self._lock:
-            for r in ranges:
-                self._gen += 1
-                self._writes.append((self._gen, r))
+            # one generation per write call, however many events it touched
+            self._gen += 1
+            self._writes.append((self._gen, ranges))
             stale = [
                 k
                 for k, (period, _, _) in self._entries.items()

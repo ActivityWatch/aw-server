@@ -6,7 +6,7 @@ from aw_core.models import Event
 from aw_datastore import Datastore
 
 from aw_server.api import ServerAPI
-from aw_server.query_cache import QueryCache
+from aw_server.query_cache import QueryCache, coalesce
 
 UTC = timezone.utc
 DAY1 = (datetime(2024, 1, 1, tzinfo=UTC), datetime(2024, 1, 2, tzinfo=UTC))
@@ -56,6 +56,27 @@ def test_put_refused_when_write_log_overflowed():
     for i in range(3):  # non-overlapping, but the log no longer reaches `started`
         c.invalidate([(DAY2[0], DAY2[0] + timedelta(seconds=i))])
     assert not c.put(c.key("q", DAY1), DAY1, [1], started)
+
+
+def test_coalesce_bulk_write_ranges():
+    h = lambda n: DAY1[0] + timedelta(hours=n)  # noqa: E731
+    assert coalesce([(h(3), h(4)), (h(1), h(2)), (h(2), h(3))]) == [(h(1), h(4))]
+    assert coalesce([(h(1), h(2)), (h(5), h(6))]) == [(h(1), h(2)), (h(5), h(6))]
+    many = [(h(i), h(i) + timedelta(minutes=1)) for i in range(0, 200, 2)]
+    assert coalesce(many, max_ranges=64) == [(h(0), h(198) + timedelta(minutes=1))]
+
+
+def test_bulk_write_is_one_generation():
+    c = QueryCache(write_log_size=2)
+    started = c.generation()
+    c.invalidate(
+        [
+            (DAY2[0] + timedelta(hours=i), DAY2[0] + timedelta(hours=i, minutes=1))
+            for i in range(1, 10)
+        ]
+    )
+    assert c.generation() == started + 1
+    assert c.put(c.key("q", DAY1), DAY1, [1], started)
 
 
 def test_cacheable_margin():

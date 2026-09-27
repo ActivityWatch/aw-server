@@ -55,6 +55,7 @@ def main():
         storage_method=storage_method,
         cors_origins=settings.cors_origins,
         custom_static=settings.custom_static,
+        query_cache=settings.query_cache,
     )
 
 
@@ -136,6 +137,7 @@ def parse_settings():
     settings.storage = config[section]["storage"]
     settings.cors_origins = config[section]["cors_origins"]
     settings.custom_static = dict(config[section]["custom_static"])
+    settings.query_cache = bool(config[section].get("query_cache", True))
     settings.profile = profile
     settings.testing = testing
 

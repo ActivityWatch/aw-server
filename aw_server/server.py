@@ -37,6 +37,7 @@ class AWFlask(Flask):
         custom_static=dict(),
         static_folder=static_folder,
         static_url_path="",
+        query_cache: bool = True,
     ):
         name = "aw-server"
         self.json_provider_class = CustomJSONProvider
@@ -58,7 +59,7 @@ class AWFlask(Flask):
         if storage_method is None:
             storage_method = aw_datastore.get_storage_methods()["memory"]
         db = Datastore(storage_method, testing=testing)
-        self.api = ServerAPI(db=db, testing=testing)
+        self.api = ServerAPI(db=db, testing=testing, query_cache=query_cache)
 
         self.register_blueprint(root)
         self.register_blueprint(rest.blueprint)
@@ -129,6 +130,7 @@ def _start(
     testing: bool = False,
     cors_origins: List[str] = [],
     custom_static: Dict[str, str] = dict(),
+    query_cache: bool = True,
 ):
     app = AWFlask(
         host,
@@ -136,6 +138,7 @@ def _start(
         storage_method=storage_method,
         cors_origins=cors_origins,
         custom_static=custom_static,
+        query_cache=query_cache,
     )
     try:
         app.run(

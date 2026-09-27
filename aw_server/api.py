@@ -23,6 +23,7 @@ from aw_transform import heartbeat_merge
 from .__about__ import __version__
 from .exceptions import NotFound
 from .profile import profile_from_env
+from .query_cache import QueryCache, event_range
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -51,12 +52,25 @@ def check_bucket_exists(f):
 
 
 class ServerAPI:
-    def __init__(self, db, testing) -> None:
+    def __init__(self, db, testing, query_cache: bool = True) -> None:
         self.db = db
         self.settings = Settings(testing)
         self.testing = testing
         self.profile = profile_from_env(testing=testing)
         self.last_event = {}  # type: dict
+        # Every write below must invalidate the cache (see query_cache.py).
+        self.query_cache: Optional[QueryCache] = QueryCache() if query_cache else None
+        # Buckets written outside heartbeat(), where self.last_event may not be
+        # the event replace_last() actually replaces.
+        self._last_event_unverified: set = set()
+
+    def _invalidate(self, ranges) -> None:
+        if self.query_cache:
+            self.query_cache.invalidate(ranges)
+
+    def _invalidate_all(self) -> None:
+        if self.query_cache:
+            self.query_cache.clear()
 
     def get_info(self) -> Dict[str, Any]:
         """Get server info"""
@@ -111,17 +125,20 @@ class ServerAPI:
         logger.info(f"Importing bucket {bucket_id}")
 
         # TODO: Check that bucket doesn't already exist
-        self.db.create_bucket(
-            bucket_id,
-            type=bucket_data["type"],
-            client=bucket_data["client"],
-            hostname=bucket_data["hostname"],
-            created=(
-                bucket_data["created"]
-                if isinstance(bucket_data["created"], datetime)
-                else iso8601.parse_date(bucket_data["created"])
-            ),
-        )
+        try:
+            self.db.create_bucket(
+                bucket_id,
+                type=bucket_data["type"],
+                client=bucket_data["client"],
+                hostname=bucket_data["hostname"],
+                created=(
+                    bucket_data["created"]
+                    if isinstance(bucket_data["created"], datetime)
+                    else iso8601.parse_date(bucket_data["created"])
+                ),
+            )
+        finally:
+            self._invalidate_all()
 
         # scrub IDs from events
         # (otherwise causes weird bugs with no events seemingly imported when importing events exported from aw-server-rust, which contains IDs)
@@ -165,14 +182,17 @@ class ServerAPI:
                 data = {}
             hostname = info["hostname"]
             data["device_id"] = info["device_id"]
-        self.db.create_bucket(
-            bucket_id,
-            type=event_type,
-            client=client,
-            hostname=hostname,
-            created=created,
-            data=data,
-        )
+        try:
+            self.db.create_bucket(
+                bucket_id,
+                type=event_type,
+                client=client,
+                hostname=hostname,
+                created=created,
+                data=data,
+            )
+        finally:
+            self._invalidate_all()
         return True
 
     @check_bucket_exists
@@ -185,19 +205,27 @@ class ServerAPI:
         data: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Update bucket metadata"""
-        self.db.update_bucket(
-            bucket_id,
-            type=event_type,
-            client=client,
-            hostname=hostname,
-            data=data,
-        )
+        try:
+            self.db.update_bucket(
+                bucket_id,
+                type=event_type,
+                client=client,
+                hostname=hostname,
+                data=data,
+            )
+        finally:
+            # hostname/type changes can change what find_bucket() resolves to
+            self._invalidate_all()
         return None
 
     @check_bucket_exists
     def delete_bucket(self, bucket_id: str) -> None:
         """Delete a bucket"""
-        self.db.delete_bucket(bucket_id)
+        try:
+            self.db.delete_bucket(bucket_id)
+        finally:
+            self._invalidate_all()
+            self._last_event_unverified.add(bucket_id)
         logger.debug(f"Deleted bucket '{bucket_id}'")
         return None
 
@@ -239,13 +267,24 @@ class ServerAPI:
         For single events, the returned event includes the server-assigned ID.
         For bulk inserts, returns empty list (events may not have IDs without a response-SQL roundtrip).
         """
-        if len(events) == 1:
-            # Pass as single Event so Bucket.insert uses insert_one (returns Event with ID)
-            inserted = self.db[bucket_id].insert(events[0])
-            return [inserted]
-        else:
-            self.db[bucket_id].insert(events)
-            return []
+        affected = [event_range(e) for e in events]
+        # An event with an ID replaces the stored one, whose range changes too
+        for e in events:
+            if e.id is not None:
+                old = self.db[bucket_id].get_by_id(e.id)
+                if old:
+                    affected.append(event_range(old))
+        try:
+            if len(events) == 1:
+                # Pass as single Event so Bucket.insert uses insert_one (returns Event with ID)
+                inserted = self.db[bucket_id].insert(events[0])
+                return [inserted]
+            else:
+                self.db[bucket_id].insert(events)
+                return []
+        finally:
+            self._invalidate(affected)
+            self._last_event_unverified.add(bucket_id)
 
     @check_bucket_exists
     def get_eventcount(
@@ -261,7 +300,13 @@ class ServerAPI:
     @check_bucket_exists
     def delete_event(self, bucket_id: str, event_id) -> bool:
         """Delete a single event from a bucket"""
-        return self.db[bucket_id].delete(event_id)
+        old = self.db[bucket_id].get_by_id(event_id)
+        try:
+            return self.db[bucket_id].delete(event_id)
+        finally:
+            if old:
+                self._invalidate([event_range(old)])
+            self._last_event_unverified.add(bucket_id)
 
     @check_bucket_exists
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
@@ -323,8 +368,18 @@ class ServerAPI:
                             bucket_id
                         )
                     )
+                    affected = [event_range(last_event), event_range(merged)]
+                    if bucket_id in self._last_event_unverified:
+                        # replace_last() replaces the stored last event, which
+                        # may not be last_event after other writes
+                        stored = self.db[bucket_id].get(limit=1)
+                        affected += [event_range(e) for e in stored]
+                        self._last_event_unverified.discard(bucket_id)
                     self.last_event[bucket_id] = merged
-                    self.db[bucket_id].replace_last(merged)
+                    try:
+                        self.db[bucket_id].replace_last(merged)
+                    finally:
+                        self._invalidate(affected)
                     return merged
                 else:
                     logger.info(
@@ -345,11 +400,22 @@ class ServerAPI:
                 )
             )
 
-        self.db[bucket_id].insert(heartbeat)
+        try:
+            self.db[bucket_id].insert(heartbeat)
+        finally:
+            self._invalidate([event_range(heartbeat)])
         self.last_event[bucket_id] = heartbeat
+        self._last_event_unverified.discard(bucket_id)
         return heartbeat
 
-    def query2(self, name, query, timeperiods, cache):
+    def query2(self, name, query, timeperiods, cache: bool = True):
+        """Run a query for each timeperiod.
+
+        Results for periods that ended a while ago are cached in memory unless
+        ``cache`` is False (see query_cache.py for invalidation).
+        """
+        query = "".join(query)
+        qc = self.query_cache if cache else None
         result = []
         for timeperiod in timeperiods:
             period = timeperiod.split("/")[
@@ -365,8 +431,19 @@ class ServerAPI:
                 endtime = iso8601.parse_date(period[1])
             except iso8601.ParseError as e:
                 raise QueryException(f"Invalid timeperiod '{timeperiod}': {e}")
-            query = "".join(query)
-            result.append(query2.query(name, query, starttime, endtime, self.db))
+            period = (starttime, endtime)
+            if qc is None or not qc.cacheable(period):
+                result.append(query2.query(name, query, starttime, endtime, self.db))
+                continue
+            key = QueryCache.key(query, period)
+            cached = qc.get(key)
+            if cached is not None:
+                result.append(cached)
+                continue
+            started = qc.generation()
+            res = query2.query(name, query, starttime, endtime, self.db)
+            qc.put(key, period, res, started)
+            result.append(res)
         return result
 
     # TODO: Right now the log format on disk has to be JSON, this is hard to read by humans...

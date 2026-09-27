@@ -98,6 +98,10 @@ query = api.model(
         "query": fields.List(
             fields.String, required=True, description="String list of query statements"
         ),
+        "cache": fields.Boolean(
+            required=False,
+            description="Set to false to bypass the cache for finished past periods",
+        ),
     },
 )
 
@@ -316,15 +320,23 @@ class HeartbeatResource(Resource):
 class QueryResource(Resource):
     # TODO Docs
     @api.expect(query, validate=True)
-    @api.param("name", "Name of the query (required if using cache)")
+    @api.param("name", "Name of the query")
+    @api.param(
+        "cache",
+        "Set to false to bypass the server-side cache of results for finished past periods"
+        " (also accepted as a boolean `cache` field in the body). Default: true.",
+    )
     def post(self):
         name = ""
         if "name" in request.args:
             name = request.args["name"]
         query = request.get_json()
+        cache = request.args.get("cache", "true").lower() not in ("false", "0", "no")
+        if query.get("cache") is False:
+            cache = False
         try:
             result = current_app.api.query2(
-                name, query["query"], query["timeperiods"], False
+                name, query["query"], query["timeperiods"], cache
             )
             return jsonify(result)
         except QueryException as qe:

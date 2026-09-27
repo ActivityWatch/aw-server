@@ -1,6 +1,7 @@
 import functools
 import json
 import logging
+import threading
 from datetime import datetime
 from pathlib import Path
 from socket import gethostname
@@ -51,6 +52,19 @@ def check_bucket_exists(f):
     return g
 
 
+def _serialized(f):
+    """Run a write under the API's write lock, so reading an event's old range,
+    the write, and the cache invalidation can't interleave with another write
+    (see query_cache.py). SQLite serializes writes anyway."""
+
+    @functools.wraps(f)
+    def g(self, *args, **kwargs):
+        with self._write_lock:
+            return f(self, *args, **kwargs)
+
+    return g
+
+
 class ServerAPI:
     def __init__(self, db, testing, query_cache: bool = True) -> None:
         self.db = db
@@ -60,6 +74,7 @@ class ServerAPI:
         self.last_event = {}  # type: dict
         # Every write below must invalidate the cache (see query_cache.py).
         self.query_cache: Optional[QueryCache] = QueryCache() if query_cache else None
+        self._write_lock = threading.RLock()
 
     def _invalidate(self, ranges) -> None:
         if self.query_cache:
@@ -117,6 +132,7 @@ class ServerAPI:
             exported_buckets[bid] = self.export_bucket(bid)
         return exported_buckets
 
+    @_serialized
     def import_bucket(self, bucket_data: Any):
         bucket_id = bucket_data["id"]
         logger.info(f"Importing bucket {bucket_id}")
@@ -152,6 +168,7 @@ class ServerAPI:
         for bid, bucket in buckets.items():
             self.import_bucket(bucket)
 
+    @_serialized
     def create_bucket(
         self,
         bucket_id: str,
@@ -193,6 +210,7 @@ class ServerAPI:
         return True
 
     @check_bucket_exists
+    @_serialized
     def update_bucket(
         self,
         bucket_id: str,
@@ -216,6 +234,7 @@ class ServerAPI:
         return None
 
     @check_bucket_exists
+    @_serialized
     def delete_bucket(self, bucket_id: str) -> None:
         """Delete a bucket"""
         try:
@@ -256,6 +275,7 @@ class ServerAPI:
         return events
 
     @check_bucket_exists
+    @_serialized
     def create_events(self, bucket_id: str, events: List[Event]) -> List[Event]:
         """Create events for a bucket. Can handle both single events and multiple ones.
 
@@ -293,6 +313,7 @@ class ServerAPI:
         return self.db[bucket_id].get_eventcount(start, end)
 
     @check_bucket_exists
+    @_serialized
     def delete_event(self, bucket_id: str, event_id) -> bool:
         """Delete a single event from a bucket"""
         old = self.db[bucket_id].get_by_id(event_id)
@@ -303,6 +324,7 @@ class ServerAPI:
                 self._invalidate([event_range(old)])
 
     @check_bucket_exists
+    @_serialized
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """
         Heartbeats are useful when implementing watchers that simply keep

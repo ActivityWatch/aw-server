@@ -32,11 +32,15 @@ def test_put_get_and_overlap_invalidation():
     assert c.get(k2) == [2]  # non-overlapping write keeps it
 
 
-def test_key_normalizes_whitespace_and_timezone():
+def test_key_normalizes_timezone_not_query_text():
     cet = timezone(timedelta(hours=1))
     same_period = (DAY1[0].astimezone(cet), DAY1[1].astimezone(cet))
-    assert QueryCache.key("  a;\n b; ", DAY1) == QueryCache.key("a;\nb;", same_period)
+    assert QueryCache.key("a;", DAY1) == QueryCache.key("a;", same_period)
     assert QueryCache.key("a;", DAY1) != QueryCache.key("b;", DAY1)
+    # whitespace inside string literals is significant
+    assert QueryCache.key('RETURN = "a\n b";', DAY1) != QueryCache.key(
+        'RETURN = "a\nb";', DAY1
+    )
 
 
 def test_put_refused_after_overlapping_write_during_computation():

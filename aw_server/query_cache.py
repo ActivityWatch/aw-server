@@ -94,9 +94,9 @@ class QueryCache:
 
     @staticmethod
     def key(query: str, period: TimeRange) -> str:
-        normalized = "\n".join(line.strip() for line in query.splitlines()).strip()
+        # Exact query text: whitespace can be significant inside string literals.
         raw = json.dumps(
-            [normalized, _utc(period[0]).isoformat(), _utc(period[1]).isoformat()]
+            [query, _utc(period[0]).isoformat(), _utc(period[1]).isoformat()]
         )
         return hashlib.sha256(raw.encode()).hexdigest()
 

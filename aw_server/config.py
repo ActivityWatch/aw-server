@@ -8,6 +8,8 @@ host = "localhost"
 port = "5600"
 storage = "peewee"
 cors_origins = ""
+# Cache query results for finished past periods in memory (see query_cache.py)
+query_cache = true
 
 [server.custom_static]
 
@@ -16,6 +18,7 @@ host = "localhost"
 port = "5666"
 storage = "peewee"
 cors_origins = ""
+query_cache = true
 
 [server-testing.custom_static]
 """.strip()

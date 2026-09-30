@@ -6,6 +6,7 @@ from typing import Dict, List
 import aw_datastore
 import flask.json.provider
 from aw_datastore import Datastore
+from aw_datastore.storages.peewee import PeeweeStorage
 from flask import (
     Blueprint,
     Flask,
@@ -59,6 +60,19 @@ class AWFlask(Flask):
         if storage_method is None:
             storage_method = aw_datastore.get_storage_methods()["memory"]
         db = Datastore(storage_method, testing=testing)
+        if isinstance(db.storage_strategy, PeeweeStorage):
+            database = db.storage_strategy.db
+            # aw-core enables WAL for concurrent readers and writers. Close
+            # its initialization connection before serving request threads.
+            database.close()
+
+            @self.teardown_request
+            def close_database(error):
+                # Peewee opens connections lazily and keeps them thread-local.
+                # Release cursors/locks even if handling a request failed.
+                if not database.is_closed():
+                    database.close()
+
         self.api = ServerAPI(db=db, testing=testing, query_cache=query_cache)
 
         self.register_blueprint(root)

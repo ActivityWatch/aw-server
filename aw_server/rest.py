@@ -12,7 +12,8 @@ from flask import (
     Blueprint,
     current_app,
     jsonify,
-    make_response,
+    Response,
+    stream_with_context,
     request,
 )
 from flask_restx import Api, Resource, fields
@@ -218,9 +219,9 @@ class EventsResource(Resource):
     def post(self, bucket_id):
         data = request.get_json()
         logger.debug(
-            "Received post request for event in bucket '{}' and data: {}".format(
-                bucket_id, data
-            )
+            "Received post request for event in bucket '%s' and data: %s",
+            bucket_id,
+            data,
         )
 
         if isinstance(data, dict):
@@ -255,7 +256,9 @@ class EventResource(Resource):
     @copy_doc(ServerAPI.get_event)
     def get(self, bucket_id: str, event_id: int):
         logger.debug(
-            f"Received get request for event with id '{event_id}' in bucket '{bucket_id}'"
+            "Received get request for event with id '%s' in bucket '%s'",
+            event_id,
+            bucket_id,
         )
         event = current_app.api.get_event(bucket_id, event_id)
         if event:
@@ -266,9 +269,9 @@ class EventResource(Resource):
     @copy_doc(ServerAPI.delete_event)
     def delete(self, bucket_id: str, event_id: int):
         logger.debug(
-            "Received delete request for event with id '{}' in bucket '{}'".format(
-                event_id, bucket_id
-            )
+            "Received delete request for event with id '%s' in bucket '%s'",
+            event_id,
+            bucket_id,
         )
         success = current_app.api.delete_event(bucket_id, event_id)
         return {"success": success}, 200
@@ -352,9 +355,10 @@ class ExportAllResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_all)
     def get(self):
-        buckets_export = current_app.api.export_all()
-        payload = {"buckets": buckets_export}
-        response = make_response(json.dumps(payload))
+        response = Response(
+            stream_with_context(current_app.api.stream_export()),
+            mimetype="application/json",
+        )
         filename = "aw-buckets-export.json"
         response.headers["Content-Disposition"] = "attachment; filename={}".format(
             filename
@@ -368,10 +372,11 @@ class BucketExportResource(Resource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
-        bucket_export = current_app.api.export_bucket(bucket_id)
-        payload = {"buckets": {bucket_export["id"]: bucket_export}}
-        response = make_response(json.dumps(payload))
-        filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
+        response = Response(
+            stream_with_context(current_app.api.stream_export(bucket_id)),
+            mimetype="application/json",
+        )
+        filename = "aw-bucket-export_{}.json".format(bucket_id)
         response.headers["Content-Disposition"] = "attachment; filename={}".format(
             filename
         )

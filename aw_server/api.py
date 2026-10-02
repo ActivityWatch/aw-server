@@ -184,9 +184,17 @@ class ServerAPI:
 
     @_serialized
     def import_all(self, buckets: Dict[str, Any]):
+        if not isinstance(buckets, dict):
+            raise ValueError(
+                "'buckets' must be an object mapping bucket IDs to buckets"
+            )
         # Check every bucket up front, so a rejected import writes nothing.
         bucket_ids = [bucket["id"] for bucket in buckets.values()]
         for bucket_id in bucket_ids:
+            if bucket_ids.count(bucket_id) > 1:
+                raise ValueError(
+                    f"Bucket '{bucket_id}' appears more than once in the import."
+                )
             if bucket_id in self.db.buckets():
                 raise ValueError(
                     f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."

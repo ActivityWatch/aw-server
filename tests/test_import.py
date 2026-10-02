@@ -110,3 +110,52 @@ def test_import_malformed_json(flask_client):
         "/api/0/import", data="{not json", content_type="application/json"
     )
     assert r.status_code == 400
+
+
+def test_import_duplicate_ids_within_export(flask_client, cleanup):
+    cleanup.append("test-import-twice")
+    r = flask_client.post(
+        "/api/0/import",
+        json={
+            "buckets": {
+                "a": _bucket("test-import-twice"),
+                "b": _bucket("test-import-twice"),
+            }
+        },
+    )
+    assert r.status_code == 400
+    assert "more than once" in r.json["message"]
+    assert "test-import-twice" not in _buckets(flask_client)
+
+
+def test_import_buckets_not_an_object(flask_client):
+    r = flask_client.post("/api/0/import", json={"buckets": []})
+    assert r.status_code == 400
+    assert r.json["message"]
+
+
+def test_import_multipart_failure_rolls_back_every_file(flask_client, cleanup):
+    import io
+    import json
+
+    cleanup.extend(["test-import-file1", "test-import-file2"])
+    good = {"buckets": {"test-import-file1": _bucket("test-import-file1")}}
+    bad = {
+        "buckets": {
+            "test-import-file2": _bucket(
+                "test-import-file2", events=[{"not": "an event"}]
+            )
+        }
+    }
+    r = flask_client.post(
+        "/api/0/import",
+        data={
+            "file1": (io.BytesIO(json.dumps(good).encode()), "one.json"),
+            "file2": (io.BytesIO(json.dumps(bad).encode()), "two.json"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert r.status_code == 400
+    buckets = _buckets(flask_client)
+    assert "test-import-file1" not in buckets
+    assert "test-import-file2" not in buckets

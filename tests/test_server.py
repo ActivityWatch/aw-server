@@ -337,3 +337,46 @@ def test_heartbeat_after_insert_does_not_merge_into_stale_event(
         "a",
     ]
     assert [e["duration"] for e in events] == [0.5] * (n_inserted + 2)
+
+
+def test_heartbeat_after_delete_does_not_merge_into_deleted_event(
+    flask_client, bucket
+):
+    """Deleting events must invalidate the heartbeat cache.
+
+    Otherwise a later heartbeat merges into the cached (deleted) event and
+    replace_last() targets an event that no longer exists.
+    """
+    t = datetime(2026, 1, 1)
+
+    def event(offset, label):
+        return {
+            "timestamp": (t + timedelta(seconds=offset)).isoformat(),
+            "duration": 0.5,
+            "data": {"label": label},
+        }
+
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/heartbeat?pulsetime=10", json=event(0, "a")
+    )
+    assert r.status_code == 200
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/events")
+    stored = r.json[0]
+    r = flask_client.delete(f"/api/0/buckets/{bucket}/events/{stored['id']}")
+    assert r.status_code == 200
+
+    # The heartbeat data matches the deleted cached event, so without the
+    # cache invalidation it would merge into the deleted event and
+    # replace_last() would operate on a nonexistent event.
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/heartbeat?pulsetime=10", json=event(1, "a")
+    )
+    assert r.status_code == 200
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/events")
+    events = r.json
+    assert len(events) == 1
+    assert events[0]["data"]["label"] == "a"
+    assert events[0]["duration"] == 0.5
+    assert events[0]["timestamp"] == (t + timedelta(seconds=1)).isoformat()

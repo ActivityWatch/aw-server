@@ -388,9 +388,16 @@ class ImportAllResource(Resource):
             if len(request.files) > 0:
                 # web-ui form only allows one file, but technically it's possible to
                 # upload multiple files at the same time
+                # Import every file as one batch, so a failure rolls back all of them.
+                buckets = {}
                 for filename, f in request.files.items():
-                    buckets = json.loads(f.stream.read())["buckets"]
-                    current_app.api.import_all(buckets)
+                    for key, bucket in json.loads(f.stream.read())["buckets"].items():
+                        if key in buckets:
+                            raise ValueError(
+                                f"Bucket '{key}' appears in more than one uploaded file."
+                            )
+                        buckets[key] = bucket
+                current_app.api.import_all(buckets)
             # Normal import from body
             else:
                 buckets = request.get_json()["buckets"]

@@ -10,6 +10,7 @@ from typing import (
     Dict,
     List,
     Optional,
+    Set,
 )
 from uuid import uuid4
 
@@ -28,6 +29,15 @@ from .query_cache import QueryCache, event_range
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
+
+
+class ImportRollbackError(RuntimeError):
+    """An import failed and rollback could not remove every created bucket.
+
+    A distinct type so the REST layer can return the remaining bucket IDs to the
+    client: those buckets are still stored, so a retry would be rejected as a
+    duplicate, and the client needs to know which ones to delete first.
+    """
 
 
 def get_device_id() -> str:
@@ -137,7 +147,11 @@ class ServerAPI:
         bucket_id = bucket_data["id"]
         logger.info(f"Importing bucket {bucket_id}")
 
-        # TODO: Check that bucket doesn't already exist
+        if bucket_id in self.db.buckets():
+            raise ValueError(
+                f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
+            )
+
         try:
             self.db.create_bucket(
                 bucket_id,
@@ -164,9 +178,62 @@ class ServerAPI:
             [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]],
         )
 
+    @_serialized
     def import_all(self, buckets: Dict[str, Any]):
-        for bid, bucket in buckets.items():
-            self.import_bucket(bucket)
+        if not isinstance(buckets, dict):
+            raise ValueError(
+                "'buckets' must be an object mapping bucket IDs to buckets"
+            )
+        # Check every bucket up front, so a rejected import writes nothing.
+        # Track seen IDs in a set: an O(n) membership check instead of the
+        # O(n^2) list.count() scan, which mattered because this runs while
+        # import_all holds the write lock shared by bucket and event writes.
+        bucket_ids = [bucket["id"] for bucket in buckets.values()]
+        seen: Set[str] = set()
+        for bucket_id in bucket_ids:
+            if bucket_id in seen:
+                raise ValueError(
+                    f"Bucket '{bucket_id}' appears more than once in the import."
+                )
+            seen.add(bucket_id)
+            if bucket_id in self.db.buckets():
+                raise ValueError(
+                    f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
+                )
+        try:
+            for bucket in buckets.values():
+                self.import_bucket(bucket)
+        except Exception as import_error:
+            # None of these buckets existed before (checked above, under the
+            # write lock), so any that exist now were created by this import,
+            # including one whose events failed after the bucket was created.
+            existing = self.db.buckets()
+            failed_rollbacks = []
+            for bucket_id in seen:
+                if bucket_id not in existing:
+                    continue
+                try:
+                    self.delete_bucket(bucket_id)
+                except Exception:
+                    # Keep rolling back the remaining buckets, but record the
+                    # failure: a bucket left behind must not be reported as a
+                    # clean partial import.
+                    logger.exception(
+                        "Failed to roll back bucket '%s' after a failed import",
+                        bucket_id,
+                    )
+                    failed_rollbacks.append(bucket_id)
+            if failed_rollbacks:
+                # The import failed *and* the rollback is incomplete: these
+                # buckets are still stored, so a retry would be rejected as a
+                # duplicate. Surface this as a server error (not the
+                # client-fault 400) with the partial state spelled out.
+                raise ImportRollbackError(
+                    "Import failed and rollback could not remove bucket(s) "
+                    f"{failed_rollbacks!r}; they remain stored. "
+                    f"Original error: {import_error!r}"
+                ) from import_error
+            raise
 
     @_serialized
     def create_bucket(

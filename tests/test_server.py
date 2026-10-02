@@ -377,4 +377,5 @@ def test_heartbeat_after_delete_does_not_merge_into_deleted_event(flask_client, 
     assert len(events) == 1
     assert events[0]["data"]["label"] == "a"
     assert events[0]["duration"] == 0.5
-    assert events[0]["timestamp"] == (t + timedelta(seconds=1)).isoformat()
+    ts = datetime.fromisoformat(events[0]["timestamp"]).replace(tzinfo=None)
+    assert ts == t + timedelta(seconds=1)

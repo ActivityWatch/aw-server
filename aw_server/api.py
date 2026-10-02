@@ -152,7 +152,7 @@ class ServerAPI:
         logger.info(f"Importing bucket {bucket_id}")
 
         if bucket_id in self.db.buckets():
-            raise Exception(
+            raise ValueError(
                 f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
             )
 
@@ -182,15 +182,26 @@ class ServerAPI:
             [Event(**e) if isinstance(e, dict) else e for e in bucket_data["events"]],
         )
 
+    @_serialized
     def import_all(self, buckets: Dict[str, Any]):
-        imported: List[str] = []
+        # Check every bucket up front, so a rejected import writes nothing.
+        bucket_ids = [bucket["id"] for bucket in buckets.values()]
+        for bucket_id in bucket_ids:
+            if bucket_id in self.db.buckets():
+                raise ValueError(
+                    f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
+                )
         try:
-            for _bid, bucket in buckets.items():
+            for bucket in buckets.values():
                 self.import_bucket(bucket)
-                imported.append(bucket["id"])
         except Exception:
-            for bid in imported:
-                self.db.delete_bucket(bid)
+            # None of these buckets existed before (checked above, under the
+            # write lock), so any that exist now were created by this import,
+            # including one whose events failed after the bucket was created.
+            existing = self.db.buckets()
+            for bucket_id in bucket_ids:
+                if bucket_id in existing:
+                    self.delete_bucket(bucket_id)
             raise
 
     @_serialized

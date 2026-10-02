@@ -422,9 +422,12 @@ class ImportAllResource(Resource):
             else:
                 buckets = request.get_json()["buckets"]
                 current_app.api.import_all(buckets)
-        except Exception as e:
-            logger.exception("Import failed")
-            return {"message": str(e)}, 400
+        except (KeyError, TypeError, ValueError) as e:
+            # Malformed export or a bucket that already exists: the client's
+            # fault, so a 400 with a message instead of a traceback.
+            logger.warning(f"Import failed: {e!r}")
+            reason = f"missing field {e}" if isinstance(e, KeyError) else str(e)
+            return {"message": f"Import failed: {reason}"}, 400
         return {"message": "Import successful"}, 200
 
 

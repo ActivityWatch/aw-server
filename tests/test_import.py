@@ -161,15 +161,18 @@ def test_import_multipart_failure_rolls_back_every_file(flask_client, cleanup):
     assert "test-import-file2" not in buckets
 
 
-def test_import_rollback_survives_delete_failure(
+def test_import_rollback_failure_is_reported_as_server_error(
     flask_client, app, monkeypatch, cleanup
 ):
-    """A failure while deleting one rolled-back bucket must not abort the
-    rollback of the others, nor replace the original import error (which
-    would turn the intended descriptive 400 into a 500)."""
+    """If rollback cannot delete the buckets it created, the request must not
+    report a clean client-fault 400: the buckets are still stored, so the
+    incomplete rollback is surfaced as a server error."""
     cleanup.extend(["test-import-rb-a", "test-import-rb-b"])
 
+    calls = []
+
     def failing_delete(bucket_id):
+        calls.append(bucket_id)
         raise RuntimeError("simulated database error during rollback")
 
     monkeypatch.setattr(app.api, "delete_bucket", failing_delete)
@@ -185,7 +188,40 @@ def test_import_rollback_survives_delete_failure(
             }
         },
     )
-    # The original client-fault error is preserved as a 400; the rollback's
-    # RuntimeError (a non-client error) must not leak out as a 500.
-    assert r.status_code == 400
-    assert r.json["message"]
+    assert r.status_code == 500
+    # Both buckets were attempted, so one failure did not abort the rollback.
+    assert sorted(calls) == ["test-import-rb-a", "test-import-rb-b"]
+
+
+def test_import_rollback_failure_does_not_abort_other_deletes(
+    flask_client, app, monkeypatch, cleanup
+):
+    """A failure deleting one bucket must not abort the rollback of the others,
+    and the bucket that could not be removed is reported honestly."""
+    cleanup.extend(["test-import-rb-c", "test-import-rb-d"])
+    original_delete = app.api.delete_bucket
+
+    def flaky_delete(bucket_id):
+        if bucket_id == "test-import-rb-c":
+            raise RuntimeError("simulated database error during rollback")
+        return original_delete(bucket_id)
+
+    monkeypatch.setattr(app.api, "delete_bucket", flaky_delete)
+
+    r = flask_client.post(
+        "/api/0/import",
+        json={
+            "buckets": {
+                "test-import-rb-c": _bucket("test-import-rb-c"),
+                "test-import-rb-d": _bucket(
+                    "test-import-rb-d", events=[{"not": "an event"}]
+                ),
+            }
+        },
+    )
+    assert r.status_code == 500
+    buckets = _buckets(flask_client)
+    # The other bucket was still rolled back
+    assert "test-import-rb-d" not in buckets
+    # The one whose delete failed remains, which is why this returns a 500
+    assert "test-import-rb-c" in buckets

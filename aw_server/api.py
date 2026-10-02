@@ -31,6 +31,15 @@ from .settings import Settings
 logger = logging.getLogger(__name__)
 
 
+class ImportRollbackError(RuntimeError):
+    """An import failed and rollback could not remove every created bucket.
+
+    A distinct type so the REST layer can return the remaining bucket IDs to the
+    client: those buckets are still stored, so a retry would be rejected as a
+    duplicate, and the client needs to know which ones to delete first.
+    """
+
+
 def get_device_id() -> str:
     path = Path(get_data_dir("aw-server")) / "device_id"
     if path.exists():
@@ -219,7 +228,7 @@ class ServerAPI:
                 # buckets are still stored, so a retry would be rejected as a
                 # duplicate. Surface this as a server error (not the
                 # client-fault 400) with the partial state spelled out.
-                raise RuntimeError(
+                raise ImportRollbackError(
                     "Import failed and rollback could not remove bucket(s) "
                     f"{failed_rollbacks!r}; they remain stored. "
                     f"Original error: {import_error!r}"

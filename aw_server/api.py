@@ -194,24 +194,36 @@ class ServerAPI:
         try:
             for bucket in buckets.values():
                 self.import_bucket(bucket)
-        except Exception:
+        except Exception as import_error:
             # None of these buckets existed before (checked above, under the
             # write lock), so any that exist now were created by this import,
             # including one whose events failed after the bucket was created.
             existing = self.db.buckets()
+            failed_rollbacks = []
             for bucket_id in seen:
                 if bucket_id not in existing:
                     continue
                 try:
                     self.delete_bucket(bucket_id)
                 except Exception:
-                    # A failure while deleting one bucket must not abort the
-                    # rollback of the others, nor replace the original import
-                    # error that is about to be re-raised.
+                    # Keep rolling back the remaining buckets, but record the
+                    # failure: a bucket left behind must not be reported as a
+                    # clean partial import.
                     logger.exception(
                         "Failed to roll back bucket '%s' after a failed import",
                         bucket_id,
                     )
+                    failed_rollbacks.append(bucket_id)
+            if failed_rollbacks:
+                # The import failed *and* the rollback is incomplete: these
+                # buckets are still stored, so a retry would be rejected as a
+                # duplicate. Surface this as a server error (not the
+                # client-fault 400) with the partial state spelled out.
+                raise RuntimeError(
+                    "Import failed and rollback could not remove bucket(s) "
+                    f"{failed_rollbacks!r}; they remain stored. "
+                    f"Original error: {import_error!r}"
+                ) from import_error
             raise
 
     @_serialized

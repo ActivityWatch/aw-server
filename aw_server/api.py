@@ -304,6 +304,9 @@ class ServerAPI:
                 old = self.db[bucket_id].get_by_id(e.id)
                 if old:
                     affected.append(event_range(old))
+        # The cached last heartbeat may no longer be the bucket's last event,
+        # and a heartbeat merging into it would replace the wrong one.
+        self.last_event.pop(bucket_id, None)
         try:
             if len(events) == 1:
                 # Pass as single Event so Bucket.insert uses insert_one (returns Event with ID)

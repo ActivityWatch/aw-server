@@ -2,7 +2,7 @@ import json
 import traceback
 from functools import wraps
 from threading import Lock
-from typing import Dict
+from typing import Callable, Dict, Optional, TypeVar
 
 import iso8601
 from aw_core import schema
@@ -20,6 +20,8 @@ from flask_restx import Api, Resource, fields
 from . import logger
 from .api import ServerAPI
 from .exceptions import BadRequest, Unauthorized
+
+T = TypeVar("T")
 
 
 def host_header_check(f):
@@ -106,6 +108,26 @@ query = api.model(
 )
 
 
+def _parse_arg(args, name: str, parse: Callable[[str], T]) -> Optional[T]:
+    """Parse an optional query parameter, raising BadRequest on malformed input."""
+    if name not in args:
+        return None
+    try:
+        return parse(args[name])
+    except ValueError as e:
+        raise BadRequest("InvalidParameter", f"Invalid value for parameter {name}: {e}")
+
+
+def _parse_event(data) -> Event:
+    """Construct an Event from client JSON, raising BadRequest on malformed input."""
+    if not isinstance(data, dict):
+        raise BadRequest("InvalidEvent", "Event must be a JSON object")
+    try:
+        return Event(**data)
+    except (ValueError, TypeError) as e:
+        raise BadRequest("InvalidEvent", f"Invalid event: {e}")
+
+
 def copy_doc(api_method):
     """Decorator that copies another functions docstring to the decorated function.
     Used to copy the docstrings in ServerAPI over to the flask-restplus Resources.
@@ -151,6 +173,14 @@ class BucketResource(Resource):
     @copy_doc(ServerAPI.create_bucket)
     def post(self, bucket_id):
         data = request.get_json()
+        if not isinstance(data, dict):
+            raise BadRequest("InvalidBucket", "Bucket must be a JSON object")
+        missing = [k for k in ("type", "client", "hostname") if k not in data]
+        if missing:
+            raise BadRequest(
+                "MissingParameter",
+                f"Missing required field(s): {', '.join(missing)}",
+            )
         bucket_created = current_app.api.create_bucket(
             bucket_id,
             event_type=data["type"],
@@ -203,9 +233,11 @@ class EventsResource(Resource):
     @copy_doc(ServerAPI.get_events)
     def get(self, bucket_id):
         args = request.args
-        limit = int(args["limit"]) if "limit" in args else -1
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
+        limit = _parse_arg(args, "limit", int)
+        if limit is None:
+            limit = -1
+        start = _parse_arg(args, "start", iso8601.parse_date)
+        end = _parse_arg(args, "end", iso8601.parse_date)
 
         events = current_app.api.get_events(
             bucket_id, limit=limit, start=start, end=end
@@ -224,9 +256,9 @@ class EventsResource(Resource):
         )
 
         if isinstance(data, dict):
-            events = [Event(**data)]
+            events = [_parse_event(data)]
         elif isinstance(data, list):
-            events = [Event(**e) for e in data]
+            events = [_parse_event(e) for e in data]
         else:
             raise BadRequest("Invalid POST data", "")
 
@@ -242,8 +274,8 @@ class EventCountResource(Resource):
     @copy_doc(ServerAPI.get_eventcount)
     def get(self, bucket_id):
         args = request.args
-        start = iso8601.parse_date(args["start"]) if "start" in args else None
-        end = iso8601.parse_date(args["end"]) if "end" in args else None
+        start = _parse_arg(args, "start", iso8601.parse_date)
+        end = _parse_arg(args, "end", iso8601.parse_date)
 
         events = current_app.api.get_eventcount(bucket_id, start=start, end=end)
         return events, 200
@@ -290,11 +322,10 @@ class HeartbeatResource(Resource):
     )
     @copy_doc(ServerAPI.heartbeat)
     def post(self, bucket_id):
-        heartbeat = Event(**request.get_json())
+        heartbeat = _parse_event(request.get_json())
 
-        if "pulsetime" in request.args:
-            pulsetime = float(request.args["pulsetime"])
-        else:
+        pulsetime = _parse_arg(request.args, "pulsetime", float)
+        if pulsetime is None:
             raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
 
         # This lock is meant to ensure that only one heartbeat is processed at a time,

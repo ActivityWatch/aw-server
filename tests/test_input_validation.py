@@ -19,28 +19,32 @@ def bucket(flask_client):
         flask_client.delete(f"/api/0/buckets/{BUCKET}")
 
 
-def assert_bad_request(r):
+def assert_bad_request(r, expect: str):
+    """400 with a JSON message that names the offending parameter/field/value."""
     assert r.status_code == 400, r.data
     assert r.is_json
-    assert r.json["message"]
+    assert expect in r.json["message"], r.json
 
 
 @pytest.mark.parametrize(
-    "query",
+    "query,expect",
     [
-        "limit=abc",
-        "start=garbage",
-        "end=garbage",
+        ("limit=abc", "limit"),
+        ("start=garbage", "start"),
+        ("end=garbage", "end"),
     ],
 )
-def test_get_events_bad_args(flask_client, bucket, query):
-    assert_bad_request(flask_client.get(f"/api/0/buckets/{bucket}/events?{query}"))
-
-
-@pytest.mark.parametrize("query", ["start=garbage", "end=garbage"])
-def test_eventcount_bad_args(flask_client, bucket, query):
+def test_get_events_bad_args(flask_client, bucket, query, expect):
     assert_bad_request(
-        flask_client.get(f"/api/0/buckets/{bucket}/events/count?{query}")
+        flask_client.get(f"/api/0/buckets/{bucket}/events?{query}"), expect
+    )
+
+
+@pytest.mark.parametrize("name", ["start", "end"])
+def test_eventcount_bad_args(flask_client, bucket, name):
+    assert_bad_request(
+        flask_client.get(f"/api/0/buckets/{bucket}/events/count?{name}=garbage"),
+        name,
     )
 
 
@@ -49,48 +53,53 @@ def test_heartbeat_bad_pulsetime(flask_client, bucket):
         flask_client.post(
             f"/api/0/buckets/{bucket}/heartbeat?pulsetime=abc",
             json={"timestamp": TS, "duration": 0, "data": {}},
-        )
+        ),
+        "pulsetime",
     )
 
 
+BAD_EVENTS = [
+    ({"timestamp": "not-a-date", "duration": 0, "data": {}}, "not-a-date"),
+    ({"timestamp": TS, "duration": "abc", "data": {}}, "duration"),
+]
+
+
 @pytest.mark.parametrize(
-    "event",
-    [
-        {"timestamp": "not-a-date", "duration": 0, "data": {}},
-        {"timestamp": TS, "duration": "abc", "data": {}},
-        {"timestamp": TS, "duration": 0, "data": {}, "unknown": 1},
-    ],
+    "event,expect",
+    BAD_EVENTS
+    + [({"timestamp": TS, "duration": 0, "data": {}, "unknown": 1}, "unknown")],
 )
-def test_post_events_bad_event(flask_client, bucket, event):
-    assert_bad_request(flask_client.post(f"/api/0/buckets/{bucket}/events", json=event))
+def test_post_events_bad_event(flask_client, bucket, event, expect):
     assert_bad_request(
-        flask_client.post(f"/api/0/buckets/{bucket}/events", json=[event])
+        flask_client.post(f"/api/0/buckets/{bucket}/events", json=event), expect
+    )
+    assert_bad_request(
+        flask_client.post(f"/api/0/buckets/{bucket}/events", json=[event]), expect
     )
 
 
-@pytest.mark.parametrize(
-    "event",
-    [
-        {"timestamp": "not-a-date", "duration": 0, "data": {}},
-        {"timestamp": TS, "duration": "abc", "data": {}},
-    ],
-)
-def test_heartbeat_bad_event(flask_client, bucket, event):
-    assert_bad_request(
-        flask_client.post(f"/api/0/buckets/{bucket}/heartbeat?pulsetime=1", json=event)
-    )
+@pytest.mark.parametrize("event,expect", BAD_EVENTS)
+def test_heartbeat_bad_event(flask_client, bucket, event, expect):
+    r = flask_client.post(f"/api/0/buckets/{bucket}/heartbeat?pulsetime=1", json=event)
+    if expect == "duration":
+        # rejected by the existing schema validation, which names the field
+        assert r.status_code == 400, r.data
+        assert "duration" in str(r.json)
+    else:
+        assert_bad_request(r, expect)
 
 
 @pytest.mark.parametrize(
-    "body",
+    "body,expect",
     [
-        {},
-        {"client": "test", "type": "test"},
+        ({}, "type, client, hostname"),
+        ({"client": "test", "type": "test"}, "hostname"),
     ],
 )
-def test_create_bucket_missing_fields(flask_client, body):
+def test_create_bucket_missing_fields(flask_client, body, expect):
     assert_bad_request(
-        flask_client.post("/api/0/buckets/test-input-validation-missing", json=body)
+        flask_client.post("/api/0/buckets/test-input-validation-missing", json=body),
+        expect,
     )
     assert (
         flask_client.get("/api/0/buckets/test-input-validation-missing").status_code

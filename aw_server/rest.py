@@ -20,7 +20,7 @@ from flask import (
 from flask_restx import Api, Resource, fields
 
 from . import logger
-from .api import ServerAPI
+from .api import ImportRollbackError, ServerAPI
 from .csv_export import content_disposition
 from .exceptions import BadRequest, Unauthorized
 
@@ -429,6 +429,13 @@ class ImportAllResource(Resource):
             else:
                 buckets = request.get_json()["buckets"]
                 current_app.api.import_all(buckets)
+        except ImportRollbackError as e:
+            # The import failed *and* rollback could not remove some created
+            # buckets: they are still stored, so a retry would be rejected as a
+            # duplicate. This is a server-side failure, but the message names the
+            # buckets to clean up before retrying.
+            logger.error(f"Import failed with incomplete rollback: {e!r}")
+            return {"message": str(e)}, 500
         except (KeyError, TypeError, ValueError) as e:
             # Malformed export or a bucket that already exists: the client's
             # fault, so a 400 with a message instead of a traceback.

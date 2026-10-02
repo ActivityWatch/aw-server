@@ -191,6 +191,11 @@ def test_import_rollback_failure_is_reported_as_server_error(
     assert r.status_code == 500
     # Both buckets were attempted, so one failure did not abort the rollback.
     assert sorted(calls) == ["test-import-rb-a", "test-import-rb-b"]
+    # The buckets that could not be rolled back are named in the response, so
+    # the client knows what to delete before retrying.
+    message = r.get_json()["message"]
+    assert "test-import-rb-a" in message
+    assert "test-import-rb-b" in message
 
 
 def test_import_rollback_failure_does_not_abort_other_deletes(
@@ -225,3 +230,5 @@ def test_import_rollback_failure_does_not_abort_other_deletes(
     assert "test-import-rb-d" not in buckets
     # The one whose delete failed remains, which is why this returns a 500
     assert "test-import-rb-c" in buckets
+    # ...and it is named in the response so the client can clean it up
+    assert "test-import-rb-c" in r.get_json()["message"]

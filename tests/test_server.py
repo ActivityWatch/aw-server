@@ -339,9 +339,7 @@ def test_heartbeat_after_insert_does_not_merge_into_stale_event(
     assert [e["duration"] for e in events] == [0.5] * (n_inserted + 2)
 
 
-def test_heartbeat_after_delete_does_not_merge_into_deleted_event(
-    flask_client, bucket
-):
+def test_heartbeat_after_delete_does_not_merge_into_deleted_event(flask_client, bucket):
     """Deleting events must invalidate the heartbeat cache.
 
     Otherwise a later heartbeat merges into the cached (deleted) event and

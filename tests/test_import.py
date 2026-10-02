@@ -159,3 +159,33 @@ def test_import_multipart_failure_rolls_back_every_file(flask_client, cleanup):
     buckets = _buckets(flask_client)
     assert "test-import-file1" not in buckets
     assert "test-import-file2" not in buckets
+
+
+def test_import_rollback_survives_delete_failure(
+    flask_client, app, monkeypatch, cleanup
+):
+    """A failure while deleting one rolled-back bucket must not abort the
+    rollback of the others, nor replace the original import error (which
+    would turn the intended descriptive 400 into a 500)."""
+    cleanup.extend(["test-import-rb-a", "test-import-rb-b"])
+
+    def failing_delete(bucket_id):
+        raise RuntimeError("simulated database error during rollback")
+
+    monkeypatch.setattr(app.api, "delete_bucket", failing_delete)
+
+    r = flask_client.post(
+        "/api/0/import",
+        json={
+            "buckets": {
+                "test-import-rb-a": _bucket("test-import-rb-a"),
+                "test-import-rb-b": _bucket(
+                    "test-import-rb-b", events=[{"not": "an event"}]
+                ),
+            }
+        },
+    )
+    # The original client-fault error is preserved as a 400; the rollback's
+    # RuntimeError (a non-client error) must not leak out as a 500.
+    assert r.status_code == 400
+    assert r.json["message"]

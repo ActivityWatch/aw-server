@@ -11,6 +11,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
 )
 from uuid import uuid4
 
@@ -189,12 +190,17 @@ class ServerAPI:
                 "'buckets' must be an object mapping bucket IDs to buckets"
             )
         # Check every bucket up front, so a rejected import writes nothing.
+        # Track seen IDs in a set: an O(n) membership check instead of the
+        # O(n^2) list.count() scan, which mattered because this runs while
+        # import_all holds the write lock shared by bucket and event writes.
         bucket_ids = [bucket["id"] for bucket in buckets.values()]
+        seen: Set[str] = set()
         for bucket_id in bucket_ids:
-            if bucket_ids.count(bucket_id) > 1:
+            if bucket_id in seen:
                 raise ValueError(
                     f"Bucket '{bucket_id}' appears more than once in the import."
                 )
+            seen.add(bucket_id)
             if bucket_id in self.db.buckets():
                 raise ValueError(
                     f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
@@ -207,9 +213,19 @@ class ServerAPI:
             # write lock), so any that exist now were created by this import,
             # including one whose events failed after the bucket was created.
             existing = self.db.buckets()
-            for bucket_id in bucket_ids:
-                if bucket_id in existing:
+            for bucket_id in seen:
+                if bucket_id not in existing:
+                    continue
+                try:
                     self.delete_bucket(bucket_id)
+                except Exception:
+                    # A failure while deleting one bucket must not abort the
+                    # rollback of the others, nor replace the original import
+                    # error that is about to be re-raised.
+                    logger.exception(
+                        "Failed to roll back bucket '%s' after a failed import",
+                        bucket_id,
+                    )
             raise
 
     @_serialized

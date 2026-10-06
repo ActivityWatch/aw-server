@@ -56,6 +56,7 @@ def main():
         cors_origins=settings.cors_origins,
         custom_static=settings.custom_static,
         query_cache=settings.query_cache,
+        api_key=settings.api_key,
     )
 
 
@@ -138,6 +139,7 @@ def parse_settings():
     settings.cors_origins = config[section]["cors_origins"]
     settings.custom_static = dict(config[section]["custom_static"])
     settings.query_cache = bool(config[section].get("query_cache", True))
+    settings.api_key = config[section].get("auth", {}).get("api_key", "") or ""
     settings.profile = profile
     settings.testing = testing
 

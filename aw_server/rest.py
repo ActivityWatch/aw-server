@@ -79,6 +79,8 @@ create_bucket = api.model(
         "client": fields.String(required=True),
         "type": fields.String(required=True),
         "hostname": fields.String(required=True),
+        "created": fields.String(required=False),
+        "data": fields.Raw(required=False),
     },
 )
 
@@ -154,11 +156,24 @@ class BucketResource(Resource):
     @copy_doc(ServerAPI.create_bucket)
     def post(self, bucket_id):
         data = request.get_json()
+        # Optional, like aw-server-rust: aw-sync sets created and data
+        # ($aw.sync.origin) on the buckets it pulls.
+        bucket_data = data.get("data")
+        if bucket_data is not None and not isinstance(bucket_data, dict):
+            raise BadRequest("InvalidData", "Bucket data must be an object")
+        try:
+            created = (
+                iso8601.parse_date(data["created"]) if data.get("created") else None
+            )
+        except iso8601.ParseError as e:
+            raise BadRequest("InvalidCreated", str(e))
         bucket_created = current_app.api.create_bucket(
             bucket_id,
             event_type=data["type"],
             client=data["client"],
             hostname=data["hostname"],
+            created=created,
+            data=bucket_data,
         )
         if bucket_created:
             return {}, 200

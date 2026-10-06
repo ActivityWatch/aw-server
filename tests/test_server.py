@@ -262,3 +262,37 @@ def test_export_bucket_csv_wide(flask_client, bucket, n_keys):
             events[1]["data"], separators=(",", ":")
         )  # compact JSON
         assert json.loads(rows[1][3]) == events[0]["data"]
+
+
+def test_create_bucket_keeps_created_and_data(flask_client):
+    # aw-sync creates pulled buckets with created + data ($aw.sync.origin)
+    bucket_id = "test-synced-from-otherhost"
+    try:
+        r = flask_client.post(
+            f"/api/0/buckets/{bucket_id}",
+            json={
+                "client": "aw-watcher-afk",
+                "type": "afkstatus",
+                "hostname": "otherhost",
+                "created": "2026-09-26T22:39:59.959388+00:00",
+                "data": {"$aw.sync.origin": "otherhost"},
+            },
+        )
+        assert r.status_code == 200
+        r = flask_client.get(f"/api/0/buckets/{bucket_id}")
+        assert r.json["data"] == {"$aw.sync.origin": "otherhost"}
+        assert r.json["created"].startswith("2026-09-26T22:39:59")
+
+        r = flask_client.post(
+            "/api/0/buckets/test-bad-data",
+            json={"client": "c", "type": "t", "hostname": "h", "data": "nope"},
+        )
+        assert r.status_code == 400
+
+        r = flask_client.post(
+            "/api/0/buckets/test-empty-created",
+            json={"client": "c", "type": "t", "hostname": "h", "created": ""},
+        )
+        assert r.status_code == 400
+    finally:
+        flask_client.delete(f"/api/0/buckets/{bucket_id}")

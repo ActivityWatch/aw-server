@@ -182,3 +182,48 @@ def test_query_valid_timeperiod(flask_client):
     )
     assert r.status_code == 200
     assert r.json == [1]
+
+
+def test_export_bucket_csv(flask_client, bucket):
+    now = datetime(2026, 10, 6, 12, 0, 0, 123456)
+    events = [
+        {
+            "timestamp": now.isoformat() + "+00:00",
+            "duration": 1.5,
+            "data": {"app": "Firefox", "title": 'a, "quoted" title'},
+        },
+        {
+            "timestamp": (now + timedelta(seconds=2)).isoformat() + "+00:00",
+            "duration": 0,
+            "data": {"app": "=cmd", "count": 3, "flag": None},
+        },
+    ]
+    r = flask_client.post(f"/api/0/buckets/{bucket}/events", json=events)
+    assert r.status_code == 200
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/export/csv")
+    assert r.status_code == 200
+    assert r.mimetype == "text/csv"
+    assert (
+        r.headers["Content-Disposition"]
+        == f'attachment; filename="aw-events-export-{bucket}.csv"'
+    )
+    lines = r.get_data(as_text=True).split("\r\n")
+    # Newest first, union of data keys, formula-looking values neutralized
+    assert lines[0] == "id,timestamp,duration,app,count,flag,title"
+    assert lines[1].endswith(
+        ",2026-10-06T12:00:02.123000+00:00,0.000000000,'=cmd,3,null,"
+    )
+    assert lines[2].endswith(
+        ',2026-10-06T12:00:00.123000+00:00,1.500000000,Firefox,,,"a, ""quoted"" title"'
+    )
+    assert lines[3] == ""
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/export/csv?limit=1")
+    assert len(r.get_data(as_text=True).split("\r\n")) == 3
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/export/csv?start=notadate")
+    assert r.status_code == 400
+
+    r = flask_client.get("/api/0/buckets/does-not-exist/export/csv")
+    assert r.status_code == 404

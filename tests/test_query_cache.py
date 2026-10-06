@@ -4,6 +4,7 @@ import aw_datastore
 import pytest
 from aw_core.models import Event
 from aw_datastore import Datastore
+from aw_datastore.storages import SqliteStorage
 
 from aw_server.api import ServerAPI
 from aw_server.query_cache import QueryCache, coalesce
@@ -149,6 +150,9 @@ def test_heartbeat_overlapping_cached_period_invalidates(api):
 
 
 def test_merge_after_out_of_order_heartbeat_invalidates_replaced_event(api):
+    # Memory storage does not set an id on the event passed to insert(), so the
+    # heartbeat falls back to replace_last(): this covers that path, where the
+    # stored (DAY2) last event is overwritten and its cached result must drop.
     b = "ooo-bucket"
     api.create_bucket(b, "test", "test", "testhost")
     q = [f'events = query_bucket("{b}");', "RETURN = sum_durations(events);"]
@@ -176,6 +180,46 @@ def test_merge_after_out_of_order_heartbeat_invalidates_replaced_event(api):
         60,
     )
     assert day2_total() == api.query2("t", q, [tp(DAY2)], False)[0].total_seconds()
+
+
+def test_merge_out_of_order_by_id_preserves_newer_event_and_invalidates_merged(
+    tmp_path,
+):
+    # SQLite storage sets an id on the inserted event, so the merge is written
+    # back with replace(id, merged): the merged event's cached period must be
+    # dropped, while the newer stored event stays intact.
+    db = Datastore(SqliteStorage, testing=True, filepath=str(tmp_path / "test.db"))
+    a = ServerAPI(db=db, testing=True)
+    b = "ooo-id-bucket"
+    a.create_bucket(b, "test", "test", "testhost")
+    q = [f'events = query_bucket("{b}");', "RETURN = sum_durations(events);"]
+
+    def day_total(day, cache=True):
+        return a.query2("t", q, [tp(day)], cache)[0].total_seconds()
+
+    a.heartbeat(
+        b, Event(timestamp=DAY2[0] + timedelta(hours=5), duration=30, data={"x": 1}), 0
+    )
+    a.heartbeat(
+        b, Event(timestamp=DAY1[0] + timedelta(hours=5), duration=0, data={"y": 1}), 0
+    )
+    assert day_total(DAY1) == 0
+    assert day_total(DAY2) == 30
+    a.heartbeat(
+        b,
+        Event(
+            timestamp=DAY1[0] + timedelta(hours=5, seconds=10),
+            duration=0,
+            data={"y": 1},
+        ),
+        60,
+    )
+    # merged DAY1 event changed: its cached result must be re-queried
+    assert day_total(DAY1) == 10
+    assert day_total(DAY1) == day_total(DAY1, cache=False)
+    # newer DAY2 event untouched: its cached result is unchanged and still valid
+    assert day_total(DAY2) == 30
+    assert day_total(DAY2) == day_total(DAY2, cache=False)
 
 
 def test_insert_and_delete_invalidate_only_overlapping(api):

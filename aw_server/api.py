@@ -399,7 +399,7 @@ class ServerAPI:
                         )
                     )
                     affected = [event_range(last_event), event_range(merged)]
-                    if self.query_cache:
+                    if merged.id is None and self.query_cache:
                         # replace_last() replaces the *stored* last event, which
                         # is not always last_event (other writes, or an earlier
                         # out-of-order heartbeat), so invalidate its range too.
@@ -407,7 +407,15 @@ class ServerAPI:
                         affected += [event_range(e) for e in stored]
                     self.last_event[bucket_id] = merged
                     try:
-                        self.db[bucket_id].replace_last(merged)
+                        # Replace the event we merged into by id. replace_last()
+                        # targets whichever event sorts last by timestamp, which
+                        # after an out-of-order heartbeat is a different event:
+                        # it gets overwritten with a copy of this one, leaving
+                        # same-timestamp duplicates (aw-watcher-afk#61).
+                        if merged.id is not None:
+                            self.db[bucket_id].replace(merged.id, merged)
+                        else:
+                            self.db[bucket_id].replace_last(merged)
                     finally:
                         self._invalidate(affected)
                     return merged

@@ -97,6 +97,10 @@ class ServerAPI:
         }
         return payload
 
+    def get_devices(self) -> List[Dict[str, Any]]:
+        """Get list of known devices (currently only the local device)"""
+        return [{"id": get_device_id(), "hostname": gethostname()}]
+
     def get_buckets(self) -> Dict[str, Dict]:
         """Get dict {bucket_name: Bucket} of all buckets"""
         logger.debug("Received get request for buckets")

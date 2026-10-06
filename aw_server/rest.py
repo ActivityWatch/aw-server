@@ -73,6 +73,14 @@ info = api.model(
     },
 )
 
+device = api.model(
+    "Device",
+    {
+        "id": fields.String(description="Stable device identifier (UUID)"),
+        "hostname": fields.String(description="Current hostname of the device"),
+    },
+)
+
 create_bucket = api.model(
     "CreateBucket",
     {
@@ -132,6 +140,14 @@ class InfoResource(Resource):
     @copy_doc(ServerAPI.get_info)
     def get(self) -> Dict[str, Dict]:
         return current_app.api.get_info()
+
+
+@api.route("/0/devices")
+class DevicesResource(Resource):
+    @api.marshal_list_with(device)
+    @copy_doc(ServerAPI.get_devices)
+    def get(self):
+        return current_app.api.get_devices()
 
 
 # BUCKETS

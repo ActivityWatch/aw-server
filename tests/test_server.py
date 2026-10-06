@@ -1,3 +1,6 @@
+import csv
+import io
+import json
 import random
 from datetime import datetime, timedelta
 
@@ -227,3 +230,35 @@ def test_export_bucket_csv(flask_client, bucket):
 
     r = flask_client.get("/api/0/buckets/does-not-exist/export/csv")
     assert r.status_code == 404
+
+
+@pytest.mark.parametrize("n_keys", [32, 33])
+def test_export_bucket_csv_wide(flask_client, bucket, n_keys):
+    # Keys spread across events: the column decision uses their union
+    keys = [f"k{i:02d}" for i in range(n_keys)]
+    now = datetime(2026, 10, 6, 12, 0, 0)
+    events = [
+        {
+            "timestamp": (now + timedelta(seconds=i)).isoformat() + "+00:00",
+            "duration": 1,
+            "data": {k: j for j, k in enumerate(chunk)},
+        }
+        for i, chunk in enumerate([keys[:16], keys[16:]])
+    ]
+    r = flask_client.post(f"/api/0/buckets/{bucket}/events", json=events)
+    assert r.status_code == 200
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/export/csv")
+    assert r.status_code == 200
+    header, *rows = csv.reader(io.StringIO(r.get_data(as_text=True)))
+    assert len(rows) == 2
+    if n_keys <= 32:
+        assert header == ["id", "timestamp", "duration"] + keys[16:] + keys[:16]
+        assert all(len(row) == len(header) for row in rows)
+    else:
+        assert header == ["id", "timestamp", "duration", "data"]
+        newest = rows[0][3]
+        assert newest == json.dumps(
+            events[1]["data"], separators=(",", ":")
+        )  # compact JSON
+        assert json.loads(rows[1][3]) == events[0]["data"]

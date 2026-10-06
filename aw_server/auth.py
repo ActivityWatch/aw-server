@@ -1,7 +1,7 @@
 """
 Optional API key authentication for /api/* endpoints.
 
-When ``api_key`` is set under ``[auth]`` in aw-server.toml, every request to
+When ``api_key`` is set under ``[server.auth]`` in aw-server.toml, every request to
 ``/api/*`` must carry an ``Authorization: Bearer <key>`` header, except:
 
 - ``GET /api/0/info`` — health/version endpoint used by clients and the web UI
@@ -18,14 +18,14 @@ so the segment list always matches what the router dispatches to.
 
 import hmac
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from flask import Flask, Response, request
 
 logger = logging.getLogger(__name__)
 
 # Path segments that are always public even when auth is enabled.
-_PUBLIC_SEGMENTS: list[list[str]] = [["api", "0", "info"]]
+_PUBLIC_SEGMENTS: List[List[str]] = [["api", "0", "info"]]
 
 
 def register(app: Flask, api_key: Optional[str]) -> None:
@@ -59,8 +59,13 @@ def register(app: Flask, api_key: Optional[str]) -> None:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[len("Bearer ") :]
-            if hmac.compare_digest(token, api_key):
-                return None
+            try:
+                if hmac.compare_digest(
+                    token.encode("ascii"), api_key.encode("ascii")
+                ):
+                    return None
+            except (UnicodeEncodeError, ValueError):
+                pass  # non-ASCII token or key → always reject
 
         return Response(
             '{"message": "Missing or invalid API key. Set Authorization: Bearer <key> header."}',

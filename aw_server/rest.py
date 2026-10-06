@@ -163,7 +163,9 @@ class BucketResource(Resource):
             raise BadRequest("InvalidData", "Bucket data must be an object")
         try:
             created = (
-                iso8601.parse_date(data["created"]) if data.get("created") else None
+                iso8601.parse_date(data["created"])
+                if data.get("created") is not None
+                else None
             )
         except iso8601.ParseError as e:
             raise BadRequest("InvalidCreated", str(e))

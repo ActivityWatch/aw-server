@@ -288,5 +288,11 @@ def test_create_bucket_keeps_created_and_data(flask_client):
             json={"client": "c", "type": "t", "hostname": "h", "data": "nope"},
         )
         assert r.status_code == 400
+
+        r = flask_client.post(
+            "/api/0/buckets/test-empty-created",
+            json={"client": "c", "type": "t", "hostname": "h", "created": ""},
+        )
+        assert r.status_code == 400
     finally:
         flask_client.delete(f"/api/0/buckets/{bucket_id}")

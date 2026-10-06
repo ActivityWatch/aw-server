@@ -60,9 +60,7 @@ def register(app: Flask, api_key: Optional[str]) -> None:
         if auth_header.startswith("Bearer "):
             token = auth_header[len("Bearer ") :]
             try:
-                if hmac.compare_digest(
-                    token.encode("ascii"), api_key.encode("ascii")
-                ):
+                if hmac.compare_digest(token.encode("ascii"), api_key.encode("ascii")):
                     return None
             except (UnicodeEncodeError, ValueError):
                 pass  # non-ASCII token or key → always reject

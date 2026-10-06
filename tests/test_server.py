@@ -379,3 +379,36 @@ def test_heartbeat_after_delete_does_not_merge_into_deleted_event(flask_client, 
     assert events[0]["duration"] == 0.5
     ts = datetime.fromisoformat(events[0]["timestamp"]).replace(tzinfo=None)
     assert ts == t + timedelta(seconds=1)
+
+
+def test_export_bucket_csv_prefixes_colliding_data_keys(flask_client, bucket):
+    data = {"app": "x", "duration": 7, "id": "a", "timestamp": "t"}
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/events",
+        json=[{"timestamp": "2026-10-06T12:00:00+00:00", "duration": 1, "data": data}],
+    )
+    assert r.status_code == 200
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/export/csv")
+    assert r.status_code == 200
+    header, row = csv.reader(io.StringIO(r.get_data(as_text=True)))
+    assert header[:3] == ["id", "timestamp", "duration"]
+    columns = dict(zip(header[3:], row[3:]))
+    assert columns == {
+        "app": "x",
+        "data.duration": "7",
+        "data.id": "a",
+        "data.timestamp": "t",
+    }
+
+
+def test_csv_header_prefix_repeats_until_unique():
+    from aw_server.csv_export import _header_names
+
+    assert _header_names(["id", "data.id"]) == [
+        "id",
+        "timestamp",
+        "duration",
+        "data.id",
+        "data.data.id",
+    ]

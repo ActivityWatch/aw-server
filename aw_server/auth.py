@@ -58,7 +58,7 @@ def register(app: Flask, api_key: Optional[str]) -> None:
 
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
-            token = auth_header[len("Bearer "):]
+            token = auth_header[len("Bearer ") :]
             if hmac.compare_digest(token, api_key):
                 return None
 

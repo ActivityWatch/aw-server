@@ -3,7 +3,6 @@
 import pytest
 from aw_server.server import AWFlask
 
-
 KEY = "test-secret-key"
 
 

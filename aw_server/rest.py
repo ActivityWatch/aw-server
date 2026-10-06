@@ -10,15 +10,18 @@ from aw_core.models import Event
 from aw_query.exceptions import QueryException
 from flask import (
     Blueprint,
+    Response,
     current_app,
     jsonify,
     make_response,
     request,
+    stream_with_context,
 )
 from flask_restx import Api, Resource, fields
 
 from . import logger
 from .api import ServerAPI
+from .csv_export import content_disposition
 from .exceptions import BadRequest, Unauthorized
 
 
@@ -374,6 +377,30 @@ class BucketExportResource(Resource):
         filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
         response.headers["Content-Disposition"] = "attachment; filename={}".format(
             filename
+        )
+        return response
+
+
+@api.route("/0/buckets/<string:bucket_id>/export/csv")
+class BucketExportCsvResource(Resource):
+    @api.param("limit", "the maximum number of events to export")
+    @api.param("start", "Start date of events")
+    @api.param("end", "End date of events")
+    @copy_doc(ServerAPI.export_bucket_csv)
+    def get(self, bucket_id):
+        args = request.args
+        try:
+            limit = int(args["limit"]) if "limit" in args else -1
+            start = iso8601.parse_date(args["start"]) if "start" in args else None
+            end = iso8601.parse_date(args["end"]) if "end" in args else None
+        except (ValueError, iso8601.ParseError) as e:
+            raise BadRequest("InvalidParameter", str(e))
+        rows = current_app.api.export_bucket_csv(
+            bucket_id, limit=limit, start=start, end=end
+        )
+        response = Response(stream_with_context(rows), mimetype="text/csv")
+        response.headers["Content-Disposition"] = content_disposition(
+            f"aw-events-export-{bucket_id}.csv"
         )
         return response
 

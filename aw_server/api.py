@@ -8,6 +8,7 @@ from socket import gethostname
 from typing import (
     Any,
     Dict,
+    Iterator,
     List,
     Optional,
 )
@@ -22,6 +23,7 @@ from aw_query.exceptions import QueryException
 from aw_transform import heartbeat_merge
 
 from .__about__ import __version__
+from .csv_export import events_to_csv
 from .exceptions import NotFound
 from .profile import profile_from_env
 from .query_cache import QueryCache, event_range
@@ -123,6 +125,18 @@ class ServerAPI:
         for event in bucket["events"]:
             del event["id"]
         return bucket
+
+    @check_bucket_exists
+    def export_bucket_csv(
+        self,
+        bucket_id: str,
+        limit: int = -1,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+    ) -> Iterator[str]:
+        """Export events in a bucket as CSV rows, newest first."""
+        # Fetch before returning the generator, so errors surface before the response starts
+        return events_to_csv(self.db[bucket_id].get(limit, start, end))
 
     def export_all(self) -> Dict[str, Any]:
         """Exports all buckets and their events to a format consistent across versions"""

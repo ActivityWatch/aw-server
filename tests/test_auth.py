@@ -97,3 +97,31 @@ def test_percent_encoded_info_is_still_public(client):
     """/%61pi/0/info decodes to /api/0/info and must remain public."""
     r = client.get("/%61pi/0/info")
     assert r.status_code == 200
+
+
+# ── Unicode / encoding robustness ───────────────────────────────────────────
+
+
+@pytest.fixture(scope="module")
+def unicode_client():
+    app = AWFlask("127.0.0.1", testing=True, api_key="sécret-kéy-🔑")
+    return app.test_client()
+
+
+def test_non_ascii_key_accepts_correct_token(unicode_client):
+    """A non-ASCII configured key must still authenticate the correct token."""
+    r = unicode_client.get(
+        "/api/0/buckets/", headers={"Authorization": "Bearer sécret-kéy-🔑"}
+    )
+    assert r.status_code == 200
+
+
+def test_non_ascii_key_rejects_wrong_token(unicode_client):
+    r = unicode_client.get("/api/0/buckets/", headers={"Authorization": "Bearer wrong"})
+    assert r.status_code == 401
+
+
+def test_info_public_only_for_get(client):
+    """The /api/0/info bypass is GET-only; other methods still require the key."""
+    r = client.post("/api/0/info")
+    assert r.status_code == 401

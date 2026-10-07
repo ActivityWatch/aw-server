@@ -52,18 +52,18 @@ def register(app: Flask, api_key: Optional[str]) -> None:
         if not segments or segments[0] != "api":
             return None
 
-        # Public API paths bypass the key check.
-        if segments in _PUBLIC_SEGMENTS:
+        # Public API paths bypass the key check (read-only: GET only).
+        if request.method == "GET" and segments in _PUBLIC_SEGMENTS:
             return None
 
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[len("Bearer ") :]
-            try:
-                if hmac.compare_digest(token.encode("ascii"), api_key.encode("ascii")):
-                    return None
-            except (UnicodeEncodeError, ValueError):
-                pass  # non-ASCII token or key → always reject
+            # UTF-8 on both sides: compare_digest needs matching encodings, and
+            # ASCII would raise UnicodeEncodeError for a non-ASCII configured
+            # key, locking out even the correct token. UTF-8 never raises on str.
+            if hmac.compare_digest(token.encode("utf-8"), api_key.encode("utf-8")):
+                return None
 
         return Response(
             '{"message": "Missing or invalid API key. Set Authorization: Bearer <key> header."}',

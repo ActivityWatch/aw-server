@@ -17,6 +17,20 @@ from .server import _start
 logger = logging.getLogger(__name__)
 
 
+def _coerce_api_key(raw: object) -> str:
+    """Normalize a raw TOML api_key value to a string, or "" to disable auth.
+
+    Booleans are always disabled: ``api_key = true`` looks like a toggle but
+    would otherwise silently enable auth with the trivially guessable key
+    "True". ``bool`` must be tested before ``int`` because it is a subclass.
+    """
+    if isinstance(raw, bool) or raw in (0, None):
+        return ""
+    if isinstance(raw, str):
+        return raw
+    return str(raw)
+
+
 def main():
     """Called from the executable and __main__.py"""
 
@@ -139,17 +153,7 @@ def parse_settings():
     settings.cors_origins = config[section]["cors_origins"]
     settings.custom_static = dict(config[section]["custom_static"])
     settings.query_cache = bool(config[section].get("query_cache", True))
-    # Coerce non-string TOML values: a bare number would otherwise crash the
-    # request hook with AttributeError on .encode(). Booleans and 0 are treated
-    # as disabled so `api_key = false` cannot silently enable auth with the
-    # literal key "False".
-    _raw_key = config[section].get("auth", {}).get("api_key", "")
-    if isinstance(_raw_key, str):
-        settings.api_key = _raw_key
-    elif _raw_key in (False, 0, None):
-        settings.api_key = ""
-    else:
-        settings.api_key = str(_raw_key)
+    settings.api_key = _coerce_api_key(config[section].get("auth", {}).get("api_key", ""))
     settings.profile = profile
     settings.testing = testing
 

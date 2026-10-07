@@ -3,6 +3,22 @@
 import pytest
 from aw_server.server import AWFlask
 
+
+# ── Config coercion (boolean/int api_key values) ─────────────────────────────
+
+
+@pytest.mark.parametrize("raw_key", [True, False, 0, None])
+def test_boolean_and_zero_api_key_disables_auth(raw_key):
+    """A boolean or zero api_key must not enable auth (disables it instead).
+
+    Setting `api_key = true` in TOML used to produce key="True" — a trivially
+    guessable string that looked like a boolean toggle. All non-string falsy
+    *and* truthy booleans must be treated as disabled.
+    """
+    from aw_server.main import _coerce_api_key
+
+    assert _coerce_api_key(raw_key) == ""
+
 KEY = "test-secret-key"
 
 

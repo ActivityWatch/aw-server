@@ -85,16 +85,16 @@ def test_static_files_are_public(client):
 # ── Path bypass hardening ────────────────────────────────────────────────────
 
 
-def test_double_slash_does_not_reach_api(client):
-    """//api/0/buckets/ is not a bypass vulnerability in Flask/Werkzeug.
+def test_double_slash_does_not_bypass_auth(client):
+    """//api/0/buckets/ is not a bypass vulnerability.
 
-    Werkzeug parses ``//api`` as an authority component, so request.path
-    becomes ``/0/buckets/`` which has no route (404). The attacker cannot
-    reach the real /api/0/buckets/ handler this way.
+    Depending on the WSGI front-end, ``//api`` is either stripped as an
+    authority component (404) or normalized to ``/api/...`` (then gated
+    by the hook, which collapses empty segments → 401). Neither outcome
+    may reach the protected handler unauthenticated.
     """
     r = client.get("//api/0/buckets/")
-    # 404 because Werkzeug strips the ``//api`` authority; not a bypass.
-    assert r.status_code == 404
+    assert r.status_code in (401, 404)
 
 
 def test_percent_encoded_api_segment_is_gated(client):

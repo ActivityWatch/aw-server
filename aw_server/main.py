@@ -139,9 +139,17 @@ def parse_settings():
     settings.cors_origins = config[section]["cors_origins"]
     settings.custom_static = dict(config[section]["custom_static"])
     settings.query_cache = bool(config[section].get("query_cache", True))
-    # Coerce to str: a non-string TOML value (e.g. an unquoted number) would
-    # otherwise crash the request hook with AttributeError on .encode().
-    settings.api_key = str(config[section].get("auth", {}).get("api_key", "") or "")
+    # Coerce non-string TOML values: a bare number would otherwise crash the
+    # request hook with AttributeError on .encode(). Booleans and 0 are treated
+    # as disabled so `api_key = false` cannot silently enable auth with the
+    # literal key "False".
+    _raw_key = config[section].get("auth", {}).get("api_key", "")
+    if isinstance(_raw_key, str):
+        settings.api_key = _raw_key
+    elif _raw_key in (False, 0, None):
+        settings.api_key = ""
+    else:
+        settings.api_key = str(_raw_key)
     settings.profile = profile
     settings.testing = testing
 

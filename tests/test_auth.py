@@ -61,6 +61,20 @@ def test_correct_key_returns_200(client):
     assert r.status_code == 200
 
 
+@pytest.mark.parametrize("scheme", ["bearer", "BEARER", "bEaReR"])
+def test_bearer_scheme_is_case_insensitive(client, scheme):
+    r = client.get("/api/0/buckets/", headers={"Authorization": f"{scheme} {KEY}"})
+    assert r.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "header", [f"Basic {KEY}", f"BearerX {KEY}", "Bearer", "Bearer ", f"bearer {KEY} "]
+)
+def test_invalid_authorization_returns_401(client, header):
+    r = client.get("/api/0/buckets/", headers={"Authorization": header})
+    assert r.status_code == 401
+
+
 def test_static_files_are_public(client):
     """Non-/api paths (static files) are always accessible."""
     r = client.get("/")

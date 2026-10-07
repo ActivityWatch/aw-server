@@ -57,8 +57,8 @@ def register(app: Flask, api_key: Optional[str]) -> None:
             return None
 
         auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[len("Bearer ") :]
+        scheme, _, token = auth_header.partition(" ")
+        if scheme.lower() == "bearer" and token:
             # UTF-8 on both sides: compare_digest needs matching encodings, and
             # ASCII would raise UnicodeEncodeError for a non-ASCII configured
             # key, locking out even the correct token. UTF-8 never raises on str.

@@ -20,15 +20,15 @@ logger = logging.getLogger(__name__)
 def _coerce_api_key(raw: object) -> str:
     """Normalize a raw TOML api_key value to a string, or "" to disable auth.
 
-    Booleans are always disabled: ``api_key = true`` looks like a toggle but
-    would otherwise silently enable auth with the trivially guessable key
-    "True". ``bool`` must be tested before ``int`` because it is a subclass.
+    Only string values enable authentication. Booleans and numbers are
+    disabled: ``api_key = true`` looks like a toggle and would otherwise
+    silently enable auth with the trivially guessable key "True"; an
+    integer such as ``api_key = 12345`` is likewise a misconfiguration that
+    must not become the guessable key "12345".
     """
-    if isinstance(raw, bool) or raw in (0, None):
-        return ""
     if isinstance(raw, str):
         return raw
-    return str(raw)
+    return ""
 
 
 def main():

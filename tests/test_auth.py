@@ -3,7 +3,6 @@
 import pytest
 from aw_server.server import AWFlask
 
-
 # ── Config coercion (boolean/int api_key values) ─────────────────────────────
 
 
@@ -18,6 +17,7 @@ def test_boolean_and_zero_api_key_disables_auth(raw_key):
     from aw_server.main import _coerce_api_key
 
     assert _coerce_api_key(raw_key) == ""
+
 
 KEY = "test-secret-key"
 

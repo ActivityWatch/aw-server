@@ -17,6 +17,20 @@ from .server import _start
 logger = logging.getLogger(__name__)
 
 
+def _coerce_api_key(raw: object) -> str:
+    """Normalize a raw TOML api_key value to a string, or "" to disable auth.
+
+    Only string values enable authentication. Booleans and numbers are
+    disabled: ``api_key = true`` looks like a toggle and would otherwise
+    silently enable auth with the trivially guessable key "True"; an
+    integer such as ``api_key = 12345`` is likewise a misconfiguration that
+    must not become the guessable key "12345".
+    """
+    if isinstance(raw, str):
+        return raw
+    return ""
+
+
 def main():
     """Called from the executable and __main__.py"""
 
@@ -56,6 +70,7 @@ def main():
         cors_origins=settings.cors_origins,
         custom_static=settings.custom_static,
         query_cache=settings.query_cache,
+        api_key=settings.api_key,
     )
 
 
@@ -138,6 +153,9 @@ def parse_settings():
     settings.cors_origins = config[section]["cors_origins"]
     settings.custom_static = dict(config[section]["custom_static"])
     settings.query_cache = bool(config[section].get("query_cache", True))
+    settings.api_key = _coerce_api_key(
+        config[section].get("auth", {}).get("api_key", "")
+    )
     settings.profile = profile
     settings.testing = testing
 

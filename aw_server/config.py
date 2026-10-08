@@ -13,6 +13,12 @@ query_cache = true
 
 [server.custom_static]
 
+[server.auth]
+# Uncomment and set to enable API key authentication for /api/* endpoints.
+# Clients must send: Authorization: Bearer <api_key>
+# GET /api/0/info and OPTIONS preflight requests are always public.
+# api_key = ""
+
 [server-testing]
 host = "localhost"
 port = "5666"
@@ -21,6 +27,9 @@ cors_origins = ""
 query_cache = true
 
 [server-testing.custom_static]
+
+[server-testing.auth]
+# api_key = ""
 """.strip()
 
 

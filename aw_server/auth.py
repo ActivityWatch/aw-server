@@ -69,4 +69,5 @@ def register(app: Flask, api_key: Optional[str]) -> None:
             '{"message": "Missing or invalid API key. Set Authorization: Bearer <key> header."}',
             status=401,
             content_type="application/json",
+            headers={"WWW-Authenticate": "Bearer"},
         )

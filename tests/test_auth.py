@@ -73,6 +73,14 @@ def test_wrong_key_returns_401(client):
     assert r.status_code == 401
 
 
+def test_401_advertises_bearer_challenge(client):
+    r = client.get("/api/0/buckets/")
+    assert r.status_code == 401
+    # RFC 7235: a 401 must carry at least one WWW-Authenticate challenge so
+    # clients can programmatically discover the Bearer scheme.
+    assert r.headers.get("WWW-Authenticate") == "Bearer"
+
+
 def test_correct_key_returns_200(client):
     r = client.get("/api/0/buckets/", headers={"Authorization": f"Bearer {KEY}"})
     assert r.status_code == 200

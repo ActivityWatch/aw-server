@@ -134,6 +134,33 @@ def test_import_buckets_not_an_object(flask_client):
     assert r.json["message"]
 
 
+@pytest.mark.parametrize("malformed_buckets", [[], None, "invalid", 1])
+def test_import_multipart_buckets_not_an_object(
+    flask_client, cleanup, malformed_buckets
+):
+    import io
+    import json
+
+    cleanup.append("test-import-file-shape")
+    good = {"buckets": {"test-import-file-shape": _bucket("test-import-file-shape")}}
+    r = flask_client.post(
+        "/api/0/import",
+        data={
+            "file1": (io.BytesIO(json.dumps(good).encode()), "one.json"),
+            "file2": (
+                io.BytesIO(json.dumps({"buckets": malformed_buckets}).encode()),
+                "two.json",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    assert r.status_code == 400
+    assert r.json == {
+        "message": "Import failed: 'buckets' must be an object mapping bucket IDs to buckets"
+    }
+    assert "test-import-file-shape" not in _buckets(flask_client)
+
+
 def test_import_multipart_failure_rolls_back_every_file(flask_client, cleanup):
     import io
     import json

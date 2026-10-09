@@ -418,7 +418,12 @@ class ImportAllResource(Resource):
                 # Import every file as one batch, so a failure rolls back all of them.
                 buckets = {}
                 for filename, f in request.files.items():
-                    for key, bucket in json.loads(f.stream.read())["buckets"].items():
+                    file_buckets = json.loads(f.stream.read())["buckets"]
+                    if not isinstance(file_buckets, dict):
+                        raise ValueError(
+                            "'buckets' must be an object mapping bucket IDs to buckets"
+                        )
+                    for key, bucket in file_buckets.items():
                         if key in buckets:
                             raise ValueError(
                                 f"Bucket '{key}' appears in more than one uploaded file."

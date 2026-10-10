@@ -322,6 +322,7 @@ class ServerAPI:
             self.db.delete_bucket(bucket_id)
         finally:
             self._invalidate_all()
+            self.last_event.pop(bucket_id, None)
         logger.debug(f"Deleted bucket '{bucket_id}'")
         return None
 
@@ -371,6 +372,9 @@ class ServerAPI:
                 old = self.db[bucket_id].get_by_id(e.id)
                 if old:
                     affected.append(event_range(old))
+        # The cached last heartbeat may no longer be the bucket's last event,
+        # and a heartbeat merging into it would replace the wrong one.
+        self.last_event.pop(bucket_id, None)
         try:
             if len(events) == 1:
                 # Pass as single Event so Bucket.insert uses insert_one (returns Event with ID)
@@ -403,6 +407,11 @@ class ServerAPI:
         finally:
             if old:
                 self._invalidate([event_range(old)])
+                # If the deleted event was the cached heartbeat last_event, a
+                # subsequent heartbeat would merge into the deleted event and
+                # replace_last() would overwrite whatever is now the stored
+                # last event. Drop the cache so it is re-read from storage.
+                self.last_event.pop(bucket_id, None)
 
     @check_bucket_exists
     @_serialized

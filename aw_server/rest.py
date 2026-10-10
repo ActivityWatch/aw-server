@@ -20,7 +20,7 @@ from flask import (
 from flask_restx import Api, Resource, fields
 
 from . import logger
-from .api import ServerAPI
+from .api import ImportRollbackError, ServerAPI
 from .csv_export import content_disposition
 from .exceptions import BadRequest, Unauthorized
 
@@ -458,18 +458,44 @@ class ImportAllResource(Resource):
     @api.expect(buckets_export)
     @copy_doc(ServerAPI.import_all)
     def post(self):
-        # If import comes from a form in th web-ui
-        if len(request.files) > 0:
-            # web-ui form only allows one file, but technically it's possible to
-            # upload multiple files at the same time
-            for filename, f in request.files.items():
-                buckets = json.loads(f.stream.read())["buckets"]
+        try:
+            # If import comes from a form in the web-ui
+            if len(request.files) > 0:
+                # web-ui form only allows one file, but technically it's possible to
+                # upload multiple files at the same time
+                # Import every file as one batch, so a failure rolls back all of them.
+                buckets = {}
+                for filename, f in request.files.items():
+                    file_buckets = json.loads(f.stream.read())["buckets"]
+                    if not isinstance(file_buckets, dict):
+                        raise ValueError(
+                            "'buckets' must be an object mapping bucket IDs to buckets"
+                        )
+                    for key, bucket in file_buckets.items():
+                        if key in buckets:
+                            raise ValueError(
+                                f"Bucket '{key}' appears in more than one uploaded file."
+                            )
+                        buckets[key] = bucket
                 current_app.api.import_all(buckets)
-        # Normal import from body
-        else:
-            buckets = request.get_json()["buckets"]
-            current_app.api.import_all(buckets)
-        return None, 200
+            # Normal import from body
+            else:
+                buckets = request.get_json()["buckets"]
+                current_app.api.import_all(buckets)
+        except ImportRollbackError as e:
+            # The import failed *and* rollback could not remove some created
+            # buckets: they are still stored, so a retry would be rejected as a
+            # duplicate. This is a server-side failure, but the message names the
+            # buckets to clean up before retrying.
+            logger.error(f"Import failed with incomplete rollback: {e!r}")
+            return {"message": str(e)}, 500
+        except (KeyError, TypeError, ValueError) as e:
+            # Malformed export or a bucket that already exists: the client's
+            # fault, so a 400 with a message instead of a traceback.
+            logger.warning(f"Import failed: {e!r}")
+            reason = f"missing field {e}" if isinstance(e, KeyError) else str(e)
+            return {"message": f"Import failed: {reason}"}, 400
+        return {"message": "Import successful"}, 200
 
 
 # LOGGING

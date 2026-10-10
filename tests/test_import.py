@@ -25,9 +25,13 @@ def _bucket(bucket_id, events=None):
 
 
 @pytest.fixture()
-def cleanup(flask_client):
+def cleanup(flask_client, monkeypatch):
     ids = []
     yield ids
+    # Fixtures tear down in reverse setup order, so a test listing
+    # `monkeypatch` before `cleanup` still has e.g. a failing delete_bucket
+    # patched here; undo first so cleanup can't leak buckets into later tests.
+    monkeypatch.undo()
     buckets = flask_client.get("/api/0/buckets/").json
     for bucket_id in ids:
         if bucket_id in buckets:

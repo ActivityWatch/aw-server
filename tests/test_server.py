@@ -381,7 +381,7 @@ def test_heartbeat_after_delete_does_not_merge_into_deleted_event(flask_client, 
     assert ts == t + timedelta(seconds=1)
 
 
-def test_bulk_delete_events(flask_client, bucket):
+def test_bulk_delete_events(flask_client, bucket, monkeypatch):
     t = datetime(2026, 1, 1)
     events = [
         {
@@ -418,7 +418,12 @@ def test_bulk_delete_events(flask_client, bucket):
         assert flask_client.post(url, json=body).status_code == 400
 
     # Oversized requests are rejected before touching storage
-    r = flask_client.post(url, json={"ids": list(range(10_001))})
+    def unexpected_delete(*args, **kwargs):
+        pytest.fail("Oversized request reached ServerAPI.delete_events")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(flask_client.application.api, "delete_events", unexpected_delete)
+        r = flask_client.post(url, json={"ids": list(range(10_001))})
     assert r.status_code == 413
     assert flask_client.get(f"/api/0/buckets/{bucket}/events/count").json == 2
 

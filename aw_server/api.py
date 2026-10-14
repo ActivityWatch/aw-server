@@ -415,6 +415,31 @@ class ServerAPI:
 
     @check_bucket_exists
     @_serialized
+    def delete_events(self, bucket_id: str, event_ids: List[int]) -> int:
+        """Delete many events from a bucket in one request.
+
+        Unknown and duplicate ids are ignored. Returns the number of events
+        that existed and were deleted.
+        """
+        ranges = []
+        deleted = 0
+        try:
+            for event_id in dict.fromkeys(event_ids):
+                old = self.db[bucket_id].get_by_id(event_id)
+                if old:
+                    ranges.append(event_range(old))
+                    if self.db[bucket_id].delete(event_id):
+                        deleted += 1
+            return deleted
+        finally:
+            if ranges:
+                self._invalidate(ranges)
+                # Same reason as delete_event: a deleted event may be the
+                # cached heartbeat last_event.
+                self.last_event.pop(bucket_id, None)
+
+    @check_bucket_exists
+    @_serialized
     def heartbeat(self, bucket_id: str, heartbeat: Event, pulsetime: float) -> Event:
         """
         Heartbeats are useful when implementing watchers that simply keep

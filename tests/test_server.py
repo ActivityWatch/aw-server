@@ -379,3 +379,96 @@ def test_heartbeat_after_delete_does_not_merge_into_deleted_event(flask_client, 
     assert events[0]["duration"] == 0.5
     ts = datetime.fromisoformat(events[0]["timestamp"]).replace(tzinfo=None)
     assert ts == t + timedelta(seconds=1)
+
+
+def test_bulk_delete_events(flask_client, bucket, monkeypatch):
+    t = datetime(2026, 1, 1)
+    events = [
+        {
+            "timestamp": (t + timedelta(seconds=i)).isoformat(),
+            "duration": 0.5,
+            "data": {"n": i},
+        }
+        for i in range(5)
+    ]
+    r = flask_client.post(f"/api/0/buckets/{bucket}/events", json=events)
+    assert r.status_code == 200
+    ids = sorted(
+        e["id"] for e in flask_client.get(f"/api/0/buckets/{bucket}/events").json
+    )
+    assert len(ids) == 5
+
+    url = f"/api/0/buckets/{bucket}/events/delete"
+    # Mixed known, unknown and duplicate ids: only distinct existing ones count
+    r = flask_client.post(url, json={"ids": [ids[0], ids[2], ids[2], ids[4], 999999]})
+    assert r.status_code == 200
+    assert r.json == 3
+    remaining = sorted(
+        e["id"] for e in flask_client.get(f"/api/0/buckets/{bucket}/events").json
+    )
+    assert remaining == [ids[1], ids[3]]
+
+    # Empty list is a no-op
+    r = flask_client.post(url, json={"ids": []})
+    assert r.status_code == 200
+    assert r.json == 0
+
+    # Malformed bodies are rejected
+    for body in (
+        {},
+        {"ids": "1"},
+        {"ids": [1, "2"]},
+        {"ids": [True]},
+        [1, 2],
+        {"ids": [-1]},  # negative ids rejected
+        {"ids": [-1]},  # negative ids rejected (listed twice for clarity, same check)
+        {"ids": [9223372036854775808]},  # overflows SQLite int64
+    ):
+        assert flask_client.post(url, json=body).status_code == 400
+
+    # Oversized requests are rejected before touching storage
+    def unexpected_delete(*args, **kwargs):
+        pytest.fail("Oversized request reached ServerAPI.delete_events")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(flask_client.application.api, "delete_events", unexpected_delete)
+        r = flask_client.post(url, json={"ids": list(range(1, 10_002))})
+    assert r.status_code == 413
+    assert flask_client.get(f"/api/0/buckets/{bucket}/events/count").json == 2
+
+    # Unknown bucket
+    r = flask_client.post(
+        "/api/0/buckets/no-such-bucket/events/delete", json={"ids": [1]}
+    )
+    assert r.status_code == 404
+
+
+def test_heartbeat_after_bulk_delete_does_not_merge_into_deleted_event(
+    flask_client, bucket
+):
+    t = datetime(2026, 1, 1)
+
+    def event(offset, label):
+        return {
+            "timestamp": (t + timedelta(seconds=offset)).isoformat(),
+            "duration": 0.5,
+            "data": {"label": label},
+        }
+
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/heartbeat?pulsetime=10", json=event(0, "a")
+    )
+    assert r.status_code == 200
+    stored = flask_client.get(f"/api/0/buckets/{bucket}/events").json[0]
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/events/delete", json={"ids": [stored["id"]]}
+    )
+    assert r.json == 1
+
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket}/heartbeat?pulsetime=10", json=event(1, "a")
+    )
+    assert r.status_code == 200
+    events = flask_client.get(f"/api/0/buckets/{bucket}/events").json
+    assert len(events) == 1
+    assert events[0]["duration"] == 0.5

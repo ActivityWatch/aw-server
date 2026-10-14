@@ -18,6 +18,7 @@ from flask import (
     stream_with_context,
 )
 from flask_restx import Api, Resource, fields
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from . import logger
 from .api import ImportRollbackError, ServerAPI
@@ -299,6 +300,34 @@ class EventCountResource(Resource):
 
         events = current_app.api.get_eventcount(bucket_id, start=start, end=end)
         return events, 200
+
+
+# Each id is one datastore round-trip under the write lock, so an unbounded
+# list would let one request stall all event writes. Matches aw-server-rust.
+MAX_BULK_DELETE_IDS = 10_000
+
+
+@api.route("/0/buckets/<string:bucket_id>/events/delete")
+class EventsDeleteResource(Resource):
+    @copy_doc(ServerAPI.delete_events)
+    def post(self, bucket_id: str):
+        data = request.get_json(silent=True)
+        ids = data.get("ids") if isinstance(data, dict) else None
+        if not isinstance(ids, list) or not all(
+            isinstance(i, int)
+            and not isinstance(i, bool)
+            and 0 <= i <= 9223372036854775807  # non-negative, within SQLite int64 range
+            for i in ids
+        ):
+            raise BadRequest(
+                "InvalidBody", 'Body must be {"ids": [...]} with integer ids'
+            )
+        if len(ids) > MAX_BULK_DELETE_IDS:
+            raise RequestEntityTooLarge(
+                f"Too many ids in bulk delete request: {len(ids)} "
+                f"(max {MAX_BULK_DELETE_IDS})"
+            )
+        return current_app.api.delete_events(bucket_id, ids), 200
 
 
 @api.route("/0/buckets/<string:bucket_id>/events/<int:event_id>")

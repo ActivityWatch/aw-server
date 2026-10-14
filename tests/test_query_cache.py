@@ -235,6 +235,22 @@ def test_insert_and_delete_invalidate_only_overlapping(api):
     assert total(api, DAY2) == 0
 
 
+def test_bulk_delete_invalidates_overlapping(api):
+    evs = [
+        api.create_events(
+            BUCKET,
+            [Event(timestamp=DAY2[0] + timedelta(hours=h), duration=30, data={})],
+        )[0]
+        for h in (2, 4)
+    ]
+    assert total(api, DAY2) == 60
+    assert total(api) == 60
+    assert api.delete_events(BUCKET, [ev.id for ev in evs]) == 2
+    assert total(api, DAY2) == 0
+    assert total(api) == 60  # DAY1 untouched: still served from cache
+    assert api.query_cache.stats()["hits"] == 1
+
+
 def test_replacing_event_by_id_invalidates_old_range(api):
     [ev] = api.create_events(
         BUCKET, [Event(timestamp=DAY2[0] + timedelta(hours=2), duration=30, data={})]

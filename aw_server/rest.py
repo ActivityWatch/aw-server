@@ -314,7 +314,10 @@ class EventsDeleteResource(Resource):
         data = request.get_json(silent=True)
         ids = data.get("ids") if isinstance(data, dict) else None
         if not isinstance(ids, list) or not all(
-            isinstance(i, int) and not isinstance(i, bool) for i in ids
+            isinstance(i, int)
+            and not isinstance(i, bool)
+            and 0 <= i <= 9223372036854775807  # non-negative, within SQLite int64 range
+            for i in ids
         ):
             raise BadRequest(
                 "InvalidBody", 'Body must be {"ids": [...]} with integer ids'

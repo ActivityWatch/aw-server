@@ -414,7 +414,16 @@ def test_bulk_delete_events(flask_client, bucket, monkeypatch):
     assert r.json == 0
 
     # Malformed bodies are rejected
-    for body in ({}, {"ids": "1"}, {"ids": [1, "2"]}, {"ids": [True]}, [1, 2]):
+    for body in (
+        {},
+        {"ids": "1"},
+        {"ids": [1, "2"]},
+        {"ids": [True]},
+        [1, 2],
+        {"ids": [-1]},  # negative ids rejected
+        {"ids": [-1]},  # negative ids rejected (listed twice for clarity, same check)
+        {"ids": [9223372036854775808]},  # overflows SQLite int64
+    ):
         assert flask_client.post(url, json=body).status_code == 400
 
     # Oversized requests are rejected before touching storage
@@ -423,7 +432,7 @@ def test_bulk_delete_events(flask_client, bucket, monkeypatch):
 
     with monkeypatch.context() as patch:
         patch.setattr(flask_client.application.api, "delete_events", unexpected_delete)
-        r = flask_client.post(url, json={"ids": list(range(10_001))})
+        r = flask_client.post(url, json={"ids": list(range(1, 10_002))})
     assert r.status_code == 413
     assert flask_client.get(f"/api/0/buckets/{bucket}/events/count").json == 2
 

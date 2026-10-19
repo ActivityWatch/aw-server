@@ -21,7 +21,7 @@ werkzeug = "^2.3.3"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "*"
-pytest = "^7.3"
+pytest = ">=7.3,<9.0"
 pytest-flask = "*"
 pytest-benchmark = "*"
 pytest-cov = "*"

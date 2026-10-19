@@ -20,6 +20,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   auto_merge:
@@ -56,7 +57,7 @@ jobs:
               return;
             }
 
-            await github.rest.pulls.merge({
+            const { data: merge } = await github.rest.pulls.merge({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pull.number,
@@ -64,4 +65,20 @@ jobs:
               sha: context.payload.workflow_run.head_sha,
             });
 
-            core.info(`Merged Dependabot PR #${pull.number}.`);
+            if (!merge.merged) {
+              core.setFailed(`PR #${pull.number} was not merged: ${merge.message}`);
+              return;
+            }
+
+            core.info(`Merged Dependabot PR #${pull.number} at ${merge.sha}.`);
+
+            // GITHUB_TOKEN merges do not trigger push workflows. Dispatch the
+            // default-branch checks explicitly to refresh coverage and CodeQL.
+            for (const workflow_id of ["build.yml", "lint.yml", "codeql.yml"]) {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id,
+                ref: pull.base.ref,
+              });
+            }

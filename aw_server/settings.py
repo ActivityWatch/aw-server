@@ -87,6 +87,7 @@ class Settings:
                 try:
                     os.unlink(tmp_path)
                 except OSError:
+                    # Cleanup must not hide the original persistence failure.
                     pass
             raise
 

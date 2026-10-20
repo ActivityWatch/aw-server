@@ -233,12 +233,12 @@ def test_read_only_existing_file_is_not_replaced(config_dir, monkeypatch):
 @pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
 def test_existing_file_mode_is_preserved(config_dir):
     path = _write_initial(config_dir)
-    os.chmod(path, 0o640)
+    os.chmod(path, 0o700)
     settings = Settings(testing=True)
 
     settings.set("locale", "sv")
 
-    assert stat.S_IMODE(os.stat(path).st_mode) == 0o640
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o700
     assert json.loads(path.read_text(encoding="utf-8")) == {"locale": "sv"}
 
 
@@ -297,7 +297,7 @@ def test_settings_post_success_returns_value(config_dir):
 
 
 def test_concurrent_settings_writes_preserve_both_updates(config_dir, monkeypatch):
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError
     from threading import Event
 
     _write_initial(config_dir)
@@ -328,6 +328,7 @@ def test_concurrent_settings_writes_preserve_both_updates(config_dir, monkeypatc
         try:
             second.result(timeout=0.1)
         except TimeoutError:
+            # Expected with serialization: release the first writer below.
             pass
         finally:
             release_first.set()

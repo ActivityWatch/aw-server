@@ -1,4 +1,5 @@
 """Device HTTP contract against the real pair-keyed SQLite datastore."""
+
 from functools import partial
 
 import pytest
@@ -353,3 +354,81 @@ def test_malformed_later_event_writes_no_groups(device_app):
     }
     assert c.post("/api/0/devices/import", json=envelope).status_code == 400
     assert c.get("/api/0/devices/first/buckets/").json == {}
+
+
+def test_grouped_export_streams_events_without_bulk_read(device_app, monkeypatch):
+    c = device_app.test_client()
+    assert create(c, "local").status_code == 200
+    assert (
+        c.post(
+            "/api/0/devices/local/buckets/window/events", json=event("streamed")
+        ).status_code
+        == 200
+    )
+
+    def bulk_read_forbidden(*args, **kwargs):
+        raise AssertionError("Grouped export must not materialize all event rows")
+
+    monkeypatch.setattr(
+        device_app.api.db.storage_strategy.__class__, "get_events", bulk_read_forbidden
+    )
+    response = c.get("/api/0/devices/export")
+    assert response.status_code == 200
+    assert response.json["devices"]["server-uuid"]["buckets"]["window"]["events"][0][
+        "data"
+    ] == {"label": "streamed"}
+
+
+def test_grouped_export_stages_before_success_and_closes_snapshot(
+    device_app, monkeypatch
+):
+    c = device_app.test_client()
+    assert create(c, "local").status_code == 200
+
+    def broken_events(*args, **kwargs):
+        yield event("partial")
+        raise RuntimeError("read failed")
+
+    monkeypatch.setattr(
+        device_app.api.db.storage_strategy.__class__, "iter_events", broken_events
+    )
+    response = c.get("/api/0/devices/export")
+    assert response.status_code == 500
+    assert not device_app.api.db.storage_strategy.conn.in_transaction
+    # A failed staging operation must release the writer lock too.
+    assert create(c, "local", "after_failure").status_code == 200
+
+
+def test_export_keeps_one_snapshot_across_bucket_iterators(device_app):
+    import sqlite3
+    import json
+
+    api = device_app.api
+    storage = api.db.storage_strategy
+    path = storage.conn.execute("PRAGMA database_list").fetchone()[2]
+    storage.conn.execute("PRAGMA journal_mode=WAL")
+    for bid in ("a", "b"):
+        api.for_device("local").create_bucket(bid, "t", "c", "h")
+    original = storage.__class__.iter_events
+    changed = []
+
+    def events_with_concurrent_write(scoped, bid, **kwargs):
+        if not changed:
+            writer = sqlite3.connect(path)
+            row = writer.execute("SELECT rowid FROM buckets WHERE id='b'").fetchone()[0]
+            writer.execute(
+                "INSERT INTO events(bucketrow,starttime,endtime,datastr) VALUES (?, ?, ?, ?)",
+                (row, 1704110400000000, 1704110401000000, "{}"),
+            )
+            writer.commit()
+            writer.close()
+            changed.append(True)
+        yield from original(scoped, bid, **kwargs)
+
+    from unittest.mock import patch
+
+    with patch.object(storage.__class__, "iter_events", events_with_concurrent_write):
+        with api.stage_device_export() as staged:
+            exported = json.load(staged)
+    assert exported["devices"]["server-uuid"]["buckets"]["b"]["events"] == []
+    assert api.for_device("local").get_eventcount("b") == 1

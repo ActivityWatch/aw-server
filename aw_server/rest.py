@@ -18,6 +18,7 @@ from flask import (
     jsonify,
     make_response,
     request,
+    send_file,
     stream_with_context,
 )
 from flask_restx import Api, Resource, fields
@@ -232,7 +233,23 @@ class DeviceBucketsResource(Resource):
 @api.route("/0/devices/export")
 class DevicesExportResource(Resource):
     def get(self):
-        return jsonify(current_app.api.device_buckets(export=True))
+        try:
+            staged = current_app.api.stage_device_export()
+        except NotImplementedError as e:
+            return {"message": str(e)}, 501
+        try:
+            response = send_file(
+                staged,
+                mimetype="application/json",
+                as_attachment=True,
+                download_name="aw-devices-export.json",
+                conditional=False,
+            )
+            response.call_on_close(staged.close)
+            return response
+        except BaseException:
+            staged.close()
+            raise
 
 
 @api.route("/0/devices/import")

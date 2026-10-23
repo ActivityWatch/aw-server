@@ -3,6 +3,7 @@ import functools
 import json
 import logging
 import threading
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from socket import gethostname
@@ -134,16 +135,18 @@ class ServerAPI:
         return [
             {
                 "id": device,
-                "hostname": gethostname()
-                if device == get_device_id()
-                else min(
-                    (b["hostname"] for b in group["buckets"].values()), default=""
+                "hostname": (
+                    gethostname()
+                    if device == get_device_id()
+                    else min(
+                        (b["hostname"] for b in group["buckets"].values()), default=""
+                    )
                 ),
             }
             for device, group in sorted(groups.items())
         ]
 
-    def device_buckets(self, export: bool = False) -> Dict[str, Any]:
+    def device_buckets(self) -> Dict[str, Any]:
         """Explicit grouping; never encode identity into a legacy bucket ID."""
         public_local = get_device_id()
         groups: Dict[str, Any] = {public_local: {"buckets": {}}}
@@ -156,18 +159,78 @@ class ServerAPI:
         for device, buckets in grouped.items():
             public = public_local if device == "local" else device
             target = groups.setdefault(public, {"buckets": {}})["buckets"]
-            scoped = (
-                self.for_device(device) if hasattr(storage, "device_buckets") else self
-            )
             for bid, metadata in buckets.items():
                 if bid in target:
                     raise ValueError(
                         f"Ambiguous bucket '{bid}'; normalized device collision"
                     )
-                bucket = scoped.export_bucket(bid) if export else dict(metadata)
+                bucket = dict(metadata)
                 bucket["device_id"] = public
                 target[bid] = bucket
         return {"devices": groups}
+
+    @_serialized
+    def stage_device_export(self):
+        """Stream one SQLite snapshot into a private file before HTTP success.
+
+        The response owns the returned file. No database cursor or transaction
+        survives into response iteration, which may run on a different thread.
+        """
+        storage = self.db.storage_strategy
+        if not hasattr(storage, "device_buckets"):
+            raise NotImplementedError("Snapshot device export requires SQLite")
+        conn = storage.conn
+        # Flush lazy writes before beginning an independent read snapshot.
+        storage.commit()
+        staged = tempfile.TemporaryFile(mode="w+b")
+
+        def write(value):
+            staged.write(value.encode("utf-8"))
+
+        try:
+            conn.execute("BEGIN")
+            groups = self.device_buckets()["devices"]
+            write('{"devices":{')
+            first_device = True
+            for device, group in groups.items():
+                if not first_device:
+                    write(",")
+                first_device = False
+                write(json.dumps(device) + ':{"buckets":{')
+                first_bucket = True
+                scoped = self.for_device(device)
+                for bid, metadata in group["buckets"].items():
+                    if not first_bucket:
+                        write(",")
+                    first_bucket = False
+                    write(
+                        json.dumps(bid)
+                        + ":"
+                        + json.dumps(metadata)[:-1]
+                        + ',"events":['
+                    )
+                    first_event = True
+                    events = scoped.db.storage_strategy.iter_events(bid, flush=False)
+                    try:
+                        for event in events:
+                            if not first_event:
+                                write(",")
+                            first_event = False
+                            payload = event.to_json_dict()
+                            payload.pop("id", None)
+                            write(json.dumps(payload))
+                    finally:
+                        events.close()
+                    write("]}")
+                write("}}")
+            write("}}")
+            conn.commit()
+            staged.seek(0)
+            return staged
+        except BaseException:
+            conn.rollback()
+            staged.close()
+            raise
 
     @_serialized
     def import_devices(self, envelope: Any) -> None:

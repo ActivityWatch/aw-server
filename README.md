@@ -90,9 +90,13 @@ payloads before writes. Local exported ownership becomes the source UUID, so
 history stays peer-owned at another server. Python's existing reject-on-existing
 import policy remains (unlike Rust's deduplicating import). Individual groups
 use legacy rollback; a runtime failure can leave earlier successful groups.
-Metadata `data` is preserved. Export currently materializes events in memory;
-streamed/snapshot export parity is unfinished. No watcher adoption or sync-v2
-import is enabled by this draft.
+Metadata `data` is preserved. Grouped export streams SQLite rows from one read
+snapshot into a private temporary file before responding; failures cannot send
+partial JSON with a success status. The response owns the staged file, not a
+live database cursor. Concurrent WAL writes are excluded from that snapshot.
+Only metadata and one event at a time are retained in memory; legacy exports
+keep their existing implementation. No watcher adoption or sync-v2 import is
+enabled by this draft.
 
 Run `make test` for the normal fast server slice plus the device HTTP contract.
 The pinned draft core is required; tests use temporary file-backed SQLite and

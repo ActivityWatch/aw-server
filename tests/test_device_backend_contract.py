@@ -218,3 +218,63 @@ def test_shared_grouped_transfer_preserves_ownership_and_is_idempotent(
     assert rows[0]["data"] == {"owner": "source"}
     assert rows[0]["duration"] == 1.234567
     assert ".123456" in rows[0]["timestamp"]
+
+
+@pytest.mark.parametrize(
+    "source_backend,target_backend", [("python", "rust"), ("rust", "python")]
+)
+def test_cross_backend_grouped_transfer(source_backend, target_backend, start_server):
+    if not os.environ.get("AW_RUST_CONTRACT_BINARY"):
+        pytest.skip("cross-backend transfer requires AW_RUST_CONTRACT_BINARY")
+    source = start_server(source_backend, "source-uuid")
+    target = start_server(target_backend, "target-uuid")
+    base = "/devices/local/buckets/archive_old_host"
+    assert source.request("POST", base, metadata("old_host"))[0] == 200
+    assert source.request("POST", base + "/events", [event("source")])[0] == 200
+    status, archive = source.request("GET", "/devices/export")
+    assert status == 200
+    for _ in range(2):
+        status, body = target.request("POST", "/devices/import", archive)
+        assert status == 200, body
+    imported = "/devices/source-uuid/buckets/archive"
+    assert target.request("GET", imported + "/events/count") == (200, 1)
+    status, rows = target.request("GET", imported + "/events")
+    assert status == 200
+    assert rows[0]["data"] == {"owner": "source"}
+    assert rows[0]["duration"] == 1.234567
+    assert ".123456" in rows[0]["timestamp"]
+    assert target.request("GET", "/devices/local/buckets/archive")[0] == 404
+
+
+def test_shared_heartbeat_alias_state_and_local_ownership(backend, start_server):
+    server = start_server(backend, "source-uuid")
+    for device, host in (("local", "old_host"), ("peer", "peer_host")):
+        base = f"/devices/{device}/buckets/window_{host}"
+        assert server.request("POST", base, metadata(host))[0] == 200
+        for second, name in ((0, f"window_{host}"), (5, "window")):
+            heartbeat = event(device, second)
+            heartbeat["duration"] = 0
+            status, body = server.request(
+                "POST",
+                f"/devices/{device}/buckets/{name}/heartbeat?pulsetime=10",
+                heartbeat,
+            )
+            assert status == 200, body
+        status, rows = server.request("GET", base + "/events")
+        assert status == 200 and len(rows) == 1, rows
+        assert rows[0]["duration"] == 5
+        assert rows[0]["data"] == {"owner": device}
+        assert (
+            server.request("GET", f"/devices/{device}/buckets/window_unknown_host")[0]
+            == 404
+        )
+    forged = metadata("!local")
+    forged["device_id"] = "peer"
+    forged["data"] = {"device_id": "peer"}
+    status, body = server.request("POST", "/buckets/new_local", forged)
+    assert status == 200, body
+    assert (
+        server.request("GET", "/devices/local/buckets/new_local")[1]["device_id"]
+        == "local"
+    )
+    assert server.request("GET", "/devices/peer/buckets/new_local")[0] == 404

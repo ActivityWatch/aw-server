@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from socket import gethostname
 from typing import (
@@ -165,6 +165,10 @@ class ServerAPI:
                         f"Ambiguous bucket '{bid}'; normalized device collision"
                     )
                 bucket = dict(metadata)
+                # Older Python-created buckets stored naive ISO timestamps.
+                # Match our import parser's UTC interpretation, but emit RFC3339
+                # so the grouped archive is accepted by the Rust backend too.
+                bucket["created"] = iso8601.parse_date(bucket["created"]).isoformat()
                 bucket["device_id"] = public
                 target[bid] = bucket
         return {"devices": groups}
@@ -496,7 +500,7 @@ class ServerAPI:
         Returns True if successful, otherwise false if a bucket with the given ID already existed.
         """
         if created is None:
-            created = datetime.now()
+            created = datetime.now(timezone.utc)
         # Legacy POST is local-only. Unsupported legacy backends retain their
         # existing behavior; explicit scoped requests fail closed in for_device.
         if self._device_scope is None:

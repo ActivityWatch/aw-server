@@ -660,3 +660,34 @@ def test_three_same_named_devices_survive_http_reload_and_scoped_deletion(
             )
     finally:
         reopened.api.db.storage_strategy.conn.close()
+
+
+def test_grouped_export_normalizes_legacy_naive_created_without_rewriting_sql(
+    device_app,
+):
+    from datetime import datetime
+
+    client = device_app.test_client()
+    assert create(client, "local", "legacy").status_code == 200
+    storage = device_app.api.db.storage_strategy
+    original = "2024-01-01T12:34:56.123456"
+    storage.conn.execute(
+        "UPDATE buckets SET created = ? WHERE id = ?", [original, "legacy"]
+    )
+    storage.commit()
+    for path in ("/api/0/devices/buckets", "/api/0/devices/export"):
+        response = client.get(path)
+        assert response.status_code == 200
+        created = response.json["devices"]["server-uuid"]["buckets"]["legacy"][
+            "created"
+        ]
+        assert created == original + "+00:00"
+    assert (
+        storage.conn.execute(
+            "SELECT created FROM buckets WHERE id = 'legacy'"
+        ).fetchone()[0]
+        == original
+    )
+    assert create(client, "local", "new").status_code == 200
+    created = client.get("/api/0/devices/local/buckets/new").json["created"]
+    assert datetime.fromisoformat(created).utcoffset().total_seconds() == 0

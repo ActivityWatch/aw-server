@@ -423,3 +423,23 @@ def test_shared_heartbeat_alias_state_and_local_ownership(backend, start_server)
         == "local"
     )
     assert server.request("GET", "/devices/peer/buckets/new_local")[0] == 404
+
+
+def test_shared_legacy_import_rejects_same_name_ambiguity_without_mutation(
+    backend, start_server
+):
+    server = start_server(backend, "source-uuid")
+    for device in ("local", "peer", "third"):
+        base = f"/devices/{device}/buckets/window"
+        assert server.request("POST", base, metadata(f"{device}_host"))[0] == 200
+        assert server.request("POST", base + "/events", [event(device)])[0] == 200
+    status, before = server.request("GET", "/devices/export")
+    assert status == 200, before
+    incoming = dict(before["devices"]["source-uuid"]["buckets"]["window"])
+    incoming["events"] = [event("must-not-land", 20)]
+    # Legacy Python import rejects existing IDs (400); Rust's name-addressed
+    # compatibility importer rejects ambiguity (409). Neither may pick local,
+    # redirect to a peer or merge into an arbitrary equal-name history.
+    status, body = server.request("POST", "/import", {"buckets": {"window": incoming}})
+    assert status == (400 if backend == "python" else 409), body
+    assert server.request("GET", "/devices/export") == (200, before)

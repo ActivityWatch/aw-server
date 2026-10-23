@@ -80,8 +80,8 @@ tomlkit = "*"
 [package.source]
 type = "git"
 url = "https://github.com/TimeToBuildBob/aw-core.git"
-reference = "4ac214618dd9e93cc8e054b4e797ad70df96f641"
-resolved_reference = "4ac214618dd9e93cc8e054b4e797ad70df96f641"
+reference = "4a04a57bd0eaf5d2e53ac2a87f231234c389bd3a"
+resolved_reference = "4a04a57bd0eaf5d2e53ac2a87f231234c389bd3a"
 
 [[package]]
 name = "black"
@@ -1212,4 +1212,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "1171ee065f23094fdcf1cf0f0c7af8010b4775bf500b31679873a64103bf5298"
+content-hash = "f36f29a27a111d2f9c22963ce8a33587f6bd53b34849924fb03f9553bb7ef808"

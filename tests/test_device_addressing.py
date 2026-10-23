@@ -526,3 +526,53 @@ def test_sqlite_parallel_devices_do_not_share_request_scope(device_app):
         results = list(pool.map(write, ("local", "peer")))
     assert results == [{"label": "local"}, {"label": "peer"}]
     assert device_app.api._device_scope is None
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    ["1960-01-01T00:00:00.123457+00:00", "2300-01-01T00:00:00.123457+00:00"],
+)
+def test_archive_export_reimport_retains_exact_event_and_owner(device_app, timestamp):
+    import csv
+    import io
+
+    client = device_app.test_client()
+    assert create(client, "peer").status_code == 200
+    base = "/api/0/devices/peer/buckets/window"
+    payload = {
+        "timestamp": timestamp,
+        "duration": 0.000003,
+        "data": {"text": "archive, \u00e5\nsecond line", "nested": {"x": [1, None]}},
+    }
+    inserted = client.post(base + "/events", json=payload)
+    assert inserted.status_code == 200
+    assert inserted.json[0]["timestamp"] == timestamp
+    assert inserted.json[0]["duration"] == payload["duration"]
+    for route in (base + "/export", "/api/0/devices/export"):
+        response = client.get(route)
+        assert response.status_code == 200
+        if route == base + "/export":
+            exported = response.json["buckets"]["window"]
+        else:
+            envelope = response.json
+            exported = envelope["devices"]["peer"]["buckets"]["window"]
+        assert exported["events"] == [payload]
+        assert exported["device_id"] == "peer"
+    csv_response = client.get(base + "/export/csv")
+    assert csv_response.status_code == 200
+    rows = list(csv.DictReader(io.StringIO(csv_response.text)))
+    assert len(rows) == 1
+    assert rows[0]["timestamp"] == timestamp
+    assert rows[0]["duration"] == "0.000003000"
+    assert client.delete(base).status_code == 200
+    response = client.post("/api/0/devices/import", json=envelope)
+    assert response.status_code == 200
+    events = client.get(base + "/events").json
+    assert [{k: v for k, v in item.items() if k != "id"} for item in events] == [
+        payload
+    ]
+    assert client.get(base + "/events/count").json == 1
+    assert client.get(base).json["device_id"] == "peer"
+    # A repeated archive does not duplicate the newly restored event.
+    assert client.post("/api/0/devices/import", json=envelope).status_code == 200
+    assert client.get(base + "/events/count").json == 1

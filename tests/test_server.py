@@ -232,10 +232,10 @@ def test_export_bucket_csv(flask_client, bucket):
     # Newest first, union of data keys, formula-looking values neutralized
     assert lines[0] == "id,timestamp,duration,app,count,flag,title"
     assert lines[1].endswith(
-        ",2026-10-06T12:00:02.123000+00:00,0.000000000,'=cmd,3,null,"
+        ",2026-10-06T12:00:02.123456+00:00,0.000000000,'=cmd,3,null,"
     )
     assert lines[2].endswith(
-        ',2026-10-06T12:00:00.123000+00:00,1.500000000,Firefox,,,"a, ""quoted"" title"'
+        ',2026-10-06T12:00:00.123456+00:00,1.500000000,Firefox,,,"a, ""quoted"" title"'
     )
     assert lines[3] == ""
 

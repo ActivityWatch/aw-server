@@ -11,7 +11,8 @@ aw-server = "aw_server:main"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-aw-core = "^0.5.18"
+# Draft dependency: ActivityWatch/aw-core#183 (integrated archive/query fixes).
+aw-core = {git = "https://github.com/TimeToBuildBob/aw-core.git", rev = "26001d3827e68bb06dfa85c460ecaca6aa51c6f1"}
 aw-client = "^0.5.8"
 flask = "^2.2"
 flask-restx = "^1.0.3"

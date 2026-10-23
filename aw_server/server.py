@@ -1,5 +1,7 @@
+import copy
 import logging
 import os
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -7,10 +9,12 @@ import aw_datastore
 import flask.json.provider
 from aw_datastore import Datastore
 from aw_datastore.storages.peewee import PeeweeStorage
+from aw_datastore.storages.sqlite import SqliteStorage
 from flask import (
     Blueprint,
     Flask,
     current_app,
+    g,
     send_from_directory,
 )
 from flask_cors import CORS
@@ -80,6 +84,40 @@ class AWFlask(Flask):
                     database.close()
 
         self.api = ServerAPI(db=db, testing=testing, query_cache=query_cache)
+        if isinstance(db.storage_strategy, SqliteStorage):
+            owner_thread = threading.get_ident()
+            filepath = db.storage_strategy.conn.execute(
+                "PRAGMA database_list"
+            ).fetchone()[2]
+
+            @self.before_request
+            def sqlite_request_connection():
+                # SQLite handles are thread-owned. Never disable that safety or
+                # swap the shared API's db while another request is running.
+                if threading.get_ident() == owner_thread:
+                    return
+                request_db = Datastore(
+                    SqliteStorage,
+                    testing=testing,
+                    filepath=filepath,
+                    enable_lazy_commit=False,
+                )
+                request_api = copy.copy(self.api)
+                request_api.db = request_db
+                g.request_api = request_api
+
+            @self.teardown_request
+            def close_sqlite_request(error):
+                request_api = g.pop("request_api", None)
+                if request_api is not None:
+                    storage = request_api.db.storage_strategy
+                    try:
+                        if error is None:
+                            storage.commit()
+                        else:
+                            storage.conn.rollback()
+                    finally:
+                        storage.conn.close()
 
         self.register_blueprint(root)
         self.register_blueprint(rest.blueprint)

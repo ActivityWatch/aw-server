@@ -50,3 +50,51 @@ You can also get a very decent API browser by browsing to `localhost:5600` after
 
 There are also some API examples in the [documentation](https://docs.activitywatch.net/en/latest/api.html).
 
+
+## Draft device-addressed API
+
+This branch is implementation work for ActivityWatch/activitywatch#302. It depends
+on draft ActivityWatch/aw-core#183 (pinned in `pyproject.toml`), and includes the
+local discovery commits from ActivityWatch/aw-server#183 rebased on master.
+**Do not release this as a complete Python/Rust identity contract yet.**
+
+With the SQLite backend, `/api/0/devices/<device_id>/buckets/<id>` and its
+`events`, `events/count`, `events/<event_id>`, `events/delete`, `heartbeat`,
+`export`, and `export/csv` operations use an explicit device scope. Device bucket
+listing is `/api/0/devices/<device_id>/buckets/`; scoped queries use
+`POST /api/0/devices/<device_id>/query`; scoped full export is
+`GET /api/0/devices/<device_id>/export`. `local` and `/api/0/info.device_id`
+normalize to the same stored local sentinel. Peer `hostname="!local"` is rejected.
+Unsupported Memory/Peewee scoped operations return 501, never global fallback.
+
+Legacy bucket creation is local-only. Other legacy name-addressed operations
+retain unique global-name compatibility; ambiguous names return 409 before a
+mutation/export response. Bidirectional hostname aliases preserve stored names
+and histories. Exact names win. Legacy POST cannot acknowledge a local alias
+when subsequent global writes would select another device. Query cache keys
+include scope; heartbeat keys use device and resolved canonical bucket ID.
+Metadata changes clear query and heartbeat state.
+
+`GET /api/0/devices` includes the local UUID even when empty, plus stored peers.
+Peer hostname is a deterministic representative of bucket metadata, not a
+latest-hostname registry. `GET /api/0/devices/buckets` groups metadata explicitly;
+`GET /api/0/devices/export` uses the same envelope with events:
+
+```json
+{"devices": {"source-uuid": {"buckets": {"window": {"id": "window", "device_id": "source-uuid", "type": "test", "client": "watcher", "hostname": "host", "created": "2024-01-01T00:00:00Z", "events": []}}}}}
+```
+
+`POST /api/0/devices/import` accepts that envelope, rejects empty or `local`
+source identities, and validates enclosing ownership, bucket keys and event
+payloads before writes. Local exported ownership becomes the source UUID, so
+history stays peer-owned at another server. Python's existing reject-on-existing
+import policy remains (unlike Rust's deduplicating import). Individual groups
+use legacy rollback; a runtime failure can leave earlier successful groups.
+Metadata `data` is preserved. Export currently materializes events in memory;
+streamed/snapshot export parity is unfinished. No watcher adoption or sync-v2
+import is enabled by this draft.
+
+Run `make test` for the normal fast server slice plus the device HTTP contract.
+The pinned draft core is required; tests use temporary file-backed SQLite and
+never a production database. Full shared HTTP parity and backend-specific
+migration/same-name acceptance still gate removal of Rust's global name guards.

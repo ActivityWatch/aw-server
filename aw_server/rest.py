@@ -14,6 +14,7 @@ from flask import (
     Blueprint,
     Response,
     current_app,
+    g,
     jsonify,
     make_response,
     request,
@@ -180,6 +181,29 @@ def copy_doc(api_method):
     return decorator
 
 
+def request_api() -> ServerAPI:
+    return getattr(g, "device_api", current_app.api)
+
+
+class DeviceResource(Resource):
+    """Reuse legacy validation/auth/streaming with a request-local API view."""
+
+    def dispatch_request(self, *args, **kwargs):
+        device_id = kwargs.pop("device_id", None)
+        if device_id is not None:
+            try:
+                g.device_api = request_api().for_device(device_id)
+            except NotImplementedError as e:
+                return {"message": str(e)}, 501
+        return super().dispatch_request(*args, **kwargs)
+
+
+@api.errorhandler(ValueError)
+def storage_value_error(error):
+    status = 409 if str(error).startswith("Ambiguous bucket") else 400
+    return {"message": str(error)}, status
+
+
 # SERVER INFO
 
 
@@ -188,7 +212,7 @@ class InfoResource(Resource):
     @api.marshal_with(info)
     @copy_doc(ServerAPI.get_info)
     def get(self) -> Dict[str, Dict]:
-        return current_app.api.get_info()
+        return request_api().get_info()
 
 
 @api.route("/0/devices")
@@ -196,26 +220,56 @@ class DevicesResource(Resource):
     @api.marshal_list_with(device)
     @copy_doc(ServerAPI.get_devices)
     def get(self):
-        return current_app.api.get_devices()
+        return request_api().get_devices()
+
+
+@api.route("/0/devices/buckets")
+class DeviceBucketsResource(Resource):
+    def get(self):
+        return current_app.api.device_buckets()
+
+
+@api.route("/0/devices/export")
+class DevicesExportResource(Resource):
+    def get(self):
+        return jsonify(current_app.api.device_buckets(export=True))
+
+
+@api.route("/0/devices/import")
+class DevicesImportResource(Resource):
+    def post(self):
+        try:
+            current_app.api.import_devices(request.get_json())
+        except NotImplementedError as e:
+            return {"message": str(e)}, 501
+        except ImportRollbackError as e:
+            logger.error(f"Device import failed with incomplete rollback: {e!r}")
+            return {"message": str(e)}, 500
+        except (ValueError, TypeError, KeyError) as e:
+            return {"message": str(e)}, 400
+        return {"message": "Import successful"}, 200
 
 
 # BUCKETS
 
 
-@api.route("/0/buckets/")
-class BucketsResource(Resource):
+@api.route("/0/buckets/", "/0/devices/<string:device_id>/buckets/")
+class BucketsResource(DeviceResource):
     # TODO: Add response marshalling/validation
     @copy_doc(ServerAPI.get_buckets)
     def get(self) -> Dict[str, Dict]:
-        return current_app.api.get_buckets()
+        return request_api().get_buckets()
 
 
-@api.route("/0/buckets/<string:bucket_id>")
-class BucketResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>",
+)
+class BucketResource(DeviceResource):
     @api.doc(model=bucket)
     @copy_doc(ServerAPI.get_bucket_metadata)
     def get(self, bucket_id):
-        return current_app.api.get_bucket_metadata(bucket_id)
+        return request_api().get_bucket_metadata(bucket_id)
 
     @api.expect(create_bucket)
     @copy_doc(ServerAPI.create_bucket)
@@ -242,7 +296,7 @@ class BucketResource(Resource):
             )
         except iso8601.ParseError as e:
             raise BadRequest("InvalidCreated", str(e))
-        bucket_created = current_app.api.create_bucket(
+        bucket_created = request_api().create_bucket(
             bucket_id,
             event_type=data["type"],
             client=data["client"],
@@ -259,12 +313,12 @@ class BucketResource(Resource):
     @copy_doc(ServerAPI.update_bucket)
     def put(self, bucket_id):
         data = request.get_json()
-        current_app.api.update_bucket(
+        request_api().update_bucket(
             bucket_id,
-            event_type=data["type"],
-            client=data["client"],
-            hostname=data["hostname"],
-            data=data["data"],
+            event_type=data.get("type"),
+            client=data.get("client"),
+            hostname=data.get("hostname"),
+            data=data.get("data"),
         )
         return {}, 200
 
@@ -272,20 +326,23 @@ class BucketResource(Resource):
     @api.param("force", "Needs to be =1 to delete a bucket it non-testing mode")
     def delete(self, bucket_id):
         args = request.args
-        if not current_app.api.testing:
+        if not request_api().testing:
             if "force" not in args or args["force"] != "1":
                 msg = "Deleting buckets is only permitted if aw-server is running in testing mode or if ?force=1"
                 raise Unauthorized("DeleteBucketUnauthorized", msg)
 
-        current_app.api.delete_bucket(bucket_id)
+        request_api().delete_bucket(bucket_id)
         return {}, 200
 
 
 # EVENTS
 
 
-@api.route("/0/buckets/<string:bucket_id>/events")
-class EventsResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>/events",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>/events",
+)
+class EventsResource(DeviceResource):
     # For some reason this doesn't work with the JSONSchema variant
     # Marshalling doesn't work with JSONSchema events
     # @api.marshal_list_with(event)
@@ -302,9 +359,7 @@ class EventsResource(Resource):
         start = _parse_arg(args, "start", iso8601.parse_date)
         end = _parse_arg(args, "end", iso8601.parse_date)
 
-        events = current_app.api.get_events(
-            bucket_id, limit=limit, start=start, end=end
-        )
+        events = request_api().get_events(bucket_id, limit=limit, start=start, end=end)
         return events, 200
 
     # TODO: How to tell expect that it could be a list of events? Until then we can't use validate.
@@ -325,12 +380,15 @@ class EventsResource(Resource):
         else:
             raise BadRequest("Invalid POST data", "")
 
-        events = current_app.api.create_events(bucket_id, events)
+        events = request_api().create_events(bucket_id, events)
         return [e.to_json_dict() for e in events], 200
 
 
-@api.route("/0/buckets/<string:bucket_id>/events/count")
-class EventCountResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>/events/count",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>/events/count",
+)
+class EventCountResource(DeviceResource):
     @api.doc(model=fields.Integer)
     @api.param("start", "Start date of eventcount")
     @api.param("end", "End date of eventcount")
@@ -340,7 +398,7 @@ class EventCountResource(Resource):
         start = _parse_arg(args, "start", iso8601.parse_date)
         end = _parse_arg(args, "end", iso8601.parse_date)
 
-        events = current_app.api.get_eventcount(bucket_id, start=start, end=end)
+        events = request_api().get_eventcount(bucket_id, start=start, end=end)
         return events, 200
 
 
@@ -349,8 +407,11 @@ class EventCountResource(Resource):
 MAX_BULK_DELETE_IDS = 10_000
 
 
-@api.route("/0/buckets/<string:bucket_id>/events/delete")
-class EventsDeleteResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>/events/delete",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>/events/delete",
+)
+class EventsDeleteResource(DeviceResource):
     @copy_doc(ServerAPI.delete_events)
     def post(self, bucket_id: str):
         data = request.get_json(silent=True)
@@ -369,18 +430,21 @@ class EventsDeleteResource(Resource):
                 f"Too many ids in bulk delete request: {len(ids)} "
                 f"(max {MAX_BULK_DELETE_IDS})"
             )
-        return current_app.api.delete_events(bucket_id, ids), 200
+        return request_api().delete_events(bucket_id, ids), 200
 
 
-@api.route("/0/buckets/<string:bucket_id>/events/<int:event_id>")
-class EventResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>/events/<int:event_id>",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>/events/<int:event_id>",
+)
+class EventResource(DeviceResource):
     @api.doc(model=event)
     @copy_doc(ServerAPI.get_event)
     def get(self, bucket_id: str, event_id: int):
         logger.debug(
             f"Received get request for event with id '{event_id}' in bucket '{bucket_id}'"
         )
-        event = current_app.api.get_event(bucket_id, event_id)
+        event = request_api().get_event(bucket_id, event_id)
         if event:
             return event, 200
         else:
@@ -393,12 +457,15 @@ class EventResource(Resource):
                 event_id, bucket_id
             )
         )
-        success = current_app.api.delete_event(bucket_id, event_id)
+        success = request_api().delete_event(bucket_id, event_id)
         return {"success": success}, 200
 
 
-@api.route("/0/buckets/<string:bucket_id>/heartbeat")
-class HeartbeatResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>/heartbeat",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>/heartbeat",
+)
+class HeartbeatResource(DeviceResource):
     # Class-level lock shared across all instances.
     # Flask-RESTX creates a new Resource instance per request, so an
     # instance-level lock would provide no mutual exclusion.
@@ -429,7 +496,7 @@ class HeartbeatResource(Resource):
             )
             return {"message": "Server busy, try again later"}, 503
         try:
-            event = current_app.api.heartbeat(bucket_id, heartbeat, pulsetime)
+            event = request_api().heartbeat(bucket_id, heartbeat, pulsetime)
         finally:
             self.lock.release()
         return event.to_json_dict(), 200
@@ -438,8 +505,8 @@ class HeartbeatResource(Resource):
 # QUERY
 
 
-@api.route("/0/query/")
-class QueryResource(Resource):
+@api.route("/0/query/", "/0/devices/<string:device_id>/query")
+class QueryResource(DeviceResource):
     # TODO Docs
     @api.expect(query, validate=True)
     @api.param("name", "Name of the query")
@@ -457,7 +524,7 @@ class QueryResource(Resource):
         if query.get("cache") is False:
             cache = False
         try:
-            result = current_app.api.query2(
+            result = request_api().query2(
                 name, query["query"], query["timeperiods"], cache
             )
             return jsonify(result)
@@ -469,14 +536,15 @@ class QueryResource(Resource):
 # EXPORT AND IMPORT
 
 
-@api.route("/0/export")
-class ExportAllResource(Resource):
+@api.route("/0/export", "/0/devices/<string:device_id>/export")
+class ExportAllResource(DeviceResource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_all)
     def get(self):
-        buckets_export = current_app.api.export_all()
+        buckets_export = request_api().export_all()
         payload = {"buckets": buckets_export}
         response = make_response(json.dumps(payload))
+        response.mimetype = "application/json"
         filename = "aw-buckets-export.json"
         response.headers["Content-Disposition"] = "attachment; filename={}".format(
             filename
@@ -485,14 +553,18 @@ class ExportAllResource(Resource):
 
 
 # TODO: Perhaps we don't need this, could be done with a query argument to /0/export instead
-@api.route("/0/buckets/<string:bucket_id>/export")
-class BucketExportResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>/export",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>/export",
+)
+class BucketExportResource(DeviceResource):
     @api.doc(model=buckets_export)
     @copy_doc(ServerAPI.export_bucket)
     def get(self, bucket_id):
-        bucket_export = current_app.api.export_bucket(bucket_id)
+        bucket_export = request_api().export_bucket(bucket_id)
         payload = {"buckets": {bucket_export["id"]: bucket_export}}
         response = make_response(json.dumps(payload))
+        response.mimetype = "application/json"
         filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
         response.headers["Content-Disposition"] = "attachment; filename={}".format(
             filename
@@ -500,8 +572,11 @@ class BucketExportResource(Resource):
         return response
 
 
-@api.route("/0/buckets/<string:bucket_id>/export/csv")
-class BucketExportCsvResource(Resource):
+@api.route(
+    "/0/buckets/<string:bucket_id>/export/csv",
+    "/0/devices/<string:device_id>/buckets/<string:bucket_id>/export/csv",
+)
+class BucketExportCsvResource(DeviceResource):
     @api.param("limit", "the maximum number of events to export")
     @api.param("start", "Start date of events")
     @api.param("end", "End date of events")
@@ -514,7 +589,7 @@ class BucketExportCsvResource(Resource):
             end = iso8601.parse_date(args["end"]) if "end" in args else None
         except (ValueError, iso8601.ParseError) as e:
             raise BadRequest("InvalidParameter", str(e))
-        rows = current_app.api.export_bucket_csv(
+        rows = request_api().export_bucket_csv(
             bucket_id, limit=limit, start=start, end=end
         )
         response = Response(stream_with_context(rows), mimetype="text/csv")
@@ -548,11 +623,11 @@ class ImportAllResource(Resource):
                                 f"Bucket '{key}' appears in more than one uploaded file."
                             )
                         buckets[key] = bucket
-                current_app.api.import_all(buckets)
+                request_api().import_all(buckets)
             # Normal import from body
             else:
                 buckets = request.get_json()["buckets"]
-                current_app.api.import_all(buckets)
+                request_api().import_all(buckets)
         except ImportRollbackError as e:
             # The import failed *and* rollback could not remove some created
             # buckets: they are still stored, so a retry would be rejected as a
@@ -576,7 +651,7 @@ class ImportAllResource(Resource):
 class LogResource(Resource):
     @copy_doc(ServerAPI.get_log)
     def get(self):
-        return current_app.api.get_log(), 200
+        return request_api().get_log(), 200
 
 
 # SETTINGS
@@ -586,11 +661,11 @@ class LogResource(Resource):
 @api.route("/0/settings/<string:key>")
 class SettingsResource(Resource):
     def get(self, key: str):
-        data = current_app.api.get_setting(key)
+        data = request_api().get_setting(key)
         return jsonify(data)
 
     def post(self, key: str):
         if not key:
             raise BadRequest("MissingParameter", "Missing required parameter key")
-        data = current_app.api.set_setting(key, request.get_json())
+        data = request_api().set_setting(key, request.get_json())
         return data

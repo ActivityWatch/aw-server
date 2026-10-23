@@ -1,3 +1,4 @@
+import copy
 import functools
 import json
 import logging
@@ -16,6 +17,8 @@ from typing import (
 from uuid import uuid4
 
 import iso8601
+import jsonschema
+from aw_core import schema
 from aw_core.dirs import get_data_dir
 from aw_core.log import get_log_file_path
 from aw_core.models import Event
@@ -25,7 +28,7 @@ from aw_transform import heartbeat_merge
 
 from .__about__ import __version__
 from .csv_export import events_to_csv
-from .exceptions import NotFound
+from .exceptions import BadRequest, NotFound
 from .profile import profile_from_env
 from .query_cache import QueryCache, event_range
 from .settings import Settings
@@ -57,8 +60,10 @@ def get_device_id() -> str:
 def check_bucket_exists(f):
     @functools.wraps(f)
     def g(self, bucket_id, *args, **kwargs):
-        if bucket_id not in self.db.buckets():
+        if not self.db.has_bucket(bucket_id):
             raise NotFound("NoSuchBucket", f"There's no bucket named {bucket_id}")
+        # Aliases and canonical names must share heartbeat state as well as SQL rows.
+        bucket_id = self.db[bucket_id].metadata()["id"]
         return f(self, bucket_id, *args, **kwargs)
 
     return g
@@ -87,12 +92,28 @@ class ServerAPI:
         # Every write below must invalidate the cache (see query_cache.py).
         self.query_cache: Optional[QueryCache] = QueryCache() if query_cache else None
         self._write_lock = threading.RLock()
+        self._device_scope: Optional[str] = None
+
+    def for_device(self, device_id: str) -> "ServerAPI":
+        """Immutable request view; never switch the shared API's datastore."""
+        if not device_id:
+            raise BadRequest("InvalidDevice", "Device scope must not be empty")
+        scope = "local" if device_id in ("local", get_device_id()) else device_id
+        scoped = copy.copy(self)
+        scoped.db = self.db.for_device(scope)
+        scoped._device_scope = scope
+        return scoped
+
+    def _heartbeat_key(self, bucket_id: str):
+        metadata = self.db[bucket_id].metadata()
+        return (metadata.get("device_id", "local"), metadata["id"])
 
     def _invalidate(self, ranges) -> None:
         if self.query_cache:
             self.query_cache.invalidate(ranges)
 
     def _invalidate_all(self) -> None:
+        self.last_event.clear()
         if self.query_cache:
             self.query_cache.clear()
 
@@ -108,8 +129,104 @@ class ServerAPI:
         return payload
 
     def get_devices(self) -> List[Dict[str, Any]]:
-        """Get list of known devices (currently only the local device)"""
-        return [{"id": get_device_id(), "hostname": gethostname()}]
+        """Local device plus peers with persisted bucket metadata."""
+        groups = self.device_buckets()["devices"]
+        return [
+            {
+                "id": device,
+                "hostname": gethostname()
+                if device == get_device_id()
+                else min(
+                    (b["hostname"] for b in group["buckets"].values()), default=""
+                ),
+            }
+            for device, group in sorted(groups.items())
+        ]
+
+    def device_buckets(self, export: bool = False) -> Dict[str, Any]:
+        """Explicit grouping; never encode identity into a legacy bucket ID."""
+        public_local = get_device_id()
+        groups: Dict[str, Any] = {public_local: {"buckets": {}}}
+        storage = self.db.storage_strategy
+        if hasattr(storage, "device_buckets"):
+            grouped = storage.device_buckets()
+        else:
+            # Non-device-aware backends can still expose their local catalogue.
+            grouped = {"local": self.db.buckets()}
+        for device, buckets in grouped.items():
+            public = public_local if device == "local" else device
+            target = groups.setdefault(public, {"buckets": {}})["buckets"]
+            scoped = (
+                self.for_device(device) if hasattr(storage, "device_buckets") else self
+            )
+            for bid, metadata in buckets.items():
+                if bid in target:
+                    raise ValueError(
+                        f"Ambiguous bucket '{bid}'; normalized device collision"
+                    )
+                bucket = scoped.export_bucket(bid) if export else dict(metadata)
+                bucket["device_id"] = public
+                target[bid] = bucket
+        return {"devices": groups}
+
+    @_serialized
+    def import_devices(self, envelope: Any) -> None:
+        """Preflight all identities and event payloads before any writes.
+
+        Existing buckets are rejected, matching Python's legacy import policy.
+        Each group uses its existing rollback contract; earlier successful groups
+        may remain on a runtime failure. This is not an atomic multi-device import.
+        """
+        if not isinstance(envelope, dict) or not isinstance(
+            envelope.get("devices"), dict
+        ):
+            raise ValueError("Expected an object with a devices map")
+        prepared = []
+        for device, group in envelope["devices"].items():
+            if not isinstance(device, str) or not device or device == "local":
+                raise ValueError(
+                    "Imported device must be a nonempty source identity, not local"
+                )
+            if not isinstance(group, dict) or not isinstance(
+                group.get("buckets"), dict
+            ):
+                raise ValueError("Each device must contain a buckets map")
+            scoped = self.for_device(device)
+            buckets = copy.deepcopy(group["buckets"])
+            for bid, bucket in buckets.items():
+                if (
+                    not isinstance(bucket, dict)
+                    or bucket.get("id") != bid
+                    or bucket.get("device_id") != device
+                ):
+                    raise ValueError(
+                        "Bucket key and device metadata must match their enclosing identity"
+                    )
+                for field in ("type", "client", "hostname", "created"):
+                    if not isinstance(bucket.get(field), str):
+                        raise ValueError(f"Invalid bucket field {field}")
+                if bucket["hostname"] == "!local" and scoped._device_scope != "local":
+                    raise ValueError("Peer hostname must not be !local")
+                iso8601.parse_date(bucket["created"])
+                if bucket.get("data") is not None and not isinstance(
+                    bucket["data"], dict
+                ):
+                    raise ValueError("Bucket data must be an object")
+                if not isinstance(bucket.get("events"), list):
+                    raise ValueError("Bucket events must be a list")
+                for event in bucket["events"]:
+                    try:
+                        jsonschema.validate(event, schema.get_json_schema("event"))
+                    except jsonschema.ValidationError as e:
+                        raise ValueError(f"Invalid event: {e.message}") from e
+                    Event(**event)
+                if scoped.db.has_bucket(bid):
+                    raise ValueError(
+                        f"Bucket '{bid}' already exists in device '{device}'"
+                    )
+            prepared.append((scoped, buckets))
+        for scoped, buckets in prepared:
+            scoped.import_all(buckets)
 
     def get_buckets(self) -> Dict[str, Dict]:
         """Get dict {bucket_name: Bucket} of all buckets"""
@@ -176,6 +293,7 @@ class ServerAPI:
                 type=bucket_data["type"],
                 client=bucket_data["client"],
                 hostname=bucket_data["hostname"],
+                data=bucket_data.get("data"),
                 created=(
                     bucket_data["created"]
                     if isinstance(bucket_data["created"], datetime)
@@ -273,7 +391,36 @@ class ServerAPI:
         """
         if created is None:
             created = datetime.now()
-        if bucket_id in self.db.buckets():
+        # Legacy POST is local-only. Unsupported legacy backends retain their
+        # existing behavior; explicit scoped requests fail closed in for_device.
+        if self._device_scope is None:
+            try:
+                local = self.for_device("local")
+            except NotImplementedError:
+                local = None
+            if local is not None:
+                if self.db.has_bucket(bucket_id):
+                    global_metadata = self.db[bucket_id].metadata()
+                    local_metadata = (
+                        local.db[bucket_id].metadata()
+                        if local.db.has_bucket(bucket_id)
+                        else None
+                    )
+                    if local_metadata is None or (
+                        global_metadata.get("device_id"),
+                        global_metadata["id"],
+                    ) != (local_metadata.get("device_id"), local_metadata["id"]):
+                        raise ValueError(
+                            f"Ambiguous bucket '{bucket_id}'; local POST and global writes disagree"
+                        )
+                return local.create_bucket(
+                    bucket_id, event_type, client, hostname, created, data
+                )
+        if hostname == "!local" and self._device_scope not in (None, "local"):
+            raise BadRequest(
+                "InvalidHostname", "!local is only valid for the local device"
+            )
+        if self.db.has_bucket(bucket_id):
             return False
         if hostname == "!local":
             info = self.get_info()
@@ -308,7 +455,7 @@ class ServerAPI:
         try:
             self.db.update_bucket(
                 bucket_id,
-                type=event_type,
+                type_id=event_type,
                 client=client,
                 hostname=hostname,
                 data=data,
@@ -326,7 +473,6 @@ class ServerAPI:
             self.db.delete_bucket(bucket_id)
         finally:
             self._invalidate_all()
-            self.last_event.pop(bucket_id, None)
         logger.debug(f"Deleted bucket '{bucket_id}'")
         return None
 
@@ -378,7 +524,7 @@ class ServerAPI:
                     affected.append(event_range(old))
         # The cached last heartbeat may no longer be the bucket's last event,
         # and a heartbeat merging into it would replace the wrong one.
-        self.last_event.pop(bucket_id, None)
+        self.last_event.pop(self._heartbeat_key(bucket_id), None)
         try:
             if len(events) == 1:
                 # Pass as single Event so Bucket.insert uses insert_one (returns Event with ID)
@@ -415,7 +561,7 @@ class ServerAPI:
                 # subsequent heartbeat would merge into the deleted event and
                 # replace_last() would overwrite whatever is now the stored
                 # last event. Drop the cache so it is re-read from storage.
-                self.last_event.pop(bucket_id, None)
+                self.last_event.pop(self._heartbeat_key(bucket_id), None)
 
     @check_bucket_exists
     @_serialized
@@ -440,7 +586,7 @@ class ServerAPI:
                 self._invalidate(ranges)
                 # Same reason as delete_event: a deleted event may be the
                 # cached heartbeat last_event.
-                self.last_event.pop(bucket_id, None)
+                self.last_event.pop(self._heartbeat_key(bucket_id), None)
 
     @check_bucket_exists
     @_serialized
@@ -485,13 +631,14 @@ class ServerAPI:
         #           That way we could double check that the event has been applied
         #           and if it hasn't we simply replace it with the updated counterpart.
 
+        heartbeat_key = self._heartbeat_key(bucket_id)
         last_event = None
-        if bucket_id not in self.last_event:
+        if heartbeat_key not in self.last_event:
             last_events = self.db[bucket_id].get(limit=1)
             if len(last_events) > 0:
                 last_event = last_events[0]
         else:
-            last_event = self.last_event[bucket_id]
+            last_event = self.last_event[heartbeat_key]
 
         if last_event:
             if last_event.data == heartbeat.data:
@@ -510,7 +657,7 @@ class ServerAPI:
                         # out-of-order heartbeat), so invalidate its range too.
                         stored = self.db[bucket_id].get(limit=1)
                         affected += [event_range(e) for e in stored]
-                    self.last_event[bucket_id] = merged
+                    self.last_event[heartbeat_key] = merged
                     try:
                         # Replace the event we merged into by id. replace_last()
                         # targets whichever event sorts last by timestamp, which
@@ -547,7 +694,7 @@ class ServerAPI:
             self.db[bucket_id].insert(heartbeat)
         finally:
             self._invalidate([event_range(heartbeat)])
-        self.last_event[bucket_id] = heartbeat
+        self.last_event[heartbeat_key] = heartbeat
         return heartbeat
 
     def query2(self, name, query, timeperiods, cache: bool = True):
@@ -577,7 +724,8 @@ class ServerAPI:
             if qc is None or not qc.cacheable(period):
                 result.append(query2.query(name, query, starttime, endtime, self.db))
                 continue
-            key = QueryCache.key(query, period)
+            # JSON tuple encoding is collision-safe even for delimiter-bearing IDs.
+            key = QueryCache.key(json.dumps([self._device_scope, query]), period)
             cached = qc.get(key)
             if cached is not None:
                 result.append(cached)

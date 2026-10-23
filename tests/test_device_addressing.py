@@ -58,7 +58,8 @@ def test_scoped_crud_uuid_alias_and_legacy_conflict(device_app):
     ] == {"label": "local"}
     for path in ("/buckets/", "/buckets/window", "/buckets/window/events", "/export"):
         assert c.get("/api/0" + path).status_code == 409
-    assert c.delete("/api/0/devices/local/buckets/window").status_code == 200
+    deleted = c.delete("/api/0/devices/local/buckets/window")
+    assert deleted.status_code == 200
     assert c.get("/api/0/devices/peer/buckets/window/events/count").json == 1
 
 
@@ -274,6 +275,31 @@ def test_import_preserves_metadata_and_rejects_alias_split(device_app):
     assert labels == {"source", "extra"}
 
 
+def test_import_skips_duplicate_new_events_in_one_batch(device_app):
+    c = device_app.test_client()
+    bucket = {
+        "id": "history",
+        "device_id": "source",
+        "client": "c",
+        "type": "t",
+        "hostname": "host",
+        "created": "2024-01-01T00:00:00Z",
+        "events": [event("source")],
+    }
+    envelope = {"devices": {"source": {"buckets": {"history": bucket}}}}
+    assert c.post("/api/0/devices/import", json=envelope).status_code == 200
+    # Existing-bucket merge must skip identical new events inside one batch,
+    # not only events already stored from a previous import.
+    bucket["events"] = [event("dup", 1), event("dup", 1)]
+    assert c.post("/api/0/devices/import", json=envelope).status_code == 200
+    assert c.get("/api/0/devices/source/buckets/history/events/count").json == 2
+    labels = [
+        e["data"]["label"]
+        for e in c.get("/api/0/devices/source/buckets/history/events").json
+    ]
+    assert sorted(labels) == ["dup", "source"]
+
+
 def test_scoped_heartbeat_invalidates_after_insert_and_delete(device_app):
     c = device_app.test_client()
     assert create(c, "local").status_code == 200
@@ -284,7 +310,8 @@ def test_scoped_heartbeat_invalidates_after_insert_and_delete(device_app):
         c.post(base + "/heartbeat?pulsetime=10", json=event("a", 4)).status_code == 200
     )
     assert c.get(base + "/events/count").json == 3
-    assert c.delete(base + f"/events/{inserted}").status_code == 200
+    deleted = c.delete(base + f"/events/{inserted}")
+    assert deleted.status_code == 200
     assert c.get(base + "/events/count").json == 2
 
 

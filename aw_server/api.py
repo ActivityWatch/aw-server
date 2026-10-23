@@ -262,11 +262,12 @@ class ServerAPI:
             self._import_event_identity(event)
             for event in self.db[bucket_id].get(-1, start, end)
         }
-        new_events = [
-            event
-            for event in incoming
-            if self._import_event_identity(event) not in existing
-        ]
+        new_events = []
+        for event in incoming:
+            identity = self._import_event_identity(event)
+            if identity not in existing:
+                existing.add(identity)
+                new_events.append(event)
         if new_events:
             self.create_events(bucket_id, new_events)
 

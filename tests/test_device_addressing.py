@@ -603,3 +603,58 @@ def test_archive_export_reimport_retains_exact_event_and_owner(device_app, times
     # A repeated archive does not duplicate the newly restored event.
     assert client.post("/api/0/devices/import", json=envelope).status_code == 200
     assert client.get(base + "/events/count").json == 1
+
+
+def test_three_same_named_devices_survive_http_reload_and_scoped_deletion(
+    device_app, monkeypatch
+):
+    client = device_app.test_client()
+    devices = ("local", "peer-one", "peer-two")
+    for device in devices:
+        assert create(client, device).status_code == 200
+        base = f"/api/0/devices/{device}/buckets/window"
+        assert client.post(base + "/events", json=event(device)).status_code == 200
+    device_app.api.db.storage_strategy.commit()
+    path = device_app.api.db.storage_strategy.conn.execute(
+        "PRAGMA database_list"
+    ).fetchone()[2]
+    reopened = AWFlask(
+        "127.0.0.1",
+        testing=True,
+        cors_origins=[],
+        storage_method=partial(SqliteStorage, filepath=path),
+    )
+    try:
+        other = reopened.test_client()
+        for device in devices:
+            base = f"/api/0/devices/{device}/buckets/window"
+            assert other.get(base + "/events/count").json == 1
+            assert other.get(base + "/events").json[0]["data"] == {"label": device}
+            result = other.post(
+                f"/api/0/devices/{device}/query",
+                json={
+                    "query": ['RETURN = query_bucket("window");'],
+                    "timeperiods": ["2024-01-01T00:00:00Z/2024-01-02T00:00:00Z"],
+                },
+            )
+            assert result.status_code == 200
+            assert result.json[0][0]["data"] == {"label": device}
+        assert other.get("/api/0/export").status_code == 409
+        assert other.get("/api/0/buckets/").status_code == 409
+        exported = other.get("/api/0/devices/export")
+        assert exported.status_code == 200
+        assert set(exported.json["devices"]) == {"server-uuid", "peer-one", "peer-two"}
+        assert other.delete("/api/0/devices/peer-one/buckets/window").status_code == 200
+        assert other.get("/api/0/devices/peer-one/buckets/window").status_code == 404
+        assert client.get("/api/0/devices/peer-one/buckets/window").status_code == 404
+        for device in ("local", "peer-two"):
+            assert (
+                other.get(f"/api/0/devices/{device}/buckets/window/events/count").json
+                == 1
+            )
+            assert (
+                client.get(f"/api/0/devices/{device}/buckets/window/events/count").json
+                == 1
+            )
+    finally:
+        reopened.api.db.storage_strategy.conn.close()

@@ -93,6 +93,11 @@ def start_server(tmp_path):
             command = [
                 sys.executable,
                 "-c",
+                # HTTPServer.server_bind reverse-resolves the bind address with
+                # socket.getfqdn before listening; that lookup stalls past the
+                # readiness deadline on macOS CI runners. Identity contracts do
+                # not depend on the WSGI SERVER_NAME, so skip the DNS round-trip.
+                "import socket; socket.getfqdn = lambda name='': name; "
                 "from functools import partial; "
                 "from aw_datastore.storages import SqliteStorage; "
                 "from aw_server.server import AWFlask; "

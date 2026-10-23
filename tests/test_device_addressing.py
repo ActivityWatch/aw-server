@@ -591,7 +591,8 @@ def test_archive_export_reimport_retains_exact_event_and_owner(device_app, times
     assert len(rows) == 1
     assert rows[0]["timestamp"] == timestamp
     assert rows[0]["duration"] == "0.000003000"
-    assert client.delete(base).status_code == 200
+    deleted = client.delete(base)
+    assert deleted.status_code == 200
     response = client.post("/api/0/devices/import", json=envelope)
     assert response.status_code == 200
     events = client.get(base + "/events").json
@@ -644,7 +645,8 @@ def test_three_same_named_devices_survive_http_reload_and_scoped_deletion(
         exported = other.get("/api/0/devices/export")
         assert exported.status_code == 200
         assert set(exported.json["devices"]) == {"server-uuid", "peer-one", "peer-two"}
-        assert other.delete("/api/0/devices/peer-one/buckets/window").status_code == 200
+        deleted = other.delete("/api/0/devices/peer-one/buckets/window")
+        assert deleted.status_code == 200
         assert other.get("/api/0/devices/peer-one/buckets/window").status_code == 404
         assert client.get("/api/0/devices/peer-one/buckets/window").status_code == 404
         for device in ("local", "peer-two"):

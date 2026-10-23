@@ -255,11 +255,23 @@ def test_import_preserves_metadata_and_rejects_alias_split(device_app):
     envelope = {"devices": {"source": {"buckets": {"history_host": bucket}}}}
     assert c.post("/api/0/devices/import", json=envelope).status_code == 200
     assert c.get("/api/0/devices/source/buckets/history").json["data"] == bucket["data"]
-    # A later import alias cannot create an empty canonical row over history.
-    bucket["id"] = "history"
-    envelope["devices"]["source"]["buckets"] = {"history": bucket}
-    assert c.post("/api/0/devices/import", json=envelope).status_code == 400
-    assert c.get("/api/0/devices/source/buckets/history/events/count").json == 1
+    # Re-import is idempotent. An alias of the stored name must merge into the
+    # existing row, never mint an empty canonical sibling.
+    assert c.post("/api/0/devices/import", json=envelope).status_code == 200
+    alias = dict(bucket)
+    alias["id"] = "history"
+    alias["events"] = [event("source"), event("extra", 1)]
+    envelope["devices"]["source"]["buckets"] = {"history": alias}
+    assert c.post("/api/0/devices/import", json=envelope).status_code == 200
+    listed = c.get("/api/0/devices/source/buckets/").json
+    assert set(listed) == {"history_host"}
+    assert "history" not in listed
+    assert c.get("/api/0/devices/source/buckets/history/events/count").json == 2
+    labels = {
+        e["data"]["label"]
+        for e in c.get("/api/0/devices/source/buckets/history/events").json
+    }
+    assert labels == {"source", "extra"}
 
 
 def test_scoped_heartbeat_invalidates_after_insert_and_delete(device_app):
@@ -432,6 +444,44 @@ def test_export_keeps_one_snapshot_across_bucket_iterators(device_app):
             exported = json.load(staged)
     assert exported["devices"]["server-uuid"]["buckets"]["b"]["events"] == []
     assert api.for_device("local").get_eventcount("b") == 1
+
+
+def test_grouped_export_does_not_block_writes(device_app):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from unittest.mock import patch
+
+    from aw_datastore.storages.sqlite import SqliteStorage
+
+    c = device_app.test_client()
+    assert create(c, "local").status_code == 200
+    entered = threading.Event()
+    release = threading.Event()
+    original = SqliteStorage.iter_events
+
+    def paused(self, bucket_id, **kwargs):
+        entered.set()
+        assert release.wait(5)
+        yield from original(self, bucket_id, **kwargs)
+
+    with patch.object(SqliteStorage, "iter_events", paused):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            export = pool.submit(
+                lambda: device_app.test_client().get("/api/0/devices/export")
+            )
+            assert entered.wait(5)
+            write = pool.submit(
+                lambda: create(device_app.test_client(), "local", "during")
+            )
+            assert write.result(timeout=5).status_code == 200
+            release.set()
+            exported = export.result(timeout=5)
+    assert exported.status_code == 200
+    assert "during" not in exported.json["devices"]["server-uuid"]["buckets"]
+    assert (
+        device_app.test_client().get("/api/0/devices/local/buckets/during").status_code
+        == 200
+    )
 
 
 def test_sqlite_device_requests_use_request_thread_connections(device_app):

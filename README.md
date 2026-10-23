@@ -87,9 +87,12 @@ latest-hostname registry. `GET /api/0/devices/buckets` groups metadata explicitl
 `POST /api/0/devices/import` accepts that envelope, rejects empty or `local`
 source identities, and validates enclosing ownership, bucket keys and event
 payloads before writes. Local exported ownership becomes the source UUID, so
-history stays peer-owned at another server. Python's existing reject-on-existing
-import policy remains (unlike Rust's deduplicating import). Individual groups
-use legacy rollback; a runtime failure can leave earlier successful groups.
+history stays peer-owned at another server. Existing same-device buckets merge
+events and skip duplicates (timestamp, duration, data), matching Rust; an
+alias of stored history merges into that row instead of creating a sibling.
+Legacy `/import` still rejects existing exact names. Individual groups use
+legacy rollback for buckets this call created; a runtime failure can leave
+earlier successful groups.
 Metadata `data` is preserved. Grouped export streams SQLite rows from one read
 snapshot into a private temporary file before responding; failures cannot send
 partial JSON with a success status. The response owns the staged file, not a
@@ -106,7 +109,7 @@ migration/same-name acceptance still gate removal of Rust's global name guards.
 SQLite HTTP requests on worker threads use their own datastore/connection,
 closed at request teardown; they share API write serialization, query cache and
 pair-keyed heartbeat state, never a mutable scope. This preserves SQLite's
-thread ownership check. Current export staging holds the API write lock while
-building the snapshot, so large exports delay writes. A dedicated read-only
-export connection and unbounded timestamp/archive fidelity remain acceptance
-work; event streaming retains the backend's existing time-range semantics.
+thread ownership check. Grouped export flushes under the write lock, then
+stages from a dedicated read-only snapshot connection so later API writes are
+not blocked. Event streaming retains the backend's existing time-range
+semantics; unbounded archive/timestamp fidelity remains acceptance work.

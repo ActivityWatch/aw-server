@@ -169,27 +169,32 @@ class ServerAPI:
                 target[bid] = bucket
         return {"devices": groups}
 
-    @_serialized
     def stage_device_export(self):
         """Stream one SQLite snapshot into a private file before HTTP success.
 
         The response owns the returned file. No database cursor or transaction
         survives into response iteration, which may run on a different thread.
+        Staging uses a dedicated read-only connection so API writes are not
+        blocked for the duration of the snapshot.
         """
         storage = self.db.storage_strategy
-        if not hasattr(storage, "device_buckets"):
+        if not hasattr(storage, "snapshot"):
             raise NotImplementedError("Snapshot device export requires SQLite")
-        conn = storage.conn
-        # Flush lazy writes before beginning an independent read snapshot.
-        storage.commit()
         staged = tempfile.TemporaryFile(mode="w+b")
+        snap = None
 
         def write(value):
             staged.write(value.encode("utf-8"))
 
         try:
-            conn.execute("BEGIN")
-            groups = self.device_buckets()["devices"]
+            with self._write_lock:
+                snap = storage.snapshot()
+            snap_db = copy.copy(self.db)
+            snap_db.storage_strategy = snap
+            snap_db.bucket_instances = {}
+            snap_api = copy.copy(self)
+            snap_api.db = snap_db
+            groups = snap_api.device_buckets()["devices"]
             write('{"devices":{')
             first_device = True
             for device, group in groups.items():
@@ -198,7 +203,7 @@ class ServerAPI:
                 first_device = False
                 write(json.dumps(device) + ':{"buckets":{')
                 first_bucket = True
-                scoped = self.for_device(device)
+                scoped = snap_api.for_device(device)
                 for bid, metadata in group["buckets"].items():
                     if not first_bucket:
                         write(",")
@@ -224,21 +229,55 @@ class ServerAPI:
                     write("]}")
                 write("}}")
             write("}}")
-            conn.commit()
+            snap.conn.commit()
             staged.seek(0)
             return staged
         except BaseException:
-            conn.rollback()
+            if snap is not None:
+                snap.conn.rollback()
             staged.close()
             raise
+        finally:
+            if snap is not None:
+                snap.conn.close()
+
+    def _import_event_identity(self, event: Event):
+        # Match Rust's import identity: start, duration, canonical data.
+        return (
+            event.timestamp,
+            event.duration,
+            json.dumps(event.data, sort_keys=True),
+        )
+
+    def _merge_imported_events(self, bucket_id: str, events: List[Event]) -> None:
+        incoming = [Event(**e) if isinstance(e, dict) else e for e in events]
+        for event in incoming:
+            if "id" in event:
+                del event["id"]
+        if not incoming:
+            return
+        start = min(event.timestamp for event in incoming)
+        end = max(event.timestamp + event.duration for event in incoming)
+        existing = {
+            self._import_event_identity(event)
+            for event in self.db[bucket_id].get(-1, start, end)
+        }
+        new_events = [
+            event
+            for event in incoming
+            if self._import_event_identity(event) not in existing
+        ]
+        if new_events:
+            self.create_events(bucket_id, new_events)
 
     @_serialized
     def import_devices(self, envelope: Any) -> None:
         """Preflight all identities and event payloads before any writes.
 
-        Existing buckets are rejected, matching Python's legacy import policy.
-        Each group uses its existing rollback contract; earlier successful groups
-        may remain on a runtime failure. This is not an atomic multi-device import.
+        Existing same-device buckets merge events and skip duplicates, matching
+        Rust device import. Each group uses its existing rollback contract for
+        buckets created by this call; earlier successful groups may remain on a
+        runtime failure. This is not an atomic multi-device import.
         """
         if not isinstance(envelope, dict) or not isinstance(
             envelope.get("devices"), dict
@@ -283,13 +322,9 @@ class ServerAPI:
                     except jsonschema.ValidationError as e:
                         raise ValueError(f"Invalid event: {e.message}") from e
                     Event(**event)
-                if scoped.db.has_bucket(bid):
-                    raise ValueError(
-                        f"Bucket '{bid}' already exists in device '{device}'"
-                    )
             prepared.append((scoped, buckets))
         for scoped, buckets in prepared:
-            scoped.import_all(buckets)
+            scoped.import_all(buckets, merge=True)
 
     def get_buckets(self) -> Dict[str, Dict]:
         """Get dict {bucket_name: Bucket} of all buckets"""
@@ -341,9 +376,14 @@ class ServerAPI:
         return exported_buckets
 
     @_serialized
-    def import_bucket(self, bucket_data: Any):
+    def import_bucket(self, bucket_data: Any, merge: bool = False):
         bucket_id = bucket_data["id"]
         logger.info(f"Importing bucket {bucket_id}")
+
+        if merge and self.db.has_bucket(bucket_id):
+            canonical = self.db[bucket_id].metadata()["id"]
+            self._merge_imported_events(canonical, bucket_data.get("events") or [])
+            return
 
         if bucket_id in self.db.buckets():
             raise ValueError(
@@ -378,7 +418,7 @@ class ServerAPI:
         )
 
     @_serialized
-    def import_all(self, buckets: Dict[str, Any]):
+    def import_all(self, buckets: Dict[str, Any], merge: bool = False):
         if not isinstance(buckets, dict):
             raise ValueError(
                 "'buckets' must be an object mapping bucket IDs to buckets"
@@ -389,27 +429,29 @@ class ServerAPI:
         # import_all holds the write lock shared by bucket and event writes.
         bucket_ids = [bucket["id"] for bucket in buckets.values()]
         seen: Set[str] = set()
+        existed_before = {}
         for bucket_id in bucket_ids:
             if bucket_id in seen:
                 raise ValueError(
                     f"Bucket '{bucket_id}' appears more than once in the import."
                 )
             seen.add(bucket_id)
-            if bucket_id in self.db.buckets():
+            existed_before[bucket_id] = self.db.has_bucket(bucket_id)
+            if not merge and bucket_id in self.db.buckets():
                 raise ValueError(
                     f"Bucket '{bucket_id}' already exists. Delete it first or rename the bucket before importing."
                 )
         try:
             for bucket in buckets.values():
-                self.import_bucket(bucket)
+                self.import_bucket(bucket, merge=merge)
         except Exception as import_error:
-            # None of these buckets existed before (checked above, under the
-            # write lock), so any that exist now were created by this import,
-            # including one whose events failed after the bucket was created.
+            # Delete only buckets this call created. A merge into pre-existing
+            # history, including an alias of a stored name, must not roll back
+            # that row. A failed create can still leave an empty bucket.
             existing = self.db.buckets()
             failed_rollbacks = []
             for bucket_id in seen:
-                if bucket_id not in existing:
+                if existed_before[bucket_id] or bucket_id not in existing:
                     continue
                 try:
                     self.delete_bucket(bucket_id)

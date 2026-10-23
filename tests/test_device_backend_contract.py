@@ -240,7 +240,31 @@ def test_shared_same_name_three_devices_query_export_and_reader_refresh(
         assert server.request(
             "GET", f"/buckets/window_{device}_host/events"
         ) == server.request("GET", base + "/events")
-    for path in ("/buckets/window", "/buckets", "/export"):
+    # Alias writes must keep their resolved owner across nested API operations,
+    # not just reads. Identical heartbeat data must never cross device state.
+    for device in devices:
+        alias = f"/buckets/window_{device}_host"
+        status, rows = server.request("POST", alias + "/events", [event(device, 10)])
+        assert status == 200 and len(rows) == 1, rows
+        event_id = rows[0]["id"]
+        status, body = server.request("DELETE", alias + f"/events/{event_id}")
+        assert status == 200, body
+        assert server.request("GET", alias + "/events/count") == (200, 1)
+        for second in (2, 5):
+            heartbeat = event(device, second)
+            heartbeat["duration"] = 0
+            status, body = server.request(
+                "POST", alias + "/heartbeat?pulsetime=10", heartbeat
+            )
+            assert status == 200, body
+        status, rows = server.request("GET", alias + "/events")
+        assert status == 200 and len(rows) == 1, rows
+        assert rows[0]["data"] == {"owner": device}
+        assert rows[0]["duration"] == 5
+    # Python's catalogue has a canonical trailing slash. Python 3.9 urllib
+    # does not follow Flask's 308 redirect, unlike newer local interpreters.
+    catalogue = "/buckets/" if backend == "python" else "/buckets"
+    for path in ("/buckets/window", catalogue, "/export"):
         assert server.request("GET", path)[0] == 409, path
     assert server.request(
         "GET", "/devices/source-uuid/buckets/window/events"
@@ -312,6 +336,59 @@ def test_cross_backend_grouped_transfer(source_backend, target_backend, start_se
     assert rows[0]["duration"] == 1.234567
     assert ".123456" in rows[0]["timestamp"]
     assert target.request("GET", "/devices/local/buckets/archive")[0] == 404
+
+
+@pytest.mark.parametrize(
+    "source_backend,target_backend", [("python", "rust"), ("rust", "python")]
+)
+def test_cross_backend_same_names_roundtrip_without_cross_device_merge(
+    source_backend, target_backend, start_server
+):
+    if not os.environ.get("AW_RUST_CONTRACT_BINARY"):
+        pytest.skip("cross-backend transfer requires AW_RUST_CONTRACT_BINARY")
+    source = start_server(source_backend, "source-uuid")
+    target = start_server(target_backend, "target-uuid")
+    base = "/devices/local/buckets/window"
+    assert target.request("POST", base, metadata("target_host"))[0] == 200
+    assert target.request("POST", base + "/events", [event("target")])[0] == 200
+    for device in ("local", "peer", "third"):
+        scoped = f"/devices/{device}/buckets/window"
+        assert source.request("POST", scoped, metadata(f"{device}_host"))[0] == 200
+        assert source.request("POST", scoped + "/events", [event(device)])[0] == 200
+    status, archive = source.request("GET", "/devices/export")
+    assert status == 200, archive
+    for _ in range(2):
+        status, body = target.request("POST", "/devices/import", archive)
+        assert status == 200, body
+    for source_device, target_device in (
+        ("local", "source-uuid"),
+        ("peer", "peer"),
+        ("third", "third"),
+    ):
+        scoped = f"/devices/{target_device}/buckets/window"
+        status, rows = target.request("GET", scoped + "/events")
+        assert status == 200 and len(rows) == 1, rows
+        assert rows[0]["data"] == {"owner": source_device}
+        assert target.request("GET", scoped)[1]["device_id"] == target_device
+    status, rows = target.request("GET", base + "/events")
+    assert (
+        status == 200 and len(rows) == 1 and rows[0]["data"] == {"owner": "target"}
+    ), rows
+    assert target.request("GET", "/buckets/window")[0] == 409
+    # Re-exporting back does not duplicate the source's local UUID into a peer.
+    status, returned = target.request("GET", "/devices/export")
+    assert status == 200, returned
+    for _ in range(2):
+        status, body = source.request("POST", "/devices/import", returned)
+        assert status == 200, body
+    status, rows = source.request("GET", base + "/events")
+    assert (
+        status == 200 and len(rows) == 1 and rows[0]["data"] == {"owner": "local"}
+    ), rows
+    status, rows = source.request("GET", "/devices/target-uuid/buckets/window/events")
+    assert (
+        status == 200 and len(rows) == 1 and rows[0]["data"] == {"owner": "target"}
+    ), rows
 
 
 def test_shared_heartbeat_alias_state_and_local_ownership(backend, start_server):

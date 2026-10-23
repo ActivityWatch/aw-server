@@ -30,6 +30,23 @@ def test_info(flask_client):
     assert r.json["profile"] == "testing"
 
 
+def test_devices(flask_client):
+    r = flask_client.get("/api/0/devices")
+    assert r.status_code == 200
+    devices = r.json
+    assert isinstance(devices, list)
+    assert len(devices) == 1
+    device = devices[0]
+    assert "id" in device
+    assert "hostname" in device
+    # id is stable across calls
+    r2 = flask_client.get("/api/0/devices")
+    assert r2.json[0]["id"] == device["id"]
+    # id matches the server's own device_id
+    info = flask_client.get("/api/0/info").json
+    assert device["id"] == info["device_id"]
+
+
 def test_buckets(flask_client, bucket, benchmark):
     @benchmark
     def list_buckets():
@@ -215,10 +232,10 @@ def test_export_bucket_csv(flask_client, bucket):
     # Newest first, union of data keys, formula-looking values neutralized
     assert lines[0] == "id,timestamp,duration,app,count,flag,title"
     assert lines[1].endswith(
-        ",2026-10-06T12:00:02.123000+00:00,0.000000000,'=cmd,3,null,"
+        ",2026-10-06T12:00:02.123456+00:00,0.000000000,'=cmd,3,null,"
     )
     assert lines[2].endswith(
-        ',2026-10-06T12:00:00.123000+00:00,1.500000000,Firefox,,,"a, ""quoted"" title"'
+        ',2026-10-06T12:00:00.123456+00:00,1.500000000,Firefox,,,"a, ""quoted"" title"'
     )
     assert lines[3] == ""
 

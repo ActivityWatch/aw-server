@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 from urllib.error import HTTPError
+from urllib.parse import quote
 from urllib.request import ProxyHandler, Request, build_opener
 
 import pytest
@@ -55,17 +56,23 @@ def backend(request):
 def start_server(tmp_path):
     processes = []
     logs = []
+    running = {}
 
-    def start(backend, label):
+    def start(backend, label, restart=False):
         root = tmp_path / label
-        root.mkdir()
+        if restart:
+            process = running.pop(label)
+            process.terminate()
+            process.wait(timeout=10)
+        else:
+            root.mkdir()
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
         env = os.environ.copy()
         for key in ("HOME", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
             env[key] = str(root / key.lower())
-            Path(env[key]).mkdir()
+            Path(env[key]).mkdir(exist_ok=restart)
         for key in ("AW_PROFILE", "AW_DB_PASSWORD", "AW_SERVER_API_KEY"):
             env.pop(key, None)
         database = str(root / "events.db")
@@ -112,6 +119,7 @@ def start_server(tmp_path):
         logs.append(log)
         process = subprocess.Popen(command, env=env, stdout=log, stderr=log)
         processes.append(process)
+        running[label] = process
         server = Server(f"http://127.0.0.1:{port}/api/0")
         deadline = time.monotonic() + 20
         last = None
@@ -423,6 +431,196 @@ def test_shared_heartbeat_alias_state_and_local_ownership(backend, start_server)
         == "local"
     )
     assert server.request("GET", "/devices/peer/buckets/new_local")[0] == 404
+
+
+def test_shared_same_name_identical_heartbeats_keep_device_state(backend, start_server):
+    server = start_server(backend, "source-uuid")
+    for device in ("local", "peer"):
+        assert (
+            server.request(
+                "POST", f"/devices/{device}/buckets/window", metadata(f"{device}_host")
+            )[0]
+            == 200
+        )
+    ids = {}
+    # The payloads are identical; differing data must not accidentally hide
+    # a cache that is keyed only by the shared stored name.
+    for device, second in (("local", 0), ("peer", 2), ("local", 5), ("peer", 9)):
+        heartbeat = event("same", second)
+        heartbeat["duration"] = 0
+        status, row = server.request(
+            "POST", f"/buckets/window_{device}_host/heartbeat?pulsetime=10", heartbeat
+        )
+        assert status == 200, row
+        if device in ids:
+            assert row["id"] == ids[device]
+        ids[device] = row["id"]
+    assert ids["local"] != ids["peer"]
+    for device, duration, second in (("local", 5, "00"), ("peer", 7, "02")):
+        status, rows = server.request("GET", f"/devices/{device}/buckets/window/events")
+        assert status == 200 and len(rows) == 1, rows
+        assert rows[0]["duration"] == duration
+        assert f"00:00:{second}.123456" in rows[0]["timestamp"]
+        assert rows[0]["data"] == {"owner": "same"}
+
+
+def test_shared_separator_alias_ambiguity(backend, start_server):
+    server = start_server(backend, "source-uuid")
+    for bid, hostname in (
+        ("a", "b_c"),
+        ("a_b", "c"),
+        ("window", "old"),
+        ("window_new", "other"),
+    ):
+        base = f"/devices/local/buckets/{bid}"
+        status, body = server.request("POST", base, metadata(hostname))
+        assert status == 200, body
+        assert server.request("POST", base + "/events", [event(bid)])[0] == 200
+    status, before = server.request("GET", "/devices/export")
+    assert status == 200, before
+    # a + '_' + b_c and a_b + '_' + c are both plausible. Never split
+    # the requested name and select one arbitrarily.
+    for method, suffix, payload in (
+        ("GET", "/events", None),
+        ("POST", "/events", [event("must-not-land")]),
+        ("DELETE", "", None),
+    ):
+        assert (
+            server.request(method, "/devices/local/buckets/a_b_c" + suffix, payload)[0]
+            == 409
+        )
+    assert server.request("GET", "/devices/export") == (200, before)
+
+
+def test_python_metadata_repair_preserves_exact_match_priority(start_server):
+    # Rust has no metadata PUT route; its exact-first resolver is tested in
+    # aw-datastore. Do not invent a new HTTP surface to seed this legacy state.
+    server = start_server("python", "source-uuid")
+    for bid, hostname in (("window", "old"), ("window_new", "other")):
+        base = f"/devices/local/buckets/{bid}"
+        assert server.request("POST", base, metadata(hostname))[0] == 200
+        assert server.request("POST", base + "/events", [event(bid)])[0] == 200
+    # Metadata repair can make an alias collide with an existing exact name.
+    # Resolution must still prefer that exact row, without merging history.
+    status, body = server.request(
+        "PUT", "/devices/local/buckets/window", {"hostname": "new"}
+    )
+    assert status == 200, body
+    for bid in ("window", "window_new"):
+        status, rows = server.request("GET", f"/devices/local/buckets/{bid}/events")
+        assert status == 200 and rows[0]["data"] == {"owner": bid}, rows
+
+
+def test_shared_same_names_survive_process_restart(backend, start_server):
+    server = start_server(backend, "source-uuid")
+    devices = ("local", "peer", "third")
+    for device in devices:
+        base = f"/devices/{device}/buckets/window"
+        assert server.request("POST", base, metadata(f"{device}_host"))[0] == 200
+        assert server.request("POST", base + "/events", [event(device)])[0] == 200
+    status, before = server.request("GET", "/devices/export")
+    assert status == 200, before
+    server = start_server(backend, "source-uuid", restart=True)
+    assert server.request("GET", "/devices/export") == (200, before)
+    for device in devices:
+        base = f"/devices/{device}/buckets/window"
+        status, rows = server.request("GET", base + "/events")
+        assert status == 200 and rows[0]["data"] == {"owner": device}, rows
+        assert server.request("GET", f"/buckets/window_{device}_host/events") == (
+            200,
+            rows,
+        )
+        assert server.request("POST", base, metadata(f"{device}_host"))[0] == 304
+    assert server.request("GET", "/buckets/window")[0] == 409
+    assert server.request("DELETE", "/devices/peer/buckets/window")[0] == 200
+    server = start_server(backend, "source-uuid", restart=True)
+    assert server.request("GET", "/devices/peer/buckets/window")[0] == 404
+    for device in ("local", "third"):
+        status, rows = server.request("GET", f"/devices/{device}/buckets/window/events")
+        assert status == 200 and rows[0]["data"] == {"owner": device}, rows
+
+
+def test_shared_ambiguous_aliases_fail_before_reads_and_writes(backend, start_server):
+    server = start_server(backend, "source-uuid")
+    for device in ("local", "peer"):
+        for suffix in ("alpha_host", "beta_host"):
+            base = f"/devices/{device}/buckets/window_{suffix}"
+            status, body = server.request("POST", base, metadata(suffix))
+            assert status == 200, body
+            assert (
+                server.request("POST", base + "/events", [event(f"{device}:{suffix}")])[
+                    0
+                ]
+                == 200
+            )
+    status, before = server.request("GET", "/devices/export")
+    assert status == 200, before
+    query = {
+        "query": ['RETURN = query_bucket("window");'],
+        "timeperiods": ["2026-01-01T00:00:00Z/2026-01-02T00:00:00Z"],
+    }
+    for device in ("local", "peer"):
+        base = f"/devices/{device}/buckets/window"
+        for method, suffix, payload in (
+            ("GET", "", None),
+            ("GET", "/events", None),
+            ("GET", "/events/count", None),
+            ("GET", "/export", None),
+            ("POST", "", metadata("alpha_host")),
+            ("POST", "/events", [event("must-not-land")]),
+            ("POST", "/heartbeat?pulsetime=10", event("must-not-land")),
+            ("DELETE", "", None),
+        ):
+            status, body = server.request(method, base + suffix, payload)
+            assert status == 409, (device, method, suffix, body)
+        assert server.request("POST", f"/devices/{device}/query", query)[0] == 409
+        # Exact spellings remain addressable despite ambiguous aliases and
+        # equal names on another device, including underscore-bearing hosts.
+        for suffix in ("alpha_host", "beta_host"):
+            base = f"/devices/{device}/buckets/window_{suffix}"
+            status, rows = server.request("GET", base + "/events")
+            assert status == 200 and rows[0]["data"] == {
+                "owner": f"{device}:{suffix}"
+            }, rows
+            assert server.request("GET", base + "_unknown_host")[0] == 404
+    assert server.request("GET", "/devices/export") == (200, before)
+
+
+def test_shared_separator_components_keep_distinct_pair_identity(backend, start_server):
+    server = start_server(backend, "source-uuid")
+    # These pairs collide if an implementation joins components with ':'.
+    # Percent escapes must decode once, independently of the other component.
+    pairs = (
+        ("peer:part", "window"),
+        ("peer", "part:window"),
+        ("peer%3Apart", "window%3Aname"),
+    )
+    for index, (device, bid) in enumerate(pairs):
+        base = f"/devices/{quote(device, safe='')}/buckets/{quote(bid, safe='')}"
+        status, body = server.request("POST", base, metadata("host_with_underscores"))
+        assert status == 200, body
+        assert server.request("POST", base + "/events", [event(str(index))])[0] == 200
+    for index, (device, bid) in enumerate(pairs):
+        base = f"/devices/{quote(device, safe='')}/buckets/{quote(bid, safe='')}"
+        status, body = server.request("GET", base)
+        assert status == 200 and body["id"] == bid and body["device_id"] == device, body
+        assert server.request("GET", base + "/events")[1][0]["data"] == {
+            "owner": str(index)
+        }
+        query = {
+            "query": [f"RETURN = query_bucket({json.dumps(bid)});"],
+            "timeperiods": ["2026-01-01T00:00:00Z/2026-01-02T00:00:00Z"],
+        }
+        status, rows = server.request(
+            "POST", f"/devices/{quote(device, safe='')}/query", query
+        )
+        assert status == 200 and rows[0][0]["data"] == {"owner": str(index)}, rows
+    status, grouped = server.request("GET", "/devices/export")
+    assert status == 200, grouped
+    for index, (device, bid) in enumerate(pairs):
+        bucket = grouped["devices"][device]["buckets"][bid]
+        assert bucket["id"] == bid and bucket["device_id"] == device
+        assert bucket["events"][0]["data"] == {"owner": str(index)}
 
 
 def test_shared_legacy_import_rejects_same_name_ambiguity_without_mutation(

@@ -1,9 +1,8 @@
 """One real-HTTP identity contract for both server implementations.
 
 Set AW_RUST_CONTRACT_BINARY to an absolute aw-server binary to include Rust.
-The Rust draft still rejects exact same-name coexistence; these shared cases
-exercise distinct stored names with the same device-scoped compatibility alias.
-Backend-specific same-name/migration tests remain required before guard removal.
+Covers both distinct stored names sharing compatibility aliases and equal names
+owned by three devices. Backend-specific raw migration preservation stays separate.
 """
 
 import json
@@ -204,6 +203,66 @@ def test_shared_scoped_alias_crud_query_and_export(backend, start_server):
         status, body = server.request("DELETE", base)
         assert status == 200, body
         assert server.request("GET", base)[0] == 404
+
+
+def test_shared_same_name_three_devices_query_export_and_reader_refresh(
+    backend, start_server
+):
+    server = start_server(backend, "source-uuid")
+    query = {
+        "query": ['RETURN = query_bucket("window");'],
+        "timeperiods": ["2026-01-01T00:00:00Z/2026-01-02T00:00:00Z"],
+    }
+    devices = ("local", "peer", "third")
+    for device in devices:
+        base = f"/devices/{device}/buckets/window"
+        status, body = server.request("POST", base, metadata(f"{device}_host"))
+        assert status == 200, body
+        assert server.request("POST", base, metadata(f"{device}_host"))[0] == 304
+        status, rows = server.request("POST", base + "/events", [event(device)])
+        assert status == 200, rows
+        # Querying after each write opens/reuses the actual backend reader/cache.
+        status, result = server.request("POST", f"/devices/{device}/query", query)
+        assert status == 200 and result[0][0]["data"] == {"owner": device}, result
+    for device in devices:
+        base = f"/devices/{device}/buckets/window"
+        assert server.request("GET", base + "/events/count") == (200, 1)
+        status, rows = server.request("GET", base + "/events")
+        assert status == 200 and len(rows) == 1 and rows[0]["data"] == {"owner": device}
+        status, result = server.request("POST", f"/devices/{device}/query", query)
+        assert status == 200 and result[0][0]["data"] == {"owner": device}, result
+        status, archive = server.request("GET", base + "/export")
+        assert status == 200, archive
+        assert archive["buckets"]["window"]["events"][0]["data"] == {"owner": device}
+        status, csv = server.request("GET", base + "/export/csv")
+        assert status == 200 and device in csv, csv
+        # Globally unique hostname aliases still address the resolved device.
+        assert server.request(
+            "GET", f"/buckets/window_{device}_host/events"
+        ) == server.request("GET", base + "/events")
+    for path in ("/buckets/window", "/buckets", "/export"):
+        assert server.request("GET", path)[0] == 409, path
+    assert server.request(
+        "GET", "/devices/source-uuid/buckets/window/events"
+    ) == server.request("GET", "/devices/local/buckets/window/events")
+    status, grouped = server.request("GET", "/devices/export")
+    assert status == 200, grouped
+    assert set(grouped["devices"]) == {"source-uuid", "peer", "third"}
+    for owner, exported in (
+        ("local", "source-uuid"),
+        ("peer", "peer"),
+        ("third", "third"),
+    ):
+        assert grouped["devices"][exported]["buckets"]["window"]["events"][0][
+            "data"
+        ] == {"owner": owner}
+    for device in ("third", "peer"):
+        status, body = server.request("DELETE", f"/devices/{device}/buckets/window")
+        assert status == 200, body
+        assert server.request("GET", f"/devices/{device}/buckets/window")[0] == 404
+        status, result = server.request("POST", "/devices/local/query", query)
+        assert status == 200 and result[0][0]["data"] == {"owner": "local"}, result
+    assert server.request("GET", "/buckets/window")[1]["device_id"] == "local"
 
 
 def test_shared_grouped_transfer_preserves_ownership_and_is_idempotent(

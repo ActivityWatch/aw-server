@@ -63,9 +63,12 @@ def check_bucket_exists(f):
     def g(self, bucket_id, *args, **kwargs):
         if not self.db.has_bucket(bucket_id):
             raise NotFound("NoSuchBucket", f"There's no bucket named {bucket_id}")
-        # Aliases and canonical names must share heartbeat state as well as SQL rows.
-        bucket_id = self.db[bucket_id].metadata()["id"]
-        return f(self, bucket_id, *args, **kwargs)
+        # Retain resolved ownership through nested operations: an unscoped
+        # alias can uniquely address a canonical name shared by several devices.
+        metadata = self.db[bucket_id].metadata()
+        if self._device_scope is None and metadata["id"] != bucket_id:
+            self = self.for_device(metadata["device_id"])
+        return f(self, metadata["id"], *args, **kwargs)
 
     return g
 

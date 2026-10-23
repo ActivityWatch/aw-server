@@ -36,18 +36,18 @@ tests-no-zope = ["cloudpickle ; platform_python_implementation == \"CPython\"", 
 
 [[package]]
 name = "aw-client"
-version = "0.5.12"
+version = "0.5.15"
 description = "Client library for ActivityWatch"
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "aw_client-0.5.12-py3-none-any.whl", hash = "sha256:12bd6cbc02a06e970267f7f192a31a0036b4a9f9ae0852bd0a8bc718b9b8ea5a"},
-    {file = "aw_client-0.5.12.tar.gz", hash = "sha256:824b5e83abe755d5f089bbbf87eaabdc8895220c1642904a5aa6b66fba09b6ba"},
+    {file = "aw_client-0.5.15-py3-none-any.whl", hash = "sha256:2d2a61d1d75e29d1e850aca1bc3390f40536929d361c7a891ed9fb394844ad50"},
+    {file = "aw_client-0.5.15.tar.gz", hash = "sha256:d6b0aeae82ded2dc0469b29109068d01ddf9e4195a5b7b8055849173b5edff7e"},
 ]
 
 [package.dependencies]
-aw-core = ">=0.5.7,<0.6.0"
+aw-core = ">=0.5.16,<0.6.0"
 click = ">=8.0,<9.0"
 persist-queue = "*"
 requests = "*"

@@ -110,15 +110,19 @@ def start_server(tmp_path):
         processes.append(process)
         server = Server(f"http://127.0.0.1:{port}/api/0")
         deadline = time.monotonic() + 20
+        last = None
         while time.monotonic() < deadline:
             assert process.poll() is None, log_path.read_text()
             try:
-                if server.request("GET", "/info")[0] == 200:
+                last = server.request("GET", "/info")
+                if last[0] == 200:
                     return server
-            except OSError:
-                pass
+            except OSError as error:
+                last = error
             time.sleep(0.05)
-        pytest.fail(f"server readiness timeout: {log_path.read_text()}")
+        pytest.fail(
+            f"server readiness timeout (last /info: {last!r}): {log_path.read_text()}"
+        )
 
     yield start
     for process in processes:

@@ -183,7 +183,7 @@ def copy_doc(api_method):
 
 
 def request_api() -> ServerAPI:
-    return getattr(g, "device_api", current_app.api)
+    return getattr(g, "device_api", getattr(g, "request_api", current_app.api))
 
 
 class DeviceResource(Resource):
@@ -227,14 +227,14 @@ class DevicesResource(Resource):
 @api.route("/0/devices/buckets")
 class DeviceBucketsResource(Resource):
     def get(self):
-        return current_app.api.device_buckets()
+        return request_api().device_buckets()
 
 
 @api.route("/0/devices/export")
 class DevicesExportResource(Resource):
     def get(self):
         try:
-            staged = current_app.api.stage_device_export()
+            staged = request_api().stage_device_export()
         except NotImplementedError as e:
             return {"message": str(e)}, 501
         try:
@@ -256,7 +256,7 @@ class DevicesExportResource(Resource):
 class DevicesImportResource(Resource):
     def post(self):
         try:
-            current_app.api.import_devices(request.get_json())
+            request_api().import_devices(request.get_json())
         except NotImplementedError as e:
             return {"message": str(e)}, 501
         except ImportRollbackError as e:

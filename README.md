@@ -102,3 +102,11 @@ Run `make test` for the normal fast server slice plus the device HTTP contract.
 The pinned draft core is required; tests use temporary file-backed SQLite and
 never a production database. Full shared HTTP parity and backend-specific
 migration/same-name acceptance still gate removal of Rust's global name guards.
+
+SQLite HTTP requests on worker threads use their own datastore/connection,
+closed at request teardown; they share API write serialization, query cache and
+pair-keyed heartbeat state, never a mutable scope. This preserves SQLite's
+thread ownership check. Current export staging holds the API write lock while
+building the snapshot, so large exports delay writes. A dedicated read-only
+export connection and unbounded timestamp/archive fidelity remain acceptance
+work; event streaming retains the backend's existing time-range semantics.

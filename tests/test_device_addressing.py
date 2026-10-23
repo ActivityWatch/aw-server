@@ -432,3 +432,47 @@ def test_export_keeps_one_snapshot_across_bucket_iterators(device_app):
             exported = json.load(staged)
     assert exported["devices"]["server-uuid"]["buckets"]["b"]["events"] == []
     assert api.for_device("local").get_eventcount("b") == 1
+
+
+def test_sqlite_device_requests_use_request_thread_connections(device_app):
+    from concurrent.futures import ThreadPoolExecutor
+
+    def request():
+        c = device_app.test_client()
+        r = create(c, "local")
+        assert r.status_code == 200
+        r = c.post("/api/0/devices/local/buckets/window/events", json=event("thread"))
+        assert r.status_code == 200
+        r = c.get("/api/0/devices/export")
+        assert r.status_code == 200
+        data = r.json
+        r.close()
+        return data
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        exported = pool.submit(request).result(timeout=10)
+    assert exported["devices"]["server-uuid"]["buckets"]["window"]["events"][0][
+        "data"
+    ] == {"label": "thread"}
+    assert (
+        device_app.test_client()
+        .get("/api/0/devices/local/buckets/window/events/count")
+        .json
+        == 1
+    )
+
+
+def test_sqlite_parallel_devices_do_not_share_request_scope(device_app):
+    from concurrent.futures import ThreadPoolExecutor
+
+    def write(device):
+        c = device_app.test_client()
+        assert create(c, device).status_code == 200
+        base = f"/api/0/devices/{device}/buckets/window"
+        assert c.post(base + "/events", json=event(device)).status_code == 200
+        return c.get(base + "/events").json[0]["data"]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(write, ("local", "peer")))
+    assert results == [{"label": "local"}, {"label": "peer"}]
+    assert device_app.api._device_scope is None

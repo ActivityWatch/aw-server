@@ -576,5 +576,18 @@ class SettingsResource(Resource):
     def post(self, key: str):
         if not key:
             raise BadRequest("MissingParameter", "Missing required parameter key")
-        data = current_app.api.set_setting(key, request.get_json())
+        try:
+            data = current_app.api.set_setting(key, request.get_json())
+        except OSError as e:
+            # Only I/O failures get this response; validation errors still propagate.
+            path = str(current_app.api.settings.config_file)
+            reason = e.strerror or str(e)
+            logger.error(
+                f"Unable to save settings to {path}: {reason} (errno {e.errno})"
+            )
+            return {
+                "message": f"Unable to save settings to {path}: {reason}",
+                "path": path,
+                "errno": e.errno,
+            }, 500
         return data

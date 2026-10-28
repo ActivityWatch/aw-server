@@ -309,7 +309,10 @@ class EventsResource(Resource):
         else:
             raise BadRequest("Invalid POST data", "")
 
-        events = current_app.api.create_events(bucket_id, events)
+        try:
+            events = current_app.api.create_events(bucket_id, events)
+        except ValueError as e:
+            raise BadRequest("InvalidEvent", f"Invalid event: {e}") from e
         return [e.to_json_dict() for e in events], 200
 
 

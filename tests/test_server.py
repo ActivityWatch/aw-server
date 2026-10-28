@@ -3,8 +3,10 @@ import io
 import json
 import random
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 import pytest
+from werkzeug.http import parse_options_header
 
 
 @pytest.fixture()
@@ -207,9 +209,9 @@ def test_export_bucket_csv(flask_client, bucket):
     r = flask_client.get(f"/api/0/buckets/{bucket}/export/csv")
     assert r.status_code == 200
     assert r.mimetype == "text/csv"
-    assert (
-        r.headers["Content-Disposition"]
-        == f'attachment; filename="aw-events-export-{bucket}.csv"'
+    assert parse_options_header(r.headers["Content-Disposition"]) == (
+        "attachment",
+        {"filename": f"aw-events-export-{bucket}.csv"},
     )
     lines = r.get_data(as_text=True).split("\r\n")
     # Newest first, union of data keys, formula-looking values neutralized
@@ -493,6 +495,84 @@ def test_export_bucket_csv_prefixes_colliding_data_keys(flask_client, bucket):
         "data.id": "a",
         "data.timestamp": "t",
     }
+
+
+@pytest.mark.parametrize("format", ["json", "csv"])
+@pytest.mark.parametrize(
+    "bucket_id,safe_id",
+    [
+        ("plain", "plain"),
+        ("work;secondary", "work_secondary"),
+        ('quoted"name', "quoted_name"),
+        ("back\\slash", "back_slash"),
+        ("line\nbreak", "line_break"),
+        ("carriage\rreturn", "carriage_return"),
+        ("tab\tname", "tab_name"),
+        ("control\x01\x7f\x85", "control___"),
+        ("with spaces", "with spaces"),
+        ("café", "café"),
+        ("工作", "工作"),
+        ("percent%name", "percent%name"),
+    ],
+)
+def test_export_attachment_filename(flask_client, bucket_id, safe_id, format):
+    route = "/api/0/buckets/" + quote(bucket_id, safe="")
+    created = flask_client.post(
+        route, json={"client": "test", "type": "test", "hostname": "test"}
+    )
+    assert created.status_code == 200
+    try:
+        event = {
+            "timestamp": "2026-10-01T00:00:00Z",
+            "duration": 5,
+            "data": {"label": "unchanged café 工作"},
+        }
+        inserted = flask_client.post(route + "/events", json=event)
+        assert inserted.status_code == 200
+        suffix = "/export" if format == "json" else "/export/csv"
+        response = flask_client.get(route + suffix, buffered=True)
+        assert response.status_code == 200
+        header = response.headers["Content-Disposition"]
+        # WSGI servers encode response header values as Latin-1, unlike the
+        # Flask test client. Require ASCII, including the Unicode fallback.
+        for key, value in response.headers.to_wsgi_list():
+            key.encode("latin-1")
+            value.encode("latin-1")
+        header.encode("ascii")
+        assert all(32 <= ord(c) < 127 for c in header)
+        prefix = "aw-bucket-export_" if format == "json" else "aw-events-export-"
+        expected = f"{prefix}{safe_id}.{format}"
+        disposition, options = parse_options_header(header)
+        assert disposition == "attachment"
+        assert options == {"filename": expected}
+        fallback = parse_options_header(header.split("; filename*=", 1)[0])[1]
+        assert fallback["filename"] == "".join(
+            c if c.isascii() else "_" for c in expected
+        )
+        if not expected.isascii():
+            assert "filename*=UTF-8''" in header
+        if format == "json":
+            payload = json.loads(response.get_data())
+            exported = payload["buckets"][bucket_id]
+            assert exported["id"] == bucket_id
+            assert exported["events"][0]["data"] == event["data"]
+        else:
+            header_row, row = csv.reader(io.StringIO(response.get_data(as_text=True)))
+            assert header_row == ["id", "timestamp", "duration", "label"]
+            assert row[-1] == event["data"]["label"]
+    finally:
+        deleted = flask_client.delete(route)
+        assert deleted.status_code == 200
+
+
+def test_export_all_attachment_filename(flask_client):
+    response = flask_client.get("/api/0/export")
+    assert response.status_code == 200
+    assert parse_options_header(response.headers["Content-Disposition"]) == (
+        "attachment",
+        {"filename": "aw-buckets-export.json"},
+    )
+    assert "buckets" in json.loads(response.get_data())
 
 
 def test_csv_header_prefix_repeats_until_unique():

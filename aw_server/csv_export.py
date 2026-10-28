@@ -12,8 +12,10 @@ keys, a single ``data`` column holds each event's data as JSON instead.
 import json
 from datetime import timedelta, timezone
 from typing import Any, Dict, Iterable, Iterator, List
+from urllib.parse import quote
 
 from aw_core.models import Event
+from werkzeug.http import dump_options_header
 
 MAX_CSV_DATA_COLUMNS = 32
 
@@ -107,9 +109,12 @@ def events_to_csv(events: List[Event]) -> Iterator[str]:
 
 
 def content_disposition(filename: str) -> str:
-    """Quoted attachment filename with header-breaking characters replaced."""
+    """WSGI-safe attachment with an ASCII fallback and RFC 5987 Unicode name."""
     safe = "".join(
         "_" if (ord(c) < 32 or 127 <= ord(c) < 160 or c in '"\\;') else c
         for c in filename
     )
-    return f'attachment; filename="{safe}"'
+    options = {"filename": "".join(c if c.isascii() else "_" for c in safe)}
+    if not safe.isascii():
+        options["filename*"] = "UTF-8''" + quote(safe, safe="!#$&+-.^_`|~")
+    return dump_options_header("attachment", options)

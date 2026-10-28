@@ -121,3 +121,53 @@ def test_valid_input_still_accepted(flask_client, bucket):
     )
     assert r.status_code == 200
     assert r.json == 1
+
+
+@pytest.mark.parametrize("timestamp", [5, 5.0, True, False, [], {}])
+@pytest.mark.parametrize("batch", [False, True])
+def test_numeric_event_timestamp_rejected_without_storage_mutation(
+    flask_client, bucket, timestamp, batch
+):
+    url = f"/api/0/buckets/{bucket}/events"
+    valid = {"timestamp": TS, "duration": 1, "data": {"control": True}}
+    assert flask_client.post(url, json=valid).status_code == 200
+    before = flask_client.get(url).json
+    invalid = {"timestamp": timestamp, "duration": 0, "data": {}}
+    # A valid event before the bad item must not make a batch partially commit.
+    body = [valid, invalid] if batch else invalid
+    assert_bad_request(flask_client.post(url, json=body), "timestamp")
+    assert flask_client.get(url).json == before
+    assert flask_client.post(url, json=valid).status_code == 200
+    assert len(flask_client.get(url).json) == 2
+
+
+@pytest.mark.parametrize("timestamp", [5, 5.0, True, [], {}])
+def test_numeric_event_timestamp_heartbeat_rejected(flask_client, bucket, timestamp):
+    url = f"/api/0/buckets/{bucket}"
+    # Heartbeats already reject these values through schema validation.
+    response = flask_client.post(
+        f"{url}/heartbeat?pulsetime=1",
+        json={"timestamp": timestamp, "duration": 0, "data": {}},
+    )
+    assert response.status_code == 400
+    assert response.is_json
+    assert "timestamp" in response.json["errors"]
+    assert flask_client.get(f"{url}/events").json == []
+    assert (
+        flask_client.post(
+            f"{url}/heartbeat?pulsetime=1",
+            json={"timestamp": TS, "duration": 0, "data": {}},
+        ).status_code
+        == 200
+    )
+
+
+@pytest.mark.parametrize("body", [{"timestamp": None}, {}])
+def test_numeric_event_timestamp_absent_and_null_compatibility(
+    flask_client, bucket, body
+):
+    url = f"/api/0/buckets/{bucket}/events"
+    r = flask_client.post(url, json={**body, "duration": 0, "data": {}})
+    assert r.status_code == 200, r.data
+    assert isinstance(r.json[0]["timestamp"], str)
+    assert len(flask_client.get(url).json) == 1

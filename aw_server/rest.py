@@ -1,4 +1,5 @@
 import json
+import math
 import re
 import traceback
 from functools import wraps
@@ -402,6 +403,8 @@ class HeartbeatResource(Resource):
         pulsetime = _parse_arg(request.args, "pulsetime", float)
         if pulsetime is None:
             raise BadRequest("MissingParameter", "Missing required parameter pulsetime")
+        if not math.isfinite(pulsetime):
+            raise BadRequest("InvalidParameter", "Parameter pulsetime must be finite")
 
         # This lock is meant to ensure that only one heartbeat is processed at a time,
         # as the heartbeat function is not thread-safe.

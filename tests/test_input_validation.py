@@ -121,3 +121,39 @@ def test_valid_input_still_accepted(flask_client, bucket):
     )
     assert r.status_code == 200
     assert r.json == 1
+
+
+@pytest.mark.parametrize("pulsetime", ["inf", "-inf", "nan", "1e999"])
+@pytest.mark.parametrize("seeded", [False, True])
+def test_heartbeat_nonfinite_pulsetime(flask_client, bucket, pulsetime, seeded):
+    endpoint = f"/api/0/buckets/{bucket}/heartbeat"
+    heartbeat = {"timestamp": TS, "duration": 0, "data": {"app": "test"}}
+    if seeded:
+        assert (
+            flask_client.post(
+                endpoint, query_string={"pulsetime": "1"}, json=heartbeat
+            ).status_code
+            == 200
+        )
+        merged = flask_client.post(
+            endpoint,
+            query_string={"pulsetime": "1"},
+            json=dict(heartbeat, timestamp="2026-01-01T00:00:01Z"),
+        )
+        assert merged.status_code == 200
+        assert merged.json["duration"] == 1
+    before = flask_client.get(f"/api/0/buckets/{bucket}/events").json
+    response = flask_client.post(
+        endpoint,
+        query_string={"pulsetime": pulsetime},
+        json=dict(heartbeat, timestamp="2026-01-01T00:00:02Z"),
+    )
+    assert_bad_request(response, "pulsetime")
+    assert flask_client.get(f"/api/0/buckets/{bucket}/events").json == before
+    followup = flask_client.post(
+        endpoint,
+        query_string={"pulsetime": "1"},
+        json=dict(heartbeat, timestamp="2026-01-01T00:00:02Z"),
+    )
+    assert followup.status_code == 200
+    assert followup.json["duration"] == (2 if seeded else 0)

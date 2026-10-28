@@ -6,7 +6,8 @@ use the same endpoint against either server.
 Columns are ``id``, ``timestamp``, ``duration``, then the union of data keys
 across all exported events (first-seen order); a data key that collides with
 an earlier column name gets a ``data.`` prefix. Above ``MAX_CSV_DATA_COLUMNS``
-keys, a single ``data`` column holds each event's data as JSON instead.
+keys, or if any event has non-object data, a single ``data`` column holds
+each event's data as JSON instead.
 """
 
 import json
@@ -83,12 +84,16 @@ def _header_names(data_keys: List[str]) -> List[str]:
 
 def events_to_csv(events: List[Event]) -> Iterator[str]:
     """Yield CSV records for events, in the order given."""
+    # Previously accepted data may be a list or scalar. Choose the lossless
+    # JSON fallback before discovering object keys (scalars may not be iterable).
+    data_json_column = any(not isinstance(e.data, dict) for e in events)
     keys: Dict[str, None] = {}
-    for e in events:
-        for k in e.data:
-            keys.setdefault(k)
+    if not data_json_column:
+        for e in events:
+            for k in e.data:
+                keys.setdefault(k)
     data_keys = list(keys)
-    data_json_column = len(data_keys) > MAX_CSV_DATA_COLUMNS
+    data_json_column = data_json_column or len(data_keys) > MAX_CSV_DATA_COLUMNS
     if data_json_column:
         data_keys = ["data"]
 

@@ -24,7 +24,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        # Python 3.9 has no setup-python binary for Ubuntu 26.04 (latest).
+        os: [ubuntu-22.04, windows-latest, macOS-latest]
         python_version: [3.9]
     steps:
     - uses: actions/checkout@v3
@@ -65,7 +66,7 @@ jobs:
       SKIP_WEBUI: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
         python_version: [3.9]
     steps:
     - uses: actions/checkout@v3

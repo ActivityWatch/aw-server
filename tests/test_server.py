@@ -517,19 +517,18 @@ def test_export_bucket_csv_prefixes_colliding_data_keys(flask_client, bucket):
 )
 def test_export_attachment_filename(flask_client, bucket_id, safe_id, format):
     route = "/api/0/buckets/" + quote(bucket_id, safe="")
-    assert (
-        flask_client.post(
-            route, json={"client": "test", "type": "test", "hostname": "test"}
-        ).status_code
-        == 200
+    created = flask_client.post(
+        route, json={"client": "test", "type": "test", "hostname": "test"}
     )
+    assert created.status_code == 200
     try:
         event = {
             "timestamp": "2026-10-01T00:00:00Z",
             "duration": 5,
             "data": {"label": "unchanged café 工作"},
         }
-        assert flask_client.post(route + "/events", json=event).status_code == 200
+        inserted = flask_client.post(route + "/events", json=event)
+        assert inserted.status_code == 200
         suffix = "/export" if format == "json" else "/export/csv"
         response = flask_client.get(route + suffix, buffered=True)
         assert response.status_code == 200
@@ -562,7 +561,8 @@ def test_export_attachment_filename(flask_client, bucket_id, safe_id, format):
             assert header_row == ["id", "timestamp", "duration", "label"]
             assert row[-1] == event["data"]["label"]
     finally:
-        assert flask_client.delete(route).status_code == 200
+        deleted = flask_client.delete(route)
+        assert deleted.status_code == 200
 
 
 def test_export_all_attachment_filename(flask_client):

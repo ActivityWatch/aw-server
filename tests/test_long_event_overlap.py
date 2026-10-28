@@ -69,6 +69,9 @@ def test_bounded_get_and_count_include_long_event(long_client):
 
 
 def test_bounded_csv_contains_long_event_row(long_client):
+    unbounded = long_client.get(ROUTE + "/events").get_json()
+    assert len(unbounded) == 1
+    assert unbounded[0]["duration"] == 172800
     response = long_client.get(ROUTE + "/export/csv", query_string=BOUNDS)
     assert response.status_code == 200
     rows = list(csv.DictReader(io.StringIO(response.get_data(as_text=True))))
@@ -76,6 +79,7 @@ def test_bounded_csv_contains_long_event_row(long_client):
     assert rows[0]["label"] == "long"
     assert rows[0]["timestamp"] == START
     assert float(rows[0]["duration"]) == 3600
+    assert long_client.get(ROUTE + "/events").get_json() == unbounded
 
 
 @pytest.mark.parametrize(
@@ -86,6 +90,9 @@ def test_bounded_csv_contains_long_event_row(long_client):
     ],
 )
 def test_bounded_aql_includes_long_event(long_client, query, expected):
+    unbounded = long_client.get(ROUTE + "/events").get_json()
+    assert len(unbounded) == 1
+    assert unbounded[0]["duration"] == 172800
     response = long_client.post(
         "/api/0/query/",
         json={"query": [query], "timeperiods": [START + "/" + END], "cache": False},
@@ -93,3 +100,4 @@ def test_bounded_aql_includes_long_event(long_client, query, expected):
     assert response.status_code == 200
     # Preserve Peewee's existing clipping semantics; do not sum the full 48h.
     assert response.get_json() == [expected]
+    assert long_client.get(ROUTE + "/events").get_json() == unbounded

@@ -462,9 +462,7 @@ class ExportAllResource(Resource):
         payload = {"buckets": buckets_export}
         response = make_response(json.dumps(payload))
         filename = "aw-buckets-export.json"
-        response.headers["Content-Disposition"] = "attachment; filename={}".format(
-            filename
-        )
+        response.headers["Content-Disposition"] = content_disposition(filename)
         return response
 
 
@@ -478,9 +476,7 @@ class BucketExportResource(Resource):
         payload = {"buckets": {bucket_export["id"]: bucket_export}}
         response = make_response(json.dumps(payload))
         filename = "aw-bucket-export_{}.json".format(bucket_export["id"])
-        response.headers["Content-Disposition"] = "attachment; filename={}".format(
-            filename
-        )
+        response.headers["Content-Disposition"] = content_disposition(filename)
         return response
 
 

@@ -417,28 +417,28 @@ Flask = ">=0.9"
 
 [[package]]
 name = "flask-restx"
-version = "1.2.0"
+version = "1.3.0"
 description = "Fully featured framework for fast, easy and documented API development with Flask"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "flask-restx-1.2.0.tar.gz", hash = "sha256:9a5338b108c57fbed1d24d5d53fe98442b2be7ffa2ff3291305af7a613ce6fc0"},
-    {file = "flask_restx-1.2.0-py2.py3-none-any.whl", hash = "sha256:be3837378c51893adf94f632b6e458c4c2d54c6bc9f4210206ebc2fb1a70ada9"},
+    {file = "flask-restx-1.3.0.tar.gz", hash = "sha256:4f3d3fa7b6191fcc715b18c201a12cd875176f92ba4acc61626ccfd571ee1728"},
+    {file = "flask_restx-1.3.0-py2.py3-none-any.whl", hash = "sha256:636c56c3fb3f2c1df979e748019f084a938c4da2035a3e535a4673e4fc177691"},
 ]
 
 [package.dependencies]
 aniso8601 = ">=0.82"
-Flask = ">=0.8,!=2.0.0,<3.0.0"
+Flask = ">=0.8,!=2.0.0"
 importlib-resources = "*"
-jsonschema = "<=4.17.3"
+jsonschema = "*"
 pytz = "*"
-werkzeug = "!=2.0.0,<3.0.0"
+werkzeug = "!=2.0.0"
 
 [package.extras]
-dev = ["Faker (==2.0.0)", "black", "blinker", "invoke (==2.0.0)", "mock (==3.0.5)", "pytest (==7.0.1)", "pytest-benchmark (==3.4.1)", "pytest-cov (==4.0.0)", "pytest-flask (==1.2.0)", "pytest-mock (==3.6.1)", "pytest-profiling (==1.7.0)", "tox", "twine (==3.8.0)", "tzlocal"]
+dev = ["Faker (==2.0.0)", "black", "blinker", "invoke (==2.2.0)", "mock (==3.0.5)", "pytest (==7.0.1)", "pytest-benchmark (==3.4.1)", "pytest-cov (==4.0.0)", "pytest-flask (==1.3.0)", "pytest-mock (==3.6.1)", "pytest-profiling (==1.7.0)", "setuptools", "tox", "twine (==3.8.0)", "tzlocal"]
 doc = ["Sphinx (==5.3.0)", "alabaster (==0.7.12)", "sphinx-issues (==3.0.1)"]
-test = ["Faker (==2.0.0)", "blinker", "invoke (==2.0.0)", "mock (==3.0.5)", "pytest (==7.0.1)", "pytest-benchmark (==3.4.1)", "pytest-cov (==4.0.0)", "pytest-flask (==1.2.0)", "pytest-mock (==3.6.1)", "pytest-profiling (==1.7.0)", "twine (==3.8.0)", "tzlocal"]
+test = ["Faker (==2.0.0)", "blinker", "invoke (==2.2.0)", "mock (==3.0.5)", "pytest (==7.0.1)", "pytest-benchmark (==3.4.1)", "pytest-cov (==4.0.0)", "pytest-flask (==1.3.0)", "pytest-mock (==3.6.1)", "pytest-profiling (==1.7.0)", "setuptools", "twine (==3.8.0)", "tzlocal"]
 
 [[package]]
 name = "idna"

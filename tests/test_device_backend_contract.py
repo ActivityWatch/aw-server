@@ -132,7 +132,10 @@ def start_server(tmp_path):
             except OSError as error:
                 last = error
             time.sleep(0.05)
-        pytest.fail(
+        # Raise rather than pytest.fail() so the readiness loop has an explicit
+        # non-returning exit: CodeQL reads pytest.fail() as a fall-through and
+        # reports this helper as mixing implicit and explicit returns.
+        raise AssertionError(
             f"server readiness timeout (last /info: {last!r}): {log_path.read_text()}"
         )
 

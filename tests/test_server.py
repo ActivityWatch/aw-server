@@ -2,7 +2,7 @@ import csv
 import io
 import json
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import pytest
@@ -585,3 +585,41 @@ def test_csv_header_prefix_repeats_until_unique():
         "data.id",
         "data.data.id",
     ]
+
+
+def test_backward_clock_step_does_not_overwrite_newer_event(flask_client, bucket):
+    """A heartbeat older than the cached one is inserted as a new event, and the
+    next merge must rewrite *that* event rather than the newest stored one.
+
+    Reproduces an NTP or manual clock step backwards: replace_last() resolves
+    "last" by maximum timestamp, so merging into the out-of-order event used to
+    overwrite the pre-step event, destroying it and leaving two rows at the
+    same timestamp.
+    """
+    t = datetime(2026, 1, 1)
+
+    def event(offset):
+        return {
+            "timestamp": (t + timedelta(seconds=offset)).isoformat(),
+            "duration": 0,
+            "data": {"label": "a"},
+        }
+
+    def beat(offset):
+        r = flask_client.post(
+            f"/api/0/buckets/{bucket}/heartbeat?pulsetime=10", json=event(offset)
+        )
+        assert r.status_code == 200
+
+    beat(0)
+    beat(5)  # merged into the event at t, duration 5
+    beat(-3600)  # clock stepped back: merge refused, inserted out of order
+    beat(-3590)  # merges into the out-of-order event
+
+    r = flask_client.get(f"/api/0/buckets/{bucket}/events")
+    events = sorted(r.json, key=lambda e: e["timestamp"])
+    assert [e["timestamp"] for e in events] == [
+        (t - timedelta(seconds=3600)).astimezone(timezone.utc).isoformat(),
+        t.astimezone(timezone.utc).isoformat(),
+    ]
+    assert [e["duration"] for e in events] == [10.0, 5.0]

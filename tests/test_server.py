@@ -596,7 +596,7 @@ def test_backward_clock_step_does_not_overwrite_newer_event(flask_client, bucket
     overwrite the pre-step event, destroying it and leaving two rows at the
     same timestamp.
     """
-    t = datetime(2026, 1, 1)
+    t = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
     def event(offset):
         return {

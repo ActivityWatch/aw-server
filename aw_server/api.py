@@ -540,10 +540,13 @@ class ServerAPI:
             )
 
         try:
-            self.db[bucket_id].insert(heartbeat)
+            inserted = self.db[bucket_id].insert(heartbeat)
         finally:
             self._invalidate([event_range(heartbeat)])
-        self.last_event[bucket_id] = heartbeat
+        # Cache the event as stored, with the id insert() assigned. Without the
+        # id, a later merge falls back to replace_last(), which targets whatever
+        # sorts last by timestamp and can overwrite a newer event.
+        self.last_event[bucket_id] = inserted if inserted is not None else heartbeat
         return heartbeat
 
     def query2(self, name, query, timeperiods, cache: bool = True):

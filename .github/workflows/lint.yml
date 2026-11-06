@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
       # Keep lint reproducible; the floating action tag can adopt new default rules.
-      - uses: jpetrucciani/ruff-check@5839e3c65007bdb626c1f3362153e45be347654f  # ruff 0.15.22
+      - uses: jpetrucciani/ruff-check@d4368676a5babaea1ecc823deb2f9b943cce2ecf  # ruff 0.17.3
 
   format:
     runs-on: ubuntu-latest

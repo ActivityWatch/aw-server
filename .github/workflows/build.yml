@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-24.04, windows-latest, macOS-latest]
         python_version: [3.9]
     steps:
     - uses: actions/checkout@v3
@@ -65,7 +65,7 @@ jobs:
       SKIP_WEBUI: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
         python_version: [3.9]
     steps:
     - uses: actions/checkout@v3

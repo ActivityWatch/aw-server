@@ -23,10 +23,10 @@ Another parameter called "view" can be used if you want to create multiple visua
 
 from flask import (
     Blueprint,
-    escape,
     jsonify,
     send_from_directory,
 )
+from markupsafe import escape
 
 
 def get_custom_static_blueprint(custom_static_directories):

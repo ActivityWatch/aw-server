@@ -525,7 +525,7 @@ class ImportAllResource(Resource):
                 for filename, f in request.files.items():
                     file_buckets = json.loads(f.stream.read())["buckets"]
                     if not isinstance(file_buckets, dict):
-                        raise ValueError(
+                        raise TypeError(
                             "'buckets' must be an object mapping bucket IDs to buckets"
                         )
                     for key, bucket in file_buckets.items():

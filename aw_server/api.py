@@ -195,9 +195,7 @@ class ServerAPI:
     @_serialized
     def import_all(self, buckets: Dict[str, Any]):
         if not isinstance(buckets, dict):
-            raise TypeError(
-                "'buckets' must be an object mapping bucket IDs to buckets"
-            )
+            raise TypeError("'buckets' must be an object mapping bucket IDs to buckets")
         # Check every bucket up front, so a rejected import writes nothing.
         # Track seen IDs in a set: an O(n) membership check instead of the
         # O(n^2) list.count() scan, which mattered because this runs while

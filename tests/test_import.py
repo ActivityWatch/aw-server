@@ -296,3 +296,25 @@ def test_import_without_bucket_data_or_name_still_succeeds(flask_client, cleanup
     assert r.status_code == 200
     metadata = flask_client.get("/api/0/buckets/test-import-no-metadata").json
     assert metadata["data"] == {}
+
+
+@pytest.mark.parametrize("timestamp", [5, 5.0, True, [], {}])
+def test_import_numeric_event_timestamp_rejected(flask_client, timestamp):
+    """Non-string timestamps in imported events must return 400, not 500."""
+    bucket_id = "test-import-numeric-ts"
+    r = flask_client.post(
+        "/api/0/import",
+        json={
+            "buckets": {
+                bucket_id: _bucket(
+                    bucket_id,
+                    events=[{"timestamp": timestamp, "duration": 0, "data": {}}],
+                )
+            }
+        },
+    )
+    assert r.status_code == 400, r.data
+    assert r.is_json
+    assert "timestamp" in r.json["message"]
+    # Rollback must have removed the partially-created bucket
+    assert bucket_id not in _buckets(flask_client)

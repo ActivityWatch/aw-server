@@ -263,3 +263,25 @@ def test_import_rollback_failure_does_not_abort_other_deletes(
     assert "test-import-rb-c" in buckets
     # ...and it is named in the response so the client can clean it up
     assert "test-import-rb-c" in r.get_json()["message"]
+
+
+@pytest.mark.parametrize("timestamp", [5, 5.0, True, [], {}])
+def test_import_numeric_event_timestamp_rejected(flask_client, timestamp):
+    """Non-string timestamps in imported events must return 400, not 500."""
+    bucket_id = "test-import-numeric-ts"
+    r = flask_client.post(
+        "/api/0/import",
+        json={
+            "buckets": {
+                bucket_id: _bucket(
+                    bucket_id,
+                    events=[{"timestamp": timestamp, "duration": 0, "data": {}}],
+                )
+            }
+        },
+    )
+    assert r.status_code == 400, r.data
+    assert r.is_json
+    assert "timestamp" in r.json["message"]
+    # Rollback must have removed the partially-created bucket
+    assert bucket_id not in _buckets(flask_client)

@@ -184,8 +184,14 @@ class ServerAPI:
         # scrub IDs from events
         # (otherwise causes weird bugs with no events seemingly imported when importing events exported from aw-server-rust, which contains IDs)
         for event in bucket_data["events"]:
-            if "id" in event:
-                del event["id"]
+            if isinstance(event, dict):
+                if "id" in event:
+                    del event["id"]
+                ts = event.get("timestamp")
+                if ts is not None and not isinstance(ts, str):
+                    raise ValueError(
+                        f"Event timestamp must be a string or null, not {type(ts).__name__!r}"
+                    )
 
         self.create_events(
             bucket_id,

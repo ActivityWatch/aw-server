@@ -155,6 +155,9 @@ def _parse_event(data) -> Event:
     """Construct an Event from client JSON, raising BadRequest on malformed input."""
     if not isinstance(data, dict):
         raise BadRequest("InvalidEvent", "Event must be a JSON object")
+    timestamp = data.get("timestamp")
+    if timestamp is not None and not isinstance(timestamp, str):
+        raise BadRequest("InvalidEvent", "Event timestamp must be a string or null")
     try:
         return Event(**data)
     except (ValueError, TypeError) as e:
@@ -522,7 +525,7 @@ class ImportAllResource(Resource):
                 for filename, f in request.files.items():
                     file_buckets = json.loads(f.stream.read())["buckets"]
                     if not isinstance(file_buckets, dict):
-                        raise ValueError(
+                        raise TypeError(
                             "'buckets' must be an object mapping bucket IDs to buckets"
                         )
                     for key, bucket in file_buckets.items():

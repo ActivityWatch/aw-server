@@ -184,8 +184,14 @@ class ServerAPI:
         # scrub IDs from events
         # (otherwise causes weird bugs with no events seemingly imported when importing events exported from aw-server-rust, which contains IDs)
         for event in bucket_data["events"]:
-            if "id" in event:
-                del event["id"]
+            if isinstance(event, dict):
+                if "id" in event:
+                    del event["id"]
+                ts = event.get("timestamp")
+                if ts is not None and not isinstance(ts, str):
+                    raise ValueError(
+                        f"Event timestamp must be a string or null, not {type(ts).__name__!r}"
+                    )
 
         self.create_events(
             bucket_id,
@@ -195,9 +201,7 @@ class ServerAPI:
     @_serialized
     def import_all(self, buckets: Dict[str, Any]):
         if not isinstance(buckets, dict):
-            raise ValueError(
-                "'buckets' must be an object mapping bucket IDs to buckets"
-            )
+            raise TypeError("'buckets' must be an object mapping bucket IDs to buckets")
         # Check every bucket up front, so a rejected import writes nothing.
         # Track seen IDs in a set: an O(n) membership check instead of the
         # O(n^2) list.count() scan, which mattered because this runs while

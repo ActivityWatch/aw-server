@@ -315,6 +315,8 @@ class ServerAPI:
                     raise ValueError(
                         f"Event timestamp must be a string or null, not {type(ts).__name__!r}"
                     )
+            else:
+                raise TypeError("Event must be an object")
 
         self.create_events(
             bucket_id,

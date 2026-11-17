@@ -5,6 +5,7 @@ from aw_core.log import setup_logging
 from aw_datastore import get_storage_methods
 
 from . import __version__
+from .api import DEFAULT_QUERY_MAX_EVENTS
 from .config import config_section, default_port, load_config
 from .profile import (
     DEFAULT_PROFILE,
@@ -70,6 +71,7 @@ def main():
         cors_origins=settings.cors_origins,
         custom_static=settings.custom_static,
         query_cache=settings.query_cache,
+        query_max_events=settings.query_max_events,
         api_key=settings.api_key,
     )
 
@@ -153,6 +155,9 @@ def parse_settings():
     settings.cors_origins = config[section]["cors_origins"]
     settings.custom_static = dict(config[section]["custom_static"])
     settings.query_cache = bool(config[section].get("query_cache", True))
+    settings.query_max_events = int(
+        config[section].get("query_max_events", DEFAULT_QUERY_MAX_EVENTS)
+    )
     settings.api_key = _coerce_api_key(
         config[section].get("auth", {}).get("api_key", "")
     )

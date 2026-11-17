@@ -12,6 +12,9 @@ storage = "peewee"
 cors_origins = ""
 # Cache query results for finished past periods in memory (see query_cache.py)
 query_cache = true
+# Most events one query timeperiod may load (about 1.3 KB of memory each).
+# Larger queries fail with HTTP 400 instead of exhausting memory. 0 = no limit.
+query_max_events = 1000000
 
 [server.custom_static]
 
@@ -27,6 +30,7 @@ port = "5666"
 storage = "peewee"
 cors_origins = ""
 query_cache = true
+query_max_events = 1000000
 
 [server-testing.custom_static]
 

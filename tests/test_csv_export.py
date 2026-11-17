@@ -117,3 +117,37 @@ def test_legacy_nonobject_csv_wide_object_fallback_unchanged():
     rows = list(csv.reader(events_to_csv([Event(data=data)])))
     assert rows[0] == ["id", "timestamp", "duration", "data"]
     assert json.loads(rows[1][3]) == data
+
+
+@pytest.mark.parametrize("value", [-5, -1.5, 0, 7])
+def test_numeric_json_is_not_formula_neutralized(value):
+    event = Event(
+        timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc), data={"n": value}
+    )
+    legacy = Event(timestamp=datetime(2026, 1, 2, tzinfo=timezone.utc))
+    legacy.data = value
+    wide = Event(
+        timestamp=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        data={f"k{i}": value for i in range(MAX_CSV_DATA_COLUMNS + 1)},
+    )
+    # Per-key column, scalar data column and wide-object JSON column.
+    assert list(csv.reader(events_to_csv([event])))[1][3] == json.dumps(value)
+    assert json.loads(list(csv.reader(events_to_csv([legacy])))[1][3]) == value
+    assert json.loads(list(csv.reader(events_to_csv([wide])))[1][3])["k0"] == value
+
+
+def test_formula_text_still_neutralized_next_to_numbers():
+    event = Event(
+        timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        data={"title": "=SUM(A1:A2)", "text": "-5", "n": -5},
+    )
+    row = list(csv.reader(events_to_csv([event])))[1]
+    assert row[3:] == ["'=SUM(A1:A2)", "'-5", "-5"]
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_numbers_are_not_trusted_as_numbers(value):
+    event = Event(timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    event.data = value
+    cell = list(csv.reader(events_to_csv([event])))[1][3]
+    assert not cell.startswith(("-", "="))

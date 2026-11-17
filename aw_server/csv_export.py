@@ -11,6 +11,7 @@ each event's data as JSON instead.
 """
 
 import json
+import math
 from datetime import timedelta, timezone
 from typing import Any, Dict, Iterable, Iterator, List
 
@@ -23,7 +24,13 @@ _FORMULA_LEADING_WHITESPACE = " \t\r\n"
 _FORMULA_STARTERS = ("=", "+", "-", "@")
 
 
+class _Number(str):
+    """A finite JSON number. It is not a formula, so it is exported unchanged."""
+
+
 def _neutralize_formula(s: str) -> str:
+    if isinstance(s, _Number):
+        return s
     if s.lstrip(_FORMULA_LEADING_WHITESPACE).startswith(_FORMULA_STARTERS):
         return "'" + s
     return s
@@ -42,7 +49,12 @@ def _csv_record(fields: Iterable[str]) -> str:
 
 
 def _json(value: Any) -> str:
-    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    text = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    # Keep -5 / -1.5 as valid JSON numbers; a leading "'" would break json.loads.
+    is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+    if is_number and math.isfinite(value):
+        return _Number(text)
+    return text
 
 
 def _duration(duration: timedelta) -> str:

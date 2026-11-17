@@ -114,3 +114,15 @@ def test_over_limit_query_is_a_400(flask_client):
         flask_client.delete(f"/api/0/buckets/{bucket}?force=1")
     assert r.status_code == 400
     assert "query_max_events" in r.json["message"]
+
+
+def test_over_limit_fails_before_fetching_events(monkeypatch):
+    """The limit must trip on the COUNT, before any events are materialized."""
+    api = make_api(2)
+
+    def fetch(*args, **kwargs):
+        raise AssertionError("events were fetched for an over-limit query")
+
+    monkeypatch.setattr(aw_datastore.datastore.Bucket, "get", fetch)
+    with pytest.raises(QueryException, match="more than the server limit of 2"):
+        count(api, ["a"], DAY1)

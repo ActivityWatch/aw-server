@@ -132,6 +132,14 @@ def test_import_duplicate_ids_within_export(flask_client, cleanup):
     assert "test-import-twice" not in _buckets(flask_client)
 
 
+@pytest.mark.parametrize("buckets", [[], None, "invalid", 1])
+def test_import_all_invalid_buckets_preserves_value_error(app, buckets):
+    before = app.api.get_buckets()
+    with pytest.raises(ValueError, match="'buckets' must be an object"):
+        app.api.import_all(buckets)
+    assert app.api.get_buckets() == before
+
+
 def test_import_buckets_not_an_object(flask_client):
     r = flask_client.post("/api/0/import", json={"buckets": []})
     assert r.status_code == 400

@@ -6,10 +6,12 @@ use the same endpoint against either server.
 Columns are ``id``, ``timestamp``, ``duration``, then the union of data keys
 across all exported events (first-seen order); a data key that collides with
 an earlier column name gets a ``data.`` prefix. Above ``MAX_CSV_DATA_COLUMNS``
-keys, a single ``data`` column holds each event's data as JSON instead.
+keys, or if any event has non-object data, a single ``data`` column holds
+each event's data as JSON instead.
 """
 
 import json
+import math
 from datetime import timedelta, timezone
 from typing import Any, Dict, Iterable, Iterator, List
 from urllib.parse import quote
@@ -24,7 +26,13 @@ _FORMULA_LEADING_WHITESPACE = " \t\r\n"
 _FORMULA_STARTERS = ("=", "+", "-", "@")
 
 
+class _Number(str):
+    """A finite JSON number. It is not a formula, so it is exported unchanged."""
+
+
 def _neutralize_formula(s: str) -> str:
+    if isinstance(s, _Number):
+        return s
     if s.lstrip(_FORMULA_LEADING_WHITESPACE).startswith(_FORMULA_STARTERS):
         return "'" + s
     return s
@@ -43,7 +51,12 @@ def _csv_record(fields: Iterable[str]) -> str:
 
 
 def _json(value: Any) -> str:
-    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    text = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    # Keep -5 / -1.5 as valid JSON numbers; a leading "'" would break json.loads.
+    is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+    if is_number and math.isfinite(value):
+        return _Number(text)
+    return text
 
 
 def _duration(duration: timedelta) -> str:
@@ -85,12 +98,16 @@ def _header_names(data_keys: List[str]) -> List[str]:
 
 def events_to_csv(events: List[Event]) -> Iterator[str]:
     """Yield CSV records for events, in the order given."""
+    # Previously accepted data may be a list or scalar. Choose the lossless
+    # JSON fallback before discovering object keys (scalars may not be iterable).
+    data_json_column = any(not isinstance(e.data, dict) for e in events)
     keys: Dict[str, None] = {}
-    for e in events:
-        for k in e.data:
-            keys.setdefault(k)
+    if not data_json_column:
+        for e in events:
+            for k in e.data:
+                keys.setdefault(k)
     data_keys = list(keys)
-    data_json_column = len(data_keys) > MAX_CSV_DATA_COLUMNS
+    data_json_column = data_json_column or len(data_keys) > MAX_CSV_DATA_COLUMNS
     if data_json_column:
         data_keys = ["data"]
 

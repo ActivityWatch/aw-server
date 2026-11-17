@@ -49,10 +49,21 @@ def test_within_limit_returns_all_events():
     assert count(api, ["a", "b"], DAY1) == [3, 3]
 
 
-def test_limit_counts_all_buckets_of_one_period():
+def test_limit_counts_all_buckets_of_one_period(monkeypatch):
     api = make_api(5)
+    storage = api.db.storage_strategy
+    fetched = []
+    real_get_events = storage.get_events
+
+    def spy(bucket_id, *args, **kwargs):
+        fetched.append(bucket_id)
+        return real_get_events(bucket_id, *args, **kwargs)
+
+    monkeypatch.setattr(storage, "get_events", spy)
     with pytest.raises(QueryException, match="more than the server limit of 5"):
         count(api, ["a", "b"], DAY1)
+    # The rejected bucket must fail on its COUNT, before its events are loaded.
+    assert fetched == ["a"]
 
 
 def test_limit_applies_per_timeperiod():

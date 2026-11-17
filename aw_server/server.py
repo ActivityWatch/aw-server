@@ -16,7 +16,7 @@ from flask import (
 from flask_cors import CORS
 
 from . import auth, extension_cors, rest
-from .api import ServerAPI
+from .api import DEFAULT_QUERY_MAX_EVENTS, ServerAPI
 from .custom_static import get_custom_static_blueprint
 from .log import FlaskLogHandler
 
@@ -40,6 +40,7 @@ class AWFlask(Flask):
         static_url_path="",
         query_cache: bool = True,
         api_key: str = "",
+        query_max_events: int = DEFAULT_QUERY_MAX_EVENTS,
     ):
         if cors_origins is None:
             cors_origins = []
@@ -79,7 +80,12 @@ class AWFlask(Flask):
                 if not database.is_closed():
                     database.close()
 
-        self.api = ServerAPI(db=db, testing=testing, query_cache=query_cache)
+        self.api = ServerAPI(
+            db=db,
+            testing=testing,
+            query_cache=query_cache,
+            query_max_events=query_max_events,
+        )
 
         self.register_blueprint(root)
         self.register_blueprint(rest.blueprint)
@@ -152,6 +158,7 @@ def _start(
     custom_static: Optional[Dict[str, str]] = None,
     query_cache: bool = True,
     api_key: str = "",
+    query_max_events: int = DEFAULT_QUERY_MAX_EVENTS,
 ):
     app = AWFlask(
         host,
@@ -161,6 +168,7 @@ def _start(
         custom_static=custom_static,
         query_cache=query_cache,
         api_key=api_key,
+        query_max_events=query_max_events,
     )
     try:
         app.run(

@@ -77,8 +77,73 @@ def _serialized(f):
     return g
 
 
+# Most events one query timeperiod may load from storage (#187). A loaded and
+# transformed event costs roughly 1.3 KB of Python memory, so this bounds one
+# period to about 1.3 GB instead of letting an "All time" query grow until the
+# machine swaps and heartbeats stall. 0 disables the limit.
+DEFAULT_QUERY_MAX_EVENTS = 1_000_000
+
+
+class _EventBudget:
+    """Datastore view handed to query2 that refuses to load more than
+    ``max_events`` events across the ``query_bucket`` calls of one timeperiod.
+
+    The check counts matching rows before fetching them, so an oversized
+    query fails fast with a QueryException (HTTP 400) instead of first
+    materializing millions of events.
+    """
+
+    def __init__(self, db, max_events: int, period) -> None:
+        self._db = db
+        self._max_events = max_events
+        self._period = period
+        self._loaded = 0
+
+    def __getattr__(self, name):
+        return getattr(self._db, name)
+
+    def __getitem__(self, bucket_id: str):
+        return _BudgetedBucket(self, self._db[bucket_id], bucket_id)
+
+    def charge(self, bucket_id: str, count: int) -> None:
+        if self._loaded + count > self._max_events:
+            start, end = self._period
+            raise QueryException(
+                f"Query would load {self._loaded + count} events (bucket "
+                f"'{bucket_id}' alone has {count} in {start.isoformat()}/"
+                f"{end.isoformat()}), more than the server limit of "
+                f"{self._max_events} per timeperiod. Split the query into "
+                "shorter timeperiods, or raise query_max_events in the "
+                "aw-server config."
+            )
+        self._loaded += count
+
+
+class _BudgetedBucket:
+    def __init__(self, budget: _EventBudget, bucket, bucket_id: str) -> None:
+        self._budget = budget
+        self._bucket = bucket
+        self._bucket_id = bucket_id
+
+    def __getattr__(self, name):
+        return getattr(self._bucket, name)
+
+    def get(self, limit: int = -1, starttime=None, endtime=None):
+        count = self._bucket.get_eventcount(starttime=starttime, endtime=endtime)
+        if 0 <= limit < count:
+            count = limit
+        self._budget.charge(self._bucket_id, count)
+        return self._bucket.get(limit=limit, starttime=starttime, endtime=endtime)
+
+
 class ServerAPI:
-    def __init__(self, db, testing, query_cache: bool = True) -> None:
+    def __init__(
+        self,
+        db,
+        testing,
+        query_cache: bool = True,
+        query_max_events: int = DEFAULT_QUERY_MAX_EVENTS,
+    ) -> None:
         self.db = db
         self.settings = Settings(testing)
         self.testing = testing
@@ -87,6 +152,7 @@ class ServerAPI:
         # Every write below must invalidate the cache (see query_cache.py).
         self.query_cache: Optional[QueryCache] = QueryCache() if query_cache else None
         self._write_lock = threading.RLock()
+        self.query_max_events = query_max_events
 
     def _invalidate(self, ranges) -> None:
         if self.query_cache:
@@ -573,8 +639,13 @@ class ServerAPI:
             except iso8601.ParseError as e:
                 raise QueryException(f"Invalid timeperiod '{timeperiod}': {e}")
             period = (starttime, endtime)
+            db: Any = (
+                _EventBudget(self.db, self.query_max_events, period)
+                if self.query_max_events > 0
+                else self.db
+            )
             if qc is None or not qc.cacheable(period):
-                result.append(query2.query(name, query, starttime, endtime, self.db))
+                result.append(query2.query(name, query, starttime, endtime, db))
                 continue
             key = QueryCache.key(query, period)
             cached = qc.get(key)
@@ -582,7 +653,7 @@ class ServerAPI:
                 result.append(cached)
                 continue
             started = qc.generation()
-            res = query2.query(name, query, starttime, endtime, self.db)
+            res = query2.query(name, query, starttime, endtime, db)
             qc.put(key, period, res, started)
             result.append(res)
         return result

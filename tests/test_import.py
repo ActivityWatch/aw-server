@@ -298,6 +298,21 @@ def test_import_without_bucket_data_or_name_still_succeeds(flask_client, cleanup
     assert metadata["data"] == {}
 
 
+@pytest.mark.parametrize("event", [123, 1.5, True, None, [], "invalid"])
+def test_import_non_object_event_rejected(flask_client, cleanup, event):
+    """Malformed event entries must return 400 and roll back the import."""
+    bucket_id = "test-import-non-object"
+    cleanup.append(bucket_id)
+    r = flask_client.post(
+        "/api/0/import",
+        json={"buckets": {bucket_id: _bucket(bucket_id, events=[event])}},
+    )
+    assert r.status_code == 400, r.data
+    assert r.is_json
+    assert "event" in r.json["message"].lower()
+    assert bucket_id not in _buckets(flask_client)
+
+
 @pytest.mark.parametrize("timestamp", [5, 5.0, True, [], {}])
 def test_import_numeric_event_timestamp_rejected(flask_client, timestamp):
     """Non-string timestamps in imported events must return 400, not 500."""

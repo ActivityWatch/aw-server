@@ -2,6 +2,8 @@ import logging
 import os
 
 import pytest
+from aw_datastore import Datastore, get_storage_methods
+from aw_server.api import ServerAPI
 from aw_client import ActivityWatchClient
 from aw_server.server import AWFlask
 
@@ -46,3 +48,25 @@ def aw_client():
     for bucket_id in buckets:
         if bucket_id.startswith("test-"):
             c.delete_bucket(bucket_id)
+
+
+@pytest.fixture(params=["memory", "peewee", "sqlite"])
+def isolated_api(request, tmp_path, monkeypatch):
+    """Exercise the storage backends without accessing a user's database/settings."""
+    monkeypatch.setattr("aw_server.settings.get_config_dir", lambda _: str(tmp_path))
+    monkeypatch.setattr(
+        "aw_datastore.storages.peewee.get_data_dir",
+        lambda _: str(tmp_path),
+    )
+    storage = get_storage_methods()[request.param]
+    kwargs = (
+        {} if request.param == "memory" else {"filepath": str(tmp_path / "test.db")}
+    )
+    db = Datastore(storage, testing=True, **kwargs)
+    try:
+        yield ServerAPI(db, testing=True)
+    finally:
+        if request.param == "peewee":
+            db.storage_strategy.db.close()
+        elif request.param == "sqlite":
+            db.storage_strategy.conn.close()

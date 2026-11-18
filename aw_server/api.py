@@ -678,9 +678,8 @@ class ServerAPI:
         qc = self.query_cache if cache else None
         result = []
         for timeperiod in timeperiods:
-            period = timeperiod.split("/")[
-                :2
-            ]  # iso8601 timeperiods are separated by a slash
+            # iso8601 timeperiods are separated by a slash
+            period = timeperiod.split("/")
             if len(period) != 2:
                 raise QueryException(
                     f"Invalid timeperiod '{timeperiod}': expected two ISO8601 "
@@ -691,6 +690,10 @@ class ServerAPI:
                 endtime = iso8601.parse_date(period[1])
             except iso8601.ParseError as e:
                 raise QueryException(f"Invalid timeperiod '{timeperiod}': {e}")
+            if starttime > endtime:
+                raise QueryException(
+                    f"Invalid timeperiod '{timeperiod}': start must not be after end"
+                )
             period = (starttime, endtime)
             db: Any = (
                 _EventBudget(self.db, self.query_max_events, period)

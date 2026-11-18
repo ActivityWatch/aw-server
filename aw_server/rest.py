@@ -154,6 +154,9 @@ def _parse_event(data) -> Event:
     """Construct an Event from client JSON, raising BadRequest on malformed input."""
     if not isinstance(data, dict):
         raise BadRequest("InvalidEvent", "Event must be a JSON object")
+    timestamp = data.get("timestamp")
+    if timestamp is not None and not isinstance(timestamp, str):
+        raise BadRequest("InvalidEvent", "Event timestamp must be a string or null")
     try:
         return Event(**data)
     except (ValueError, TypeError) as e:

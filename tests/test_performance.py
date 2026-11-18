@@ -142,7 +142,7 @@ def test_disabled_debug_logging_does_not_format_payload(isolated_api, monkeypatc
         monkeypatch.setattr(
             rest.request._get_current_object(),
             "get_json",
-            lambda: Payload(timestamp=START, data={"app": "a"}),
+            lambda: Payload(timestamp=START.isoformat(), data={"app": "a"}),
         )
         monkeypatch.setattr(app.api, "create_events", lambda *args: [])
         assert rest.EventsResource().post("test") == ([], 200)

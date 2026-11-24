@@ -181,11 +181,16 @@ def test_falsy_value_is_stored_not_deleted(config_dir, value):
     )
     assert response.status_code == 200
 
+    # False == 0 in Python, so compare types too.
     response = client.get("/api/0/settings/classes", headers={"Host": "localhost"})
-    assert response.get_json() == value
+    stored = response.get_json()
     all_settings = client.get("/api/0/settings", headers={"Host": "localhost"})
-    assert all_settings.get_json() == {"classes": value}
-    assert json.loads(path.read_text(encoding="utf-8")) == {"classes": value}
+    listed = all_settings.get_json()
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert listed.keys() == on_disk.keys() == {"classes"}
+    for got in (stored, listed["classes"], on_disk["classes"]):
+        assert got == value
+        assert type(got) is type(value)
 
 
 def test_failed_save_does_not_mutate_previous_snapshot(config_dir, monkeypatch):

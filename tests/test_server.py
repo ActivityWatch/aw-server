@@ -193,6 +193,28 @@ def test_query_valid_timeperiod(flask_client):
     assert r.json == [1]
 
 
+@pytest.mark.parametrize(
+    "statement, expected",
+    [
+        # aw-core#198: negative integer literals
+        ("RETURN = -1;", -1),
+        # aw-core#187: whitespace-only empty collections
+        ("RETURN = [ ];", []),
+    ],
+)
+def test_query_uses_current_aw_core_parser(flask_client, statement, expected):
+    """Guards the aw-core pin: a stale or forked aw-core rejects these as parse errors."""
+    r = flask_client.post(
+        "/api/0/query/",
+        json={
+            "query": [statement],
+            "timeperiods": ["2024-01-01T00:00:00+00:00/2024-01-02T00:00:00+00:00"],
+        },
+    )
+    assert r.status_code == 200, r.json
+    assert r.json == [expected]
+
+
 def test_export_bucket_csv(flask_client, bucket):
     now = datetime(2026, 10, 6, 12, 0, 0, 123456)
     events = [

@@ -300,6 +300,9 @@ class ServerAPI:
                     if isinstance(bucket_data["created"], datetime)
                     else iso8601.parse_date(bucket_data["created"])
                 ),
+                # Exports carry these; dropping them loses e.g. device_id.
+                name=bucket_data.get("name"),
+                data=bucket_data.get("data"),
             )
         finally:
             self._invalidate_all()

@@ -114,7 +114,9 @@ class Settings:
         # so independent setting updates cannot overwrite one another.
         with self._lock:
             data = dict(self.data)
-            if value:
+            # Only null removes a key: [], {}, false, 0 and "" are real values
+            # (an emptied category list, an unchecked default-on toggle).
+            if value is not None:
                 data[key] = value
             else:
                 data.pop(key, None)

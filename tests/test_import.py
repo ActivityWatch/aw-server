@@ -263,3 +263,39 @@ def test_import_rollback_failure_does_not_abort_other_deletes(
     assert "test-import-rb-c" in buckets
     # ...and it is named in the response so the client can clean it up
     assert "test-import-rb-c" in r.get_json()["message"]
+
+
+def test_export_import_round_trip_keeps_bucket_data_and_name(flask_client, cleanup):
+    bucket_id = "test-import-metadata"
+    cleanup.append(bucket_id)
+    data = {"device_id": "abc", "$aw.sync.origin": "laptop"}
+    r = flask_client.post(
+        f"/api/0/buckets/{bucket_id}",
+        json={"type": "test", "client": "test", "hostname": "test", "data": data},
+    )
+    assert r.status_code == 200
+    export = flask_client.get(f"/api/0/buckets/{bucket_id}/export").json
+    exported = export["buckets"][bucket_id]
+    assert exported["data"] == data
+    exported["name"] = "My bucket"
+
+    assert flask_client.delete(f"/api/0/buckets/{bucket_id}").status_code == 200
+    r = flask_client.post("/api/0/import", json=export)
+    assert r.status_code == 200
+
+    metadata = flask_client.get(f"/api/0/buckets/{bucket_id}").json
+    assert metadata["data"] == data
+    assert metadata["name"] == "My bucket"
+
+
+def test_import_without_bucket_data_or_name_still_succeeds(flask_client, cleanup):
+    # Older exports and hand-written ones carry neither field.
+    cleanup.append("test-import-no-metadata")
+    payload = _bucket("test-import-no-metadata")
+    assert "data" not in payload and "name" not in payload
+    r = flask_client.post(
+        "/api/0/import", json={"buckets": {"test-import-no-metadata": payload}}
+    )
+    assert r.status_code == 200
+    metadata = flask_client.get("/api/0/buckets/test-import-no-metadata").json
+    assert metadata["data"] == {}

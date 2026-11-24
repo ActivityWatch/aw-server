@@ -135,6 +135,8 @@ def _config_cors(cors_origins: List[str], testing: bool):
     # Capture user-configured origins before appending the built-in wildcard.
     # extension_cors uses this list to exempt explicit opt-ins from scope narrowing.
     user_origins = list(cors_origins)
+    # /api/0/import checks Origin against these itself (see rest.py).
+    current_app.config["AW_CORS_USER_ORIGINS"] = user_origins
 
     # TODO: This could probably be more specific
     #       See https://github.com/ActivityWatch/aw-server/pull/43#issuecomment-386888769

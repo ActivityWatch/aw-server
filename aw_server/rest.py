@@ -513,14 +513,15 @@ class BucketExportCsvResource(Resource):
 
 def _import_origin_allowed(origin: str) -> bool:
     """Same-origin (the bundled web UI) or an origin the user configured."""
-    parts = urlsplit(origin)
-    if (
-        parts.scheme in ("http", "https")
-        and parts.netloc.lower() == request.host.lower()
-    ):
+    try:
+        parts = urlsplit(origin)
+    except ValueError:
+        return False
+    if parts.scheme == request.scheme and parts.netloc.lower() == request.host.lower():
         return True
     return any(
-        _matches_configured_origin(origin, pattern)
+        # Flask-CORS treats "*" as every origin; honour the same opt-in here.
+        pattern == "*" or _matches_configured_origin(origin, pattern)
         for pattern in current_app.config.get("AW_CORS_USER_ORIGINS", [])
     )
 
@@ -534,7 +535,8 @@ class ImportAllResource(Resource):
         # preflight, so CORS alone would let any web page import data.
         origin = request.headers.get("Origin")
         if origin is not None and not _import_origin_allowed(origin):
-            logger.warning(f"Rejected import from cross-site origin {origin!r}")
+            safe_origin = origin.replace("\r", "").replace("\n", "")
+            logger.warning(f"Rejected import from cross-site origin {safe_origin!r}")
             return {"message": f"Import from origin {origin!r} is not allowed"}, 403
         try:
             # If import comes from a form in the web-ui

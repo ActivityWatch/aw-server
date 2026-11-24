@@ -95,3 +95,34 @@ def test_same_or_configured_origin_import_is_accepted(client, origin):
     r = _upload(client, "test-origin-ok", origin=origin)
     assert r.status_code == 200, r.json
     assert "test-origin-ok" in _bucket_ids(client)
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://localhost:5600",  # same host and port, different scheme
+        "http://[::1",  # malformed: urlsplit raises ValueError
+    ],
+)
+def test_scheme_mismatch_and_malformed_origin_are_rejected(client, origin):
+    r = _upload(client, "test-origin-bad", origin=origin)
+    assert r.status_code == 403
+    assert "test-origin-bad" not in _bucket_ids(client)
+
+
+def test_wildcard_cors_origin_allows_import():
+    # Flask-CORS treats "*" as every origin; an owner who opted into that
+    # should not then be refused by the import check.
+    app = AWFlask(_HOST, testing=True, cors_origins=["*"])
+    client = app.test_client()
+    r = _upload(client, "test-origin-wildcard", origin="https://other.example")
+    assert r.status_code == 200, r.json
+    client.delete(
+        "/api/0/buckets/test-origin-wildcard", headers={"Host": "localhost:5600"}
+    )
+
+
+def test_shared_cors_origin_list_is_not_mutated():
+    origins = ["https://configured.example"]
+    AWFlask(_HOST, testing=True, cors_origins=origins)
+    assert origins == ["https://configured.example"]

@@ -122,6 +122,9 @@ def static_js(path):
 
 
 def _config_cors(cors_origins: List[str], testing: bool):
+    # Work on a copy: appending the defaults below to the caller's list would
+    # leak them into the next app built from the same list.
+    cors_origins = list(cors_origins)
     if cors_origins:
         logger.warning(
             "Running with additional allowed CORS origins specified through config "

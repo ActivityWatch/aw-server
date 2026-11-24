@@ -279,7 +279,8 @@ def test_export_import_round_trip_keeps_bucket_data_and_name(flask_client, clean
     assert exported["data"] == data
     exported["name"] = "My bucket"
 
-    assert flask_client.delete(f"/api/0/buckets/{bucket_id}").status_code == 200
+    r = flask_client.delete(f"/api/0/buckets/{bucket_id}")
+    assert r.status_code == 200
     r = flask_client.post("/api/0/import", json=export)
     assert r.status_code == 200
 

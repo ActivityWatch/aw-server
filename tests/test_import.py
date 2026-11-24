@@ -269,15 +269,11 @@ def test_export_import_round_trip_keeps_bucket_data_and_name(flask_client, clean
     bucket_id = "test-import-metadata"
     cleanup.append(bucket_id)
     data = {"device_id": "abc", "$aw.sync.origin": "laptop"}
-    r = flask_client.post(
-        f"/api/0/buckets/{bucket_id}",
-        json={"type": "test", "client": "test", "hostname": "test", "data": data},
+    # REST create has no name field, so create through the datastore.
+    flask_client.application.api.db.create_bucket(
+        bucket_id, "test", "test", "test", name="My bucket", data=data
     )
-    assert r.status_code == 200
     export = flask_client.get(f"/api/0/buckets/{bucket_id}/export").json
-    exported = export["buckets"][bucket_id]
-    assert exported["data"] == data
-    exported["name"] = "My bucket"
 
     r = flask_client.delete(f"/api/0/buckets/{bucket_id}")
     assert r.status_code == 200

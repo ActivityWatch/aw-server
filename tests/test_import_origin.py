@@ -110,6 +110,31 @@ def test_scheme_mismatch_and_malformed_origin_are_rejected(client, origin):
     assert "test-origin-bad" not in _bucket_ids(client)
 
 
+def test_tls_proxy_public_origin_is_accepted_once_configured():
+    # A reverse proxy that terminates TLS forwards plain HTTP with a local Host
+    # (the server's host check refuses others), so the browser's public Origin
+    # never matches the request. The documented fix is to list the public origin
+    # in cors_origins; forwarded headers stay untrusted.
+    def upload(client):
+        return _upload(
+            client,
+            "test-origin-proxy",
+            origin="https://aw.example.com",
+            host="localhost:5600",
+        )
+
+    unconfigured = AWFlask(_HOST, testing=True).test_client()
+    assert upload(unconfigured).status_code == 403
+
+    app = AWFlask(_HOST, testing=True, cors_origins=["https://aw.example.com"])
+    client = app.test_client()
+    r = upload(client)
+    assert r.status_code == 200, r.json
+    client.delete(
+        "/api/0/buckets/test-origin-proxy", headers={"Host": "localhost:5600"}
+    )
+
+
 def test_wildcard_cors_origin_allows_import():
     # Flask-CORS treats "*" as every origin; an owner who opted into that
     # should not then be refused by the import check.

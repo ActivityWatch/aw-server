@@ -512,7 +512,16 @@ class BucketExportCsvResource(Resource):
 
 
 def _import_origin_allowed(origin: str) -> bool:
-    """Same-origin (the bundled web UI) or an origin the user configured."""
+    """Same-origin (the bundled web UI) or an origin the user configured.
+
+    Same-origin means scheme, host and port all match the request, as browsers
+    define an origin. Behind a reverse proxy (for example one terminating TLS),
+    the browser sends the public ``Origin: https://aw.example.com`` while the
+    request arrives over plain HTTP with a local Host (the server's host check
+    refuses others), so the import is refused. Add the public origin to
+    ``cors_origins``. Forwarded headers are deliberately not trusted here: any
+    client can set them.
+    """
     try:
         parts = urlsplit(origin)
     except ValueError:

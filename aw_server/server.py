@@ -122,6 +122,9 @@ def static_js(path):
 
 
 def _config_cors(cors_origins: List[str], testing: bool):
+    # Work on a copy: appending the defaults below to the caller's list would
+    # leak them into the next app built from the same list.
+    cors_origins = list(cors_origins)
     if cors_origins:
         logger.warning(
             "Running with additional allowed CORS origins specified through config "
@@ -135,6 +138,8 @@ def _config_cors(cors_origins: List[str], testing: bool):
     # Capture user-configured origins before appending the built-in wildcard.
     # extension_cors uses this list to exempt explicit opt-ins from scope narrowing.
     user_origins = list(cors_origins)
+    # /api/0/import checks Origin against these itself (see rest.py).
+    current_app.config["AW_CORS_USER_ORIGINS"] = user_origins
 
     # TODO: This could probably be more specific
     #       See https://github.com/ActivityWatch/aw-server/pull/43#issuecomment-386888769

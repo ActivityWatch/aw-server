@@ -322,9 +322,10 @@ def test_import_non_object_event_rejected(flask_client, cleanup, event):
 
 
 @pytest.mark.parametrize("timestamp", [5, 5.0, True, [], {}])
-def test_import_numeric_event_timestamp_rejected(flask_client, timestamp):
+def test_import_numeric_event_timestamp_rejected(flask_client, cleanup, timestamp):
     """Non-string timestamps in imported events must return 400, not 500."""
     bucket_id = "test-import-numeric-ts"
+    cleanup.append(bucket_id)
     r = flask_client.post(
         "/api/0/import",
         json={
@@ -341,3 +342,33 @@ def test_import_numeric_event_timestamp_rejected(flask_client, timestamp):
     assert "timestamp" in r.json["message"]
     # Rollback must have removed the partially-created bucket
     assert bucket_id not in _buckets(flask_client)
+
+
+def test_import_all_accepts_datetime_event_timestamp(app, cleanup):
+    """In-process callers may pass a datetime timestamp, as Event() accepts.
+
+    The JSON endpoint cannot carry a datetime, so only the other JSON types
+    are a client error. Rejecting datetimes here broke import_all callers that
+    pass event objects now that import_bucket validates the Python API too.
+    """
+    bucket_id = "test-import-datetime-ts"
+    cleanup.append(bucket_id)
+    timestamp = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    app.api.import_all(
+        {
+            bucket_id: {
+                "id": bucket_id,
+                "type": "test",
+                "client": "test",
+                "hostname": "test",
+                "created": timestamp,
+                "events": [{"timestamp": timestamp, "duration": 1, "data": {}}],
+            }
+        }
+    )
+    events = app.api.get_events(bucket_id)
+    assert len(events) == 1
+    stored = events[0]["timestamp"]
+    if isinstance(stored, str):
+        stored = datetime.fromisoformat(stored.replace("Z", "+00:00"))
+    assert stored.timestamp() == timestamp.timestamp()

@@ -314,9 +314,13 @@ class ServerAPI:
                 if "id" in event:
                     del event["id"]
                 ts = event.get("timestamp")
-                if ts is not None and not isinstance(ts, str):
+                # datetime is what this Python-level API accepts for `created`
+                # and what Event(**e) parses natively; JSON payloads cannot
+                # carry one, so only the other JSON types are a client error.
+                if ts is not None and not isinstance(ts, (str, datetime)):
                     raise ValueError(
-                        f"Event timestamp must be a string or null, not {type(ts).__name__!r}"
+                        "Event timestamp must be a string, datetime or null, "
+                        f"not {type(ts).__name__!r}"
                     )
             else:
                 raise TypeError("Event must be an object")

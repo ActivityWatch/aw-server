@@ -1185,14 +1185,14 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "werkzeug"
-version = "2.3.8"
+version = "3.0.6"
 description = "The comprehensive WSGI web application library."
 optional = false
 python-versions = ">=3.8"
 groups = ["main", "dev"]
 files = [
-    {file = "werkzeug-2.3.8-py3-none-any.whl", hash = "sha256:bba1f19f8ec89d4d607a3bd62f1904bd2e609472d93cd85e9d4e178f472c3748"},
-    {file = "werkzeug-2.3.8.tar.gz", hash = "sha256:554b257c74bbeb7a0d254160a4f8ffe185243f52a52035060b761ca62d977f03"},
+    {file = "werkzeug-3.0.6-py3-none-any.whl", hash = "sha256:1bc0c2310d2fbb07b1dd1105eba2f7af72f322e1e455f2f93c993bee8c8a5f17"},
+    {file = "werkzeug-3.0.6.tar.gz", hash = "sha256:a8dd59d4de28ca70471a34cba79bed5f7ef2e036a76b3ab0835474246eb41f8d"},
 ]
 
 [package.dependencies]
@@ -1225,4 +1225,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "40ecafd1bf76c28ee294f417a4c5897adcb5bc7de93997bebb3ca69682a00cbe"
+content-hash = "2f0b19ed88a6458d9e71ebf5c306c0f124bd46e1c0f3ca0b34cf985188da346e"

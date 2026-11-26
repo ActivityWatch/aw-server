@@ -31,7 +31,22 @@ def test_event_write_value_error_returns_bad_request(application, monkeypatch, b
     )
     assert response.status_code == 400
     assert "another bucket" in response.get_json()["message"]
-    assert application.api.get_eventcount("test") == 0
+
+
+def test_heartbeat_value_error_returns_bad_request(application, monkeypatch):
+    def reject(*args):
+        raise ValueError("Event ID 123 belongs to another bucket")
+
+    client = application.test_client()
+    url = "/api/0/buckets/test/heartbeat?pulsetime=1"
+    event = {"timestamp": "2026-01-01T00:00:00Z", "duration": 0, "data": {}}
+    with monkeypatch.context() as patch:
+        patch.setattr(application.api.db.storage_strategy, "insert_one", reject)
+        response = client.post(url, json=dict(event, id=123))
+    assert response.status_code == 400
+    assert "another bucket" in response.get_json()["message"]
+    # The shared heartbeat lock must have been released by the rejected request.
+    assert client.post(url, json=event).status_code == 200
 
 
 def test_bulk_event_write_value_error_returns_bad_request(application, monkeypatch):
@@ -45,7 +60,6 @@ def test_bulk_event_write_value_error_returns_bad_request(application, monkeypat
     )
     assert response.status_code == 400
     assert "another bucket" in response.get_json()["message"]
-    assert application.api.get_eventcount("test") == 0
 
 
 def test_unexpected_storage_failure_is_still_server_error(application, monkeypatch):

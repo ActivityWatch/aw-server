@@ -425,6 +425,8 @@ class HeartbeatResource(Resource):
             return {"message": "Server busy, try again later"}, 503
         try:
             event = current_app.api.heartbeat(bucket_id, heartbeat, pulsetime)
+        except ValueError as e:
+            raise BadRequest("InvalidEvent", f"Invalid event: {e}") from e
         finally:
             self.lock.release()
         return event.to_json_dict(), 200

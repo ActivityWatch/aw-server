@@ -155,6 +155,9 @@ def _parse_event(data) -> Event:
     """Construct an Event from client JSON, raising BadRequest on malformed input."""
     if not isinstance(data, dict):
         raise BadRequest("InvalidEvent", "Event must be a JSON object")
+    timestamp = data.get("timestamp")
+    if timestamp is not None and not isinstance(timestamp, str):
+        raise BadRequest("InvalidEvent", "Event timestamp must be a string or null")
     try:
         return Event(**data)
     except (ValueError, TypeError) as e:
@@ -310,7 +313,10 @@ class EventsResource(Resource):
         else:
             raise BadRequest("Invalid POST data", "")
 
-        events = current_app.api.create_events(bucket_id, events)
+        try:
+            events = current_app.api.create_events(bucket_id, events)
+        except ValueError as e:
+            raise BadRequest("InvalidEvent", f"Invalid event: {e}") from e
         return [e.to_json_dict() for e in events], 200
 
 
@@ -419,6 +425,8 @@ class HeartbeatResource(Resource):
             return {"message": "Server busy, try again later"}, 503
         try:
             event = current_app.api.heartbeat(bucket_id, heartbeat, pulsetime)
+        except ValueError as e:
+            raise BadRequest("InvalidEvent", f"Invalid event: {e}") from e
         finally:
             self.lock.release()
         return event.to_json_dict(), 200

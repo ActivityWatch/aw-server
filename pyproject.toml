@@ -10,14 +10,14 @@ include = ["aw_server/static/*"]
 aw-server = "aw_server:main"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 aw-core = { git = "https://github.com/ActivityWatch/aw-core.git", rev = "4496e2eec94af4ccf04b13be38d76d8eaaa49725" }
 aw-client = "^0.5.8"
-flask = "^2.2"
+flask = "^3.1.3"
 flask-restx = "^1.0.3"
 flask-cors = "*"
 importlib-metadata = {version = "*", python = "<3.10"}
-werkzeug = ">=2.3.3,<4.0.0"
+werkzeug = ">=3.1.9,<4.0.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "*"
@@ -37,7 +37,7 @@ python_files = ["*.py",]
 
 [tool.ruff]
 # Match the minimum supported Python (tool.poetry.dependencies.python).
-target-version = "py38"
+target-version = "py39"
 
 [tool.ruff.lint]
 # Preserve the existing baseline across changes to Ruff's default rule set.
